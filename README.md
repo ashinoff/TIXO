@@ -13,9 +13,17 @@
 
 ## Запуск в Amvera
 
-Переменные окружения перечислены в `.env.example`. Подключите постоянное хранилище Amvera к `/data`. Контейнер принимает запросы на порту `3000`.
+В приложении используются следующие переменные окружения:
 
-Подробная последовательность находится в [AMVERA_DEPLOY.md](./AMVERA_DEPLOY.md).
+```env
+DATABASE_URL=postgresql://user:password@host:5432/database
+PGSSL=false
+ADMIN_PASSWORD=replace-with-a-strong-password
+SESSION_SECRET=replace-with-at-least-32-random-characters
+UPLOAD_DIR=/data/uploads
+```
+
+Подключите постоянное хранилище Amvera к `/data`. Контейнер принимает запросы на порту `3000`. Подробная последовательность находится в [AMVERA_DEPLOY.md](./AMVERA_DEPLOY.md).
 
 ## Локальная проверка
 
