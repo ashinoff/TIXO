@@ -13,6 +13,7 @@ type Product = {
   badge?: string;
   image?: string | null;
 };
+type SiteContent = Record<string, { value:string; kind:string }>;
 
 const defaultProducts: Product[] = [
   { id: 1, name: "Ещё пять минут", family: "тёплый · древесный", notes: "ваниль · сандал · бобы тонка", price: 2490, art: "twist", badge: "хит" },
@@ -67,6 +68,10 @@ export default function Home() {
   const [subscribed, setSubscribed] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [orderNumber, setOrderNumber] = useState("");
+  const [orderError, setOrderError] = useState("");
+  const [content, setContent] = useState<SiteContent>({});
+  const c = (key:string, fallback:string) => content[key]?.value || fallback;
 
   useEffect(() => {
     fetch("/api/products").then((response) => response.ok ? response.json() : Promise.reject()).then((items) => {
@@ -74,6 +79,7 @@ export default function Home() {
       setProducts(items.map((item, index) => ({ id:item.id, name:item.name, family:item.category, notes:item.notes, price:item.price, image:item.image, art:defaultProducts[index % defaultProducts.length].art })));
     }).catch(() => undefined);
   }, []);
+  useEffect(() => { fetch("/api/content").then((r) => r.ok ? r.json() : {}).then(setContent).catch(() => undefined); }, []);
 
   useEffect(() => {
     document.body.style.overflow = cartOpen || menuOpen ? "hidden" : "";
@@ -113,16 +119,20 @@ export default function Home() {
     setSubscribed(true);
   };
 
-  const handleOrder = (event: FormEvent<HTMLFormElement>) => {
+  const handleOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setOrderPlaced(true);
+    setOrderError(""); const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/orders", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ customerName:form.get("name"), phone:form.get("phone"), email:form.get("email"), address:form.get("address"), delivery:form.get("delivery"), comment:form.get("comment"), items:cartItems.map((item) => ({ productId:item.id, quantity:item.quantity })) }) });
+    const data = await response.json();
+    if (!response.ok) { setOrderError(data.error || "Не удалось отправить заказ"); return; }
+    setOrderNumber(data.orderNumber); setOrderPlaced(true); setCart({});
   };
 
   return (
     <main>
       <div className="announcement">
-        <span>Бесплатная доставка от 4 500 ₽</span>
-        <span className="announcement-note">Каждая свеча отлита вручную</span>
+        <span>{c("announcement.main", "Бесплатная доставка от 4 500 ₽")}</span>
+        <span className="announcement-note">{c("announcement.note", "Каждая свеча отлита вручную")}</span>
       </div>
 
       <header className="site-header">
@@ -156,12 +166,11 @@ export default function Home() {
         <div className="hero-copy">
           <div className="eyebrow"><span /> Сделано руками. Зажигается сердцем.</div>
           <h1>
-            Свет, который
-            <em>создаёт настроение</em>
+            {c("hero.title", "Свет, который")}
+            <em>{c("hero.emphasis", "создаёт настроение")}</em>
           </h1>
           <p className="hero-lead">
-            Скульптурные свечи и авторские ароматы для тихих вечеров,
-            долгих разговоров и дома, в который хочется возвращаться.
+            {c("hero.description", "Скульптурные свечи и авторские ароматы для тихих вечеров, долгих разговоров и дома, в который хочется возвращаться.")}
           </p>
           <div className="hero-actions">
             <a className="button button-dark" href="#catalog">Выбрать свою свечу <span>↗</span></a>
@@ -175,7 +184,7 @@ export default function Home() {
         </div>
 
         <div className="hero-visual">
-          <img src="/images/hero-candles.webp" alt="Коллекция скульптурных свечей ТИХО" fetchPriority="high" />
+          <img src={c("image.hero", "/images/hero-candles.webp")} alt="Коллекция скульптурных свечей ТИХО" fetchPriority="high" />
           <div className="hero-sticker">
             <span>new</span>
             <strong>08</strong>
@@ -239,13 +248,13 @@ export default function Home() {
 
       <section className="manifesto">
         <div className="manifesto-image">
-          <img src="/images/collection-candles.webp" alt="Пять свечей из коллекции ТИХО" loading="lazy" />
+          <img src={c("image.collection", "/images/collection-candles.webp")} alt="Пять свечей из коллекции ТИХО" loading="lazy" />
           <span>Коллекция 01 / 2026</span>
         </div>
         <div className="manifesto-copy">
           <span className="section-index light">наш манифест</span>
-          <blockquote>«Свеча — это маленькая архитектура <em>настроения</em>»</blockquote>
-          <p>Мы не торопим воск и не повторяем формы до идеальной одинаковости. В каждой свече остаётся след ручной работы — поэтому она живая.</p>
+          <blockquote>{c("manifesto.quote", "«Свеча — это маленькая архитектура настроения»")}</blockquote>
+          <p>{c("manifesto.text", "Мы не торопим воск и не повторяем формы до идеальной одинаковости. В каждой свече остаётся след ручной работы — поэтому она живая.")}</p>
           <div className="manifesto-facts">
             <div><strong>7</strong><span>этапов<br />ручной работы</span></div>
             <div><strong>48ч</strong><span>на полное<br />застывание</span></div>
@@ -296,21 +305,21 @@ export default function Home() {
           <a className="button button-outline" href="#delivery">Собрать подарок <span>↗</span></a>
         </div>
         <div className="gift-visual">
-          <img src="/images/collection-candles.webp" alt="Подарочная коллекция ароматических свечей" loading="lazy" />
+          <img src={c("image.gift", "/images/collection-candles.webp")} alt="Подарочная коллекция ароматических свечей" loading="lazy" />
           <div className="gift-label"><span>от</span><strong>4 900</strong><small>₽</small></div>
         </div>
       </section>
 
       <section className="about-section" id="about">
         <div className="about-image">
-          <img src="/images/workshop-candle-making.webp" alt="Ручная заливка соевого воска в мастерской ТИХО" loading="lazy" />
+          <img src={c("image.about", "/images/workshop-candle-making.webp")} alt="Ручная заливка соевого воска в мастерской ТИХО" loading="lazy" />
           <span className="vertical-note">Сочи · маленькая мастерская · большие планы</span>
         </div>
         <div className="about-copy">
           <span className="section-index">03 / о нас</span>
           <h2>Сделано <em>не фабрикой,</em><br />а человеком</h2>
-          <p className="about-lead">ТИХО началось с желания вернуть дому его главное свойство — быть местом, где можно выдохнуть.</p>
-          <p>Мы смешиваем ароматы маленькими партиями, вручную готовим формы и проверяем горение каждой новой композиции. Нам важны не скорость и тираж, а тот самый момент, когда вы зажигаете фитиль и пространство вокруг меняется.</p>
+          <p className="about-lead">{c("about.lead", "ТИХО началось с желания вернуть дому его главное свойство — быть местом, где можно выдохнуть.")}</p>
+          <p>{c("about.text", "Мы смешиваем ароматы маленькими партиями, вручную готовим формы и проверяем горение каждой новой композиции. Нам важны не скорость и тираж, а тот самый момент, когда вы зажигаете фитиль и пространство вокруг меняется.")}</p>
           <div className="signature">с теплом, команда тихо</div>
           <a className="text-link" href="#catalog">Смотреть коллекцию <span>→</span></a>
         </div>
@@ -398,9 +407,12 @@ export default function Home() {
               <form className="checkout-form" onSubmit={handleOrder}>
                 <label>Как к вам обращаться?<input type="text" name="name" placeholder="Имя" required /></label>
                 <label>Телефон<input type="tel" name="phone" placeholder="+7 999 000-00-00" required /></label>
-                <label>Город доставки<input type="text" name="city" placeholder="Например, Москва" required /></label>
-                <fieldset><legend>Как доставить?</legend><label><input type="radio" name="delivery" defaultChecked /> Пункт выдачи</label><label><input type="radio" name="delivery" /> Курьером</label></fieldset>
+                <label>Email<input type="email" name="email" placeholder="name@example.ru" required /></label>
+                <label>Адрес доставки<textarea name="address" placeholder="Город, улица, дом, квартира или удобный пункт выдачи" required /></label>
+                <fieldset><legend>Как доставить?</legend><label><input type="radio" name="delivery" value="Пункт выдачи" defaultChecked /> Пункт выдачи</label><label><input type="radio" name="delivery" value="Курьером" /> Курьером</label></fieldset>
+                <label>Комментарий<textarea name="comment" placeholder="Пожелания к заказу (необязательно)" /></label>
                 <div className="checkout-summary"><span>{cartCount} шт.</span><strong>{money(cartTotal)}</strong></div>
+                {orderError && <p className="checkout-error">{orderError}</p>}
                 <button className="button button-dark checkout-button" type="submit">Отправить заявку <span>→</span></button>
                 <p>Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности.</p>
               </form>
@@ -409,7 +421,7 @@ export default function Home() {
             <div className="order-success">
               <span>♡</span>
               <h2>Спасибо.<br /><em>Будем на связи</em></h2>
-              <p>Заявка собрана. Мы проверим детали и скоро свяжемся с вами, чтобы подтвердить доставку.</p>
+              <p>Заказ {orderNumber} принят. Мы проверим детали и скоро свяжемся с вами, чтобы подтвердить доставку.</p>
               <button className="button button-dark" onClick={() => { setOrderPlaced(false); setCheckoutOpen(false); setCartOpen(false); }}>Вернуться на сайт</button>
             </div>
           )}

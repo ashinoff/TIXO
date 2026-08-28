@@ -7,6 +7,12 @@ export type StoredProduct = {
   stock: number; published: boolean; image: string | null;
 };
 
+export type StoredOrder = {
+  id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string;
+  delivery:string; comment:string; items:Array<{ productId:number; name:string; price:number; quantity:number }>;
+  total:number; status:"new"|"in_progress"|"completed"; createdAt:string;
+};
+
 export function getPool() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
   global.tihoPool ??= new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined });
@@ -21,6 +27,16 @@ export async function ensureSchema() {
       notes TEXT NOT NULL, price INTEGER NOT NULL CHECK (price >= 0),
       stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0), published BOOLEAN NOT NULL DEFAULT FALSE,
       image TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await db.query(`CREATE TABLE IF NOT EXISTS orders (
+      id BIGSERIAL PRIMARY KEY, order_number TEXT UNIQUE, customer_name TEXT NOT NULL,
+      phone TEXT NOT NULL, email TEXT NOT NULL, address TEXT NOT NULL, delivery TEXT NOT NULL,
+      comment TEXT NOT NULL DEFAULT '', items JSONB NOT NULL, total INTEGER NOT NULL CHECK (total >= 0),
+      status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','in_progress','completed')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await db.query(`CREATE TABLE IF NOT EXISTS site_content (
+      key TEXT PRIMARY KEY, value TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'text', updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     const count = await db.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM products");
     if (count.rows[0].count === "0") {
@@ -40,4 +56,8 @@ export async function ensureSchema() {
 
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
   return { id:Number(row.id), name:String(row.name), category:String(row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null };
+}
+
+export function mapOrder(row: Record<string, unknown>): StoredOrder {
+  return { id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], createdAt:new Date(String(row.created_at)).toISOString() };
 }

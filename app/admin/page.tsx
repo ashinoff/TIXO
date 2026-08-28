@@ -1,164 +1,44 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- admin previews use local data URLs */
-
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./admin.css";
 
-type AdminProduct = {
-  id: number;
-  name: string;
-  category: string;
-  notes: string;
-  price: number;
-  stock: number;
-  published: boolean;
-  image: string | null;
-};
+type Product={id:number;name:string;category:string;notes:string;price:number;stock:number;published:boolean;image:string|null};
+type Order={id:number;orderNumber:string;customerName:string;phone:string;email:string;address:string;delivery:string;comment:string;items:Array<{productId:number;name:string;price:number;quantity:number}>;total:number;status:"new"|"in_progress"|"completed";createdAt:string};
+type Field={key:string;label:string;kind:"text"|"image";fallback:string};
+const empty:Product={id:0,name:"",category:"",notes:"",price:0,stock:0,published:false,image:null};
+const fields:Field[]=[
+ ["announcement.main","Верхняя строка — доставка","text","Бесплатная доставка от 4 500 ₽"],["announcement.note","Верхняя строка — подпись","text","Каждая свеча отлита вручную"],
+ ["hero.title","Главный заголовок","text","Свет, который"],["hero.emphasis","Акцент заголовка","text","создаёт настроение"],["hero.description","Текст первого экрана","text","Скульптурные свечи и авторские ароматы для тихих вечеров, долгих разговоров и дома, в который хочется возвращаться."],
+ ["manifesto.quote","Цитата манифеста","text","«Свеча — это маленькая архитектура настроения»"],["manifesto.text","Текст манифеста","text","Мы не торопим воск и не повторяем формы до идеальной одинаковости. В каждой свече остаётся след ручной работы — поэтому она живая."],
+ ["about.lead","О бренде — вводный текст","text","ТИХО началось с желания вернуть дому его главное свойство — быть местом, где можно выдохнуть."],["about.text","О бренде — основной текст","text","Мы смешиваем ароматы маленькими партиями, вручную готовим формы и проверяем горение каждой новой композиции."],
+ ["image.hero","Фото первого экрана","image","/images/hero-candles.webp"],["image.collection","Фото коллекции","image","/images/collection-candles.webp"],["image.gift","Фото подарков","image","/images/collection-candles.webp"],["image.about","Фото мастерской","image","/images/workshop-candle-making.webp"],
+].map(([key,label,kind,fallback])=>({key,label,kind:kind as Field["kind"],fallback}));
+const money=(v:number)=>`${v.toLocaleString("ru-RU")} ₽`;
 
-const emptyProduct: AdminProduct = { id: 0, name: "", category: "", notes: "", price: 0, stock: 0, published: false, image:null };
-const formatPrice = (price: number) => `${price.toLocaleString("ru-RU")} ₽`;
-
-export default function AdminPage() {
-  const [products, setProducts] = useState<AdminProduct[]>([]);
-  const [editing, setEditing] = useState<AdminProduct | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [query, setQuery] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  const loadProducts = async () => {
-    const response = await fetch("/api/products", { cache:"no-store" });
-    if (!response.ok) throw new Error("Не удалось загрузить каталог");
-    setProducts(await response.json());
-  };
-
-  useEffect(() => {
-    fetch("/api/admin/session").then((r) => r.json()).then(async ({ authenticated:ok }) => { setAuthenticated(ok); if (ok) await loadProducts(); }).catch(() => setAuthenticated(false));
-  }, []);
-
-  const visibleProducts = useMemo(() => products.filter((product) =>
-    `${product.name} ${product.category} ${product.notes}`.toLowerCase().includes(query.toLowerCase()),
-  ), [products, query]);
-
-  const notifySaved = () => {
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1800);
-  };
-
-  const saveProduct = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!editing) return;
-    setError("");
-    const form = new FormData();
-    for (const key of ["name","category","notes","price","stock"] as const) form.set(key, String(editing[key]));
-    form.set("published", String(editing.published)); if (imageFile) form.set("image", imageFile);
-    const response = await fetch(editing.id ? `/api/products/${editing.id}` : "/api/products", { method:editing.id ? "PATCH" : "POST", body:form });
-    const data = await response.json();
-    if (!response.ok) { setError(data.error || "Не удалось сохранить товар"); return; }
-    await loadProducts(); setEditing(null); setImageFile(null); notifySaved();
-  };
-
-  const handleImage = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !editing) return; setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setEditing({ ...editing, image: String(reader.result) });
-    reader.readAsDataURL(file);
-  };
-
-  const login = async (event:FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setError("");
-    const response = await fetch("/api/admin/login", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ password }) });
-    const data = await response.json(); if (!response.ok) { setError(data.error || "Не удалось войти"); return; }
-    setAuthenticated(true); setPassword(""); await loadProducts();
-  };
-
-  const togglePublished = async (product:AdminProduct) => {
-    const form = new FormData();
-    for (const key of ["name","category","notes","price","stock"] as const) form.set(key, String(product[key]));
-    form.set("published", String(!product.published));
-    const response = await fetch(`/api/products/${product.id}`, { method:"PATCH", body:form });
-    if (response.ok) { await loadProducts(); notifySaved(); }
-  };
-
-  if (authenticated === null) return <main className="admin-login"><div className="login-card"><span className="admin-logo">ТИХО●</span><p>Загрузка админки…</p></div></main>;
-  if (!authenticated) return <main className="admin-login"><form className="login-card" onSubmit={login}><Link className="admin-logo" href="/">ТИХО<span>●</span></Link><span className="admin-kicker">Закрытая зона</span><h1>Вход в админку</h1><p>Введите пароль, установленный в секретах приложения Amvera.</p><label>Пароль<input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} autoFocus required /></label>{error && <div className="editor-error">{error}</div>}<button className="save" type="submit">Войти</button></form></main>;
-
-  return (
-    <main className="admin-shell">
-      <aside className="admin-sidebar">
-        <Link className="admin-logo" href="/">ТИХО<span>●</span></Link>
-        <nav>
-          <a className="active" href="#products"><span>◫</span> Товары</a>
-          <a href="#orders"><span>♡</span> Заказы <i>скоро</i></a>
-          <a href="#content"><span>✦</span> Контент <i>скоро</i></a>
-          <a href="#settings"><span>⚙</span> Настройки</a>
-        </nav>
-        <div className="admin-owner"><span>НА</span><div><strong>Владелец</strong><small>Администратор</small></div></div>
-      </aside>
-
-      <section className="admin-workspace" id="products">
-        <header className="admin-header">
-          <div><span className="admin-kicker">Управление магазином</span><h1>Товары</h1></div>
-          <div className="admin-actions"><Link href="/" target="_blank">Открыть сайт ↗</Link><button onClick={() => setEditing({ ...emptyProduct })}>＋ Добавить товар</button></div>
-        </header>
-
-        <div className="admin-status admin-status-ready">
-          <div><span className="status-dot" /><p><strong>Серверное хранение</strong> Товары записываются в PostgreSQL, фотографии — на постоянный диск Amvera.</p></div>
-          <span className="status-tag">Готово для Amvera</span>
-        </div>
-
-        <div className="admin-stats">
-          <article><span>Всего товаров</span><strong>{products.length}</strong><small>{products.filter((p) => p.published).length} опубликовано</small></article>
-          <article><span>В наличии</span><strong>{products.filter((p) => p.stock > 0).length}</strong><small>{products.reduce((sum, p) => sum + p.stock, 0)} свечей</small></article>
-          <article><span>Нет в наличии</span><strong>{products.filter((p) => p.stock === 0).length}</strong><small>нужно пополнить</small></article>
-        </div>
-
-        <div className="admin-table-card">
-          <div className="table-toolbar"><label>⌕<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по каталогу" /></label><span>{visibleProducts.length} позиций</span></div>
-          <div className="admin-table-wrap">
-            <table>
-              <thead><tr><th>Товар</th><th>Цена</th><th>Остаток</th><th>Статус</th><th /></tr></thead>
-              <tbody>{visibleProducts.map((product) => (
-                <tr key={product.id}>
-                  <td><div className="product-cell"><div className="product-preview">{product.image ? <img src={product.image} alt="" /> : <span>♢</span>}</div><div><strong>{product.name}</strong><small>{product.category}</small></div></div></td>
-                  <td><strong>{formatPrice(product.price)}</strong></td>
-                  <td><span className={product.stock === 0 ? "stock-empty" : ""}>{product.stock} шт.</span></td>
-                  <td><button className={product.published ? "publish on" : "publish"} onClick={() => togglePublished(product)}><i />{product.published ? "На сайте" : "Черновик"}</button></td>
-                  <td><button className="edit-button" onClick={() => setEditing({ ...product })} aria-label={`Редактировать ${product.name}`}>•••</button></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        </div>
-
-        <section className="amvera-plan" id="settings">
-          <div><span className="admin-kicker">Архитектура</span><h2>Готово для Amvera</h2><p>Один контейнер обслуживает сайт, защищённую админку и API. PostgreSQL хранит каталог, постоянный диск — оригиналы фотографий.</p></div>
-          <ol><li><span>1</span>GitHub-репозиторий</li><li><span>2</span>Приложение Amvera</li><li><span>3</span>База и хранилище</li><li><span>4</span>Домен и HTTPS</li></ol>
-        </section>
-      </section>
-
-      {editing && <div className="editor-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditing(null); }}>
-        <form className="product-editor" onSubmit={saveProduct}>
-          <header><div><span className="admin-kicker">Карточка товара</span><h2>{editing.id ? "Редактировать" : "Новый товар"}</h2></div><button type="button" onClick={() => setEditing(null)}>×</button></header>
-          <label className="image-upload">
-            {editing.image ? <img src={editing.image} alt="Предпросмотр товара" /> : <><span>＋</span><strong>Добавить фотографию</strong><small>JPG, PNG или WebP</small></>}
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImage} />
-          </label>
-          <label>Название<input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="Например, Лимонный вечер" /></label>
-          <label>Категория<input required value={editing.category} onChange={(e) => setEditing({ ...editing, category: e.target.value })} placeholder="Цитрусовый · свежий" /></label>
-          <label>Ноты аромата<textarea required value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} placeholder="лимон · бергамот · белый чай" /></label>
-          <div className="editor-row"><label>Цена, ₽<input type="number" min="0" required value={editing.price || ""} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} /></label><label>Остаток<input type="number" min="0" required value={editing.stock} onChange={(e) => setEditing({ ...editing, stock: Number(e.target.value) })} /></label></div>
-          <label className="publish-check"><input type="checkbox" checked={editing.published} onChange={(e) => setEditing({ ...editing, published: e.target.checked })} /><span><strong>Опубликовать на сайте</strong><small>Товар станет виден покупателям</small></span></label>
-          {error && <div className="editor-error">{error}</div>}
-          <footer><button type="button" className="cancel" onClick={() => setEditing(null)}>Отмена</button><button type="submit" className="save">Сохранить товар</button></footer>
-        </form>
-      </div>}
-
-      <div className={saved ? "admin-toast show" : "admin-toast"}>Черновик сохранён ✓</div>
-    </main>
-  );
+export default function Admin(){
+ const [auth,setAuth]=useState<boolean|null>(null),[password,setPassword]=useState(""),[error,setError]=useState(""),[tab,setTab]=useState<"products"|"orders"|"content">("products");
+ const [products,setProducts]=useState<Product[]>([]),[orders,setOrders]=useState<Order[]>([]),[content,setContent]=useState<Record<string,{value:string;kind:string}>>({}),[editing,setEditing]=useState<Product|null>(null),[productImage,setProductImage]=useState<File|null>(null),[query,setQuery]=useState(""),[saved,setSaved]=useState(false);
+ const load=async()=>{const [p,o,c]=await Promise.all([fetch("/api/products",{cache:"no-store"}),fetch("/api/orders",{cache:"no-store"}),fetch("/api/content",{cache:"no-store"})]);if(p.ok)setProducts(await p.json());if(o.ok)setOrders(await o.json());if(c.ok)setContent(await c.json());};
+ useEffect(()=>{fetch("/api/admin/session").then(r=>r.json()).then(async d=>{setAuth(d.authenticated);if(d.authenticated)await load()}).catch(()=>setAuth(false))},[]);
+ const notify=()=>{setSaved(true);setTimeout(()=>setSaved(false),1600)};
+ const login=async(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const r=await fetch("/api/admin/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password})});const d=await r.json();if(!r.ok){setError(d.error);return}setAuth(true);await load()};
+ const saveProduct=async(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();if(!editing)return;const f=new FormData();(["name","category","notes","price","stock"] as const).forEach(k=>f.set(k,String(editing[k])));f.set("published",String(editing.published));if(productImage)f.set("image",productImage);const r=await fetch(editing.id?`/api/products/${editing.id}`:"/api/products",{method:editing.id?"PATCH":"POST",body:f});if(!r.ok){setError((await r.json()).error);return}setEditing(null);setProductImage(null);await load();notify()};
+ const status=async(id:number,value:Order["status"])=>{const r=await fetch(`/api/orders/${id}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status:value})});if(r.ok){await load();notify()}};
+ const remove=async(o:Order)=>{if(!confirm(`Удалить заказ ${o.orderNumber}?`))return;const r=await fetch(`/api/orders/${o.id}`,{method:"DELETE"});if(r.ok){await load();notify()}};
+ const saveContent=async(field:Field,value:string,file?:File)=>{const f=new FormData();f.set("key",field.key);f.set("kind",field.kind);f.set("value",value);if(file)f.set("image",file);const r=await fetch("/api/content",{method:"PATCH",body:f});if(r.ok){await load();notify()}};
+ const filtered=useMemo(()=>products.filter(p=>`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase())),[products,query]);
+ const active=orders.filter(o=>o.status!=="completed"),done=orders.filter(o=>o.status==="completed");
+ if(auth===null)return <main className="admin-login"><div className="login-card">Загрузка…</div></main>;
+ if(!auth)return <main className="admin-login"><form className="login-card" onSubmit={login}><Link className="admin-logo" href="/">ТИХО<span>●</span></Link><span className="admin-kicker">Закрытая зона</span><h1>Вход в админку</h1><label>Пароль<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoFocus/></label>{error&&<div className="editor-error">{error}</div>}<button className="save">Войти</button></form></main>;
+ return <main className="admin-shell"><aside className="admin-sidebar"><Link className="admin-logo" href="/">ТИХО<span>●</span></Link><nav><button className={tab==="products"?"active":""} onClick={()=>setTab("products")}><span>◫</span>Товары</button><button className={tab==="orders"?"active":""} onClick={()=>setTab("orders")}><span>♡</span>Заказы <i>{orders.filter(o=>o.status==="new").length||""}</i></button><button className={tab==="content"?"active":""} onClick={()=>setTab("content")}><span>✦</span>Контент</button></nav><div className="admin-owner"><span>НА</span><div><strong>Владелец</strong><small>Администратор</small></div></div></aside>
+ <section className="admin-workspace"><header className="admin-header"><div><span className="admin-kicker">Управление магазином</span><h1>{tab==="products"?"Товары":tab==="orders"?"Заказы":"Контент"}</h1></div><div className="admin-actions"><Link href="/" target="_blank">Открыть сайт ↗</Link>{tab==="products"&&<button onClick={()=>setEditing({...empty})}>＋ Добавить товар</button>}</div></header>
+ {tab==="products"&&<><div className="admin-stats"><Stat label="Всего товаров" value={String(products.length)} note={`${products.filter(p=>p.published).length} опубликовано`}/><Stat label="В наличии" value={String(products.filter(p=>p.stock>0).length)} note={`${products.reduce((s,p)=>s+p.stock,0)} свечей`}/><Stat label="Нет в наличии" value={String(products.filter(p=>p.stock===0).length)} note="нужно пополнить"/></div><div className="admin-table-card"><div className="table-toolbar"><label>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Поиск по каталогу"/></label><span>{filtered.length} позиций</span></div><div className="admin-table-wrap"><table><thead><tr><th>Товар</th><th>Цена</th><th>Остаток</th><th>Статус</th><th/></tr></thead><tbody>{filtered.map(p=><tr key={p.id}><td><div className="product-cell"><div className="product-preview">{p.image?<img src={p.image} alt=""/>:<span>♢</span>}</div><div><strong>{p.name}</strong><small>{p.category}</small></div></div></td><td>{money(p.price)}</td><td>{p.stock} шт.</td><td>{p.published?"На сайте":"Черновик"}</td><td><button className="edit-button" onClick={()=>setEditing({...p})}>•••</button></td></tr>)}</tbody></table></div></div></>}
+ {tab==="orders"&&<><div className="admin-stats order-stats"><Stat label="Все заказы" value={String(orders.length)} note={`${orders.filter(o=>o.status==="new").length} новых`}/><Stat label="В процессе" value={money(active.reduce((s,o)=>s+o.total,0))} note={`${active.length} заказов`}/><Stat label="Выполнено" value={money(done.reduce((s,o)=>s+o.total,0))} note={`${done.length} заказов`}/></div><div className="orders-list">{orders.length===0?<div className="empty-admin">Заказов пока нет</div>:orders.map(o=><article className="order-card" key={o.id}><header><div><strong>{o.orderNumber}</strong><span>{new Date(o.createdAt).toLocaleString("ru-RU")}</span></div><strong>{money(o.total)}</strong></header><div className="order-grid"><div><b>{o.customerName}</b><a href={`tel:${o.phone}`}>{o.phone}</a><a href={`mailto:${o.email}`}>{o.email}</a><p>{o.address}</p><small>{o.delivery}{o.comment?` · ${o.comment}`:""}</small></div><div className="order-items">{o.items.map(i=><p key={`${o.id}-${i.productId}`}><span>{i.name} × {i.quantity}</span><b>{money(i.price*i.quantity)}</b></p>)}</div></div><footer><select value={o.status} onChange={e=>status(o.id,e.target.value as Order["status"])}><option value="new">Новый</option><option value="in_progress">В процессе</option><option value="completed">Выполнен</option></select><button className="delete-order" onClick={()=>remove(o)}>Удалить</button></footer></article>)}</div></>}
+ {tab==="content"&&<div className="content-grid">{fields.map(f=><Content key={f.key} field={f} value={content[f.key]?.value||f.fallback} save={saveContent}/>)}</div>}
+ </section>
+ {editing&&<div className="editor-backdrop"><form className="product-editor" onSubmit={saveProduct}><header><div><span className="admin-kicker">Карточка товара</span><h2>{editing.id?"Редактировать":"Новый товар"}</h2></div><button type="button" onClick={()=>setEditing(null)}>×</button></header><label className="image-upload">{editing.image?<img src={editing.image} alt=""/>:<><span>＋</span><strong>Добавить фотографию</strong></>}<input type="file" accept="image/*" onChange={e=>setProductImage(e.target.files?.[0]||null)}/></label><label>Название<input required value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})}/></label><label>Категория<input required value={editing.category} onChange={e=>setEditing({...editing,category:e.target.value})}/></label><label>Ноты<textarea required value={editing.notes} onChange={e=>setEditing({...editing,notes:e.target.value})}/></label><div className="editor-row"><label>Цена, ₽<input type="number" min="0" required value={editing.price||""} onChange={e=>setEditing({...editing,price:Number(e.target.value)})}/></label><label>Остаток<input type="number" min="0" required value={editing.stock} onChange={e=>setEditing({...editing,stock:Number(e.target.value)})}/></label></div><label className="publish-check"><input type="checkbox" checked={editing.published} onChange={e=>setEditing({...editing,published:e.target.checked})}/><span><strong>Опубликовать на сайте</strong></span></label><footer><button type="button" className="cancel" onClick={()=>setEditing(null)}>Отмена</button><button className="save">Сохранить товар</button></footer></form></div>}<div className={saved?"admin-toast show":"admin-toast"}>Сохранено ✓</div></main>;
 }
+function Stat({label,value,note}:{label:string;value:string;note:string}){return <article><span>{label}</span><strong>{value}</strong><small>{note}</small></article>}
+function Content({field,value,save}:{field:Field;value:string;save:(f:Field,v:string,file?:File)=>void}){const [draft,setDraft]=useState(value),[file,setFile]=useState<File>();return <article className="content-card"><span className="admin-kicker">{field.kind==="image"?"Изображение":"Текст"}</span><h3>{field.label}</h3>{field.kind==="image"?<><img src={file?URL.createObjectURL(file):value} alt=""/><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0])}/></>:<textarea value={draft} onChange={e=>setDraft(e.target.value)}/>}<button onClick={()=>save(field,draft,file)}>Сохранить</button></article>}
