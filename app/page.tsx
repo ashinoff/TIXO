@@ -46,6 +46,7 @@ const defaultCategories:Category[] = [
 ];
 
 const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
+const harmony:Category={id:0,name:"Гармония",slug:"harmony",mood:"Баланс внутри",description:"Спокойное состояние без крайностей: мягкий свет, ровное дыхание и ароматы, которые не спорят с пространством, а собирают его воедино.",notes:["баланс","уют","тишина"],paper:"#fbf8ef",ink:"#211d1a",accent:"#6c1637",soft:"#f2ecdb"};
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>(defaultProducts);
@@ -84,9 +85,10 @@ export default function Home() {
   );
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const scent = categories.find((profile) => profile.slug === activeScent);
+  const selectedScent = categories.find((profile) => profile.slug === activeScent);
+  const scent = selectedScent ?? harmony;
   const visibleProducts=useMemo(()=>activeScent?[...products].sort((a,b)=>Number(b.categorySlug===activeScent)-Number(a.categorySlug===activeScent)):products,[products,activeScent]);
-  const themeStyle=scent?({"--paper":scent.paper,"--cream":scent.soft,"--ink":scent.ink,"--wine":scent.accent,"--apricot":scent.accent,"--sage":scent.soft,"--line":`${scent.ink}2b`} as CSSProperties):undefined;
+  const themeStyle=selectedScent?({"--paper":scent.paper,"--cream":scent.soft,"--ink":scent.ink,"--wine":scent.accent,"--apricot":scent.accent,"--sage":scent.soft,"--line":`${scent.ink}2b`} as CSSProperties):undefined;
 
   const addToCart = (product: Product) => {
     setCart((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }));
@@ -123,7 +125,8 @@ export default function Home() {
   };
 
   return (
-    <main className={scent?"mood-active":""} style={themeStyle}>
+    <main className={selectedScent?"mood-active":""} style={themeStyle}>
+      <div className="mood-magic" key={activeScent||"harmony"} aria-hidden="true"><i/><i/><i/></div>
       <div className="announcement">
         <span>{c("announcement.main", "Бесплатная доставка от 4 500 ₽")}</span>
         <span className="announcement-note">{c("announcement.note", "Каждая свеча отлита вручную")}</span>
@@ -202,10 +205,10 @@ export default function Home() {
       <section className={`scent-section scent-${activeScent||"default"}`} id="scents">
         <div className="scent-header"><span className="section-index">01 / настроение</span><h2>Как вы хотите <em>себя чувствовать?</em></h2></div>
         <div className="scent-tabs" role="tablist" aria-label="Выберите настроение">
-          <button className={!activeScent?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent("")}>Как сейчас</button>
+          <button className={!activeScent?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent("")}>Гармония</button>
           {categories.map(profile=><button key={profile.id} className={activeScent===profile.slug?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent(profile.slug)}>{profile.name}</button>)}
         </div>
-        {scent&&<div className="scent-content"><div className="scent-orbit" aria-hidden="true"><div className="orbit-ring ring-one"/><div className="orbit-ring ring-two"/><span>тихо<br/>внутри</span></div><div className="scent-description"><span>ваше настроение</span><h3>{scent.mood}</h3><p>{scent.description}</p><div className="note-list">{scent.notes.map((note,index)=><span key={note}><b>0{index+1}</b>{note}</span>)}</div><a className="text-link" href="#catalog">Показать свечи <span>→</span></a></div></div>}
+        <div className="scent-content" key={scent.slug}><div className="mood-aura" aria-hidden="true"><i/><i/><i/><div><small>{scent.name}</small><strong>{scent.mood}</strong></div></div><div className="scent-description"><span>ваше настроение</span><h3>{scent.mood}</h3><p>{scent.description}</p><div className="note-list">{scent.notes.map((note,index)=><span key={note}><b>0{index+1}</b>{note}</span>)}</div><a className="text-link" href="#catalog">Показать свечи <span>→</span></a></div></div>
       </section>
 
       <section className="catalog-section" id="catalog">

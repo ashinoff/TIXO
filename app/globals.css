@@ -24,6 +24,7 @@ button, a { font: inherit; }
 a { color: inherit; text-decoration: none; }
 button { color: inherit; }
 main { background:var(--paper); color:var(--ink); transition:background-color .55s ease,color .55s ease; }
+.mood-magic{position:fixed;z-index:100;inset:0;pointer-events:none;overflow:hidden;animation:magicFade 1.15s ease both}.mood-magic i{position:absolute;left:50%;top:52%;width:28vmax;height:28vmax;border-radius:50%;background:var(--cream);filter:blur(18px);transform:translate(-50%,-50%) scale(.1);opacity:0;animation:magicBloom 1.05s cubic-bezier(.2,.75,.25,1) both}.mood-magic i:nth-child(2){background:var(--apricot);animation-delay:.08s}.mood-magic i:nth-child(3){background:var(--paper);animation-delay:.16s}@keyframes magicBloom{0%{opacity:.65;transform:translate(-50%,-50%) scale(.08)}55%{opacity:.35}100%{opacity:0;transform:translate(-50%,-50%) scale(5)}}@keyframes magicFade{0%,85%{visibility:visible}100%{visibility:hidden}}
 .mood-active .site-header,.mood-active .catalog-section,.mood-active .about-section,.mood-active .newsletter { transition:background-color .55s ease,color .55s ease; }
 
 .announcement {
@@ -247,6 +248,7 @@ main { background:var(--paper); color:var(--ink); transition:background-color .5
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; }
+  .mood-magic,.mood-aura>i,.scent-content{animation:none!important}.mood-magic{display:none}
 }
 
 /* Catalog */
@@ -355,6 +357,7 @@ main { background:var(--paper); color:var(--ink); transition:background-color .5
 
 /* Scent finder */
 .scent-section { --scent-a:var(--apricot); --scent-b:var(--wine); padding: clamp(90px, 10vw, 150px) 6vw; overflow: hidden; transition: background .45s ease; background: var(--cream); }
+.scent-content{animation:moodContentIn .65s cubic-bezier(.2,.7,.2,1) both}.mood-aura{position:relative;min-height:390px;display:grid;place-items:center;isolation:isolate}.mood-aura>i{position:absolute;width:58%;aspect-ratio:1;border-radius:48% 52% 57% 43%;border:1px solid color-mix(in srgb,var(--wine) 38%,transparent);animation:auraDrift 9s ease-in-out infinite}.mood-aura>i:nth-child(2){width:76%;border-color:color-mix(in srgb,var(--ink) 20%,transparent);animation-duration:13s;animation-direction:reverse}.mood-aura>i:nth-child(3){width:42%;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--apricot) 65%,white),color-mix(in srgb,var(--wine) 78%,transparent));border:0;filter:blur(2px);opacity:.75;animation-duration:7s}.mood-aura>div{position:relative;z-index:2;width:170px;aspect-ratio:1;border-radius:50%;background:color-mix(in srgb,var(--paper) 86%,transparent);backdrop-filter:blur(10px);display:grid;place-content:center;text-align:center;padding:20px;box-shadow:0 20px 70px color-mix(in srgb,var(--ink) 15%,transparent)}.mood-aura small{font-size:8px;letter-spacing:.22em;text-transform:uppercase}.mood-aura strong{margin-top:8px;font:400 23px/1.05 var(--serif)}@keyframes auraDrift{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(160deg) scale(1.08)}}@keyframes moodContentIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 .scent-fresh { --scent-a:#9cae9c; --scent-b:#32594e; background:#dfe8df; }
 .scent-floral { --scent-a:#d6abbc; --scent-b:#7d4061; background:#efe0e7; }
 .scent-deep { --scent-a:#9f705d; --scent-b:#332820; background:#d8c5b6; }
