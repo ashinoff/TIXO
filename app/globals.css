@@ -485,12 +485,17 @@ footer { padding:65px 5vw 23px; background:var(--wine); color:#fff9ed; }
 .checkout-heading h2 { margin:7px 0 0; font-family:var(--serif); font-size:42px; font-weight:400; }
 .checkout-form { padding-top:24px; }
 .checkout-form > label { display:block; margin-bottom:22px; font-size:8px; letter-spacing:.14em; text-transform:uppercase; }
-.checkout-form input[type="text"], .checkout-form input[type="tel"] { width:100%; margin-top:8px; padding:12px 0; border:0; border-bottom:1px solid var(--ink); border-radius:0; background:transparent; outline:none; font-family:var(--serif); font-size:21px; }
-.checkout-form input::placeholder { color:rgba(33,29,26,.28); }
-.checkout-form fieldset { margin:7px 0 26px; padding:18px 0; border:0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); display:flex; gap:28px; }
-.checkout-form legend { padding:0 0 15px; font-size:8px; letter-spacing:.14em; text-transform:uppercase; }
-.checkout-form fieldset label { font-family:var(--serif); font-size:16px; }
-.checkout-form input[type="radio"] { accent-color:var(--wine); }
+.checkout-form input[type="text"], .checkout-form input[type="tel"], .checkout-form input[type="email"], .checkout-form textarea { width:100%; margin-top:8px; padding:12px 0; border:0; border-bottom:1px solid var(--ink); border-radius:0; background:transparent; outline:none; font-family:var(--serif); font-size:21px; line-height:1.25; resize:none; }
+.checkout-form textarea { min-height:58px; }
+.checkout-form input::placeholder, .checkout-form textarea::placeholder { color:rgba(33,29,26,.28); }
+.checkout-form input:focus, .checkout-form textarea:focus { border-bottom-color:var(--wine); }
+.checkout-form fieldset { margin:7px 0 26px; padding:0; border:0; display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.checkout-form legend { width:100%; padding:0 0 10px; font-size:8px; letter-spacing:.14em; text-transform:uppercase; }
+.checkout-form fieldset label { position:relative; min-height:48px; padding:14px 14px 14px 40px; border:1px solid var(--line); font-family:var(--serif); font-size:15px; cursor:pointer; transition:border-color .2s,background .2s; }
+.checkout-form fieldset label::before { content:""; position:absolute; left:15px; top:50%; width:12px; height:12px; border:1px solid rgba(33,29,26,.45); border-radius:50%; transform:translateY(-50%); }
+.checkout-form fieldset label:has(input:checked) { border-color:var(--wine); background:rgba(108,22,55,.055); }
+.checkout-form fieldset label:has(input:checked)::before { border:4px solid var(--wine); }
+.checkout-form input[type="radio"] { position:absolute; opacity:0; pointer-events:none; }
 .checkout-summary { margin-bottom:20px; display:flex; justify-content:space-between; align-items:baseline; }
 .checkout-summary span { font-size:9px; letter-spacing:.13em; text-transform:uppercase; }
 .checkout-summary strong { font-family:var(--serif); font-size:32px; font-weight:400; }
