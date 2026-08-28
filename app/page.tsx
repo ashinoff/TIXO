@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- production images are pre-compressed WebP assets */
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Product = {
   id: number;
@@ -12,7 +12,9 @@ type Product = {
   art: string;
   badge?: string;
   image?: string | null;
+  categorySlug?: string | null;
 };
+type Category={id:number;name:string;slug:string;mood:string;description:string;notes:string[];paper:string;ink:string;accent:string;soft:string};
 type SiteContent = Record<string, { value:string; kind:string }>;
 
 const defaultProducts: Product[] = [
@@ -24,33 +26,21 @@ const defaultProducts: Product[] = [
   { id: 6, name: "Без спешки", family: "зелёный · сливочный", notes: "инжир · чай матча · кашемир", price: 2490, art: "knot" },
 ];
 
-const scentProfiles = [
+const defaultCategories:Category[] = [
   {
-    key: "warm",
-    label: "Тепло",
-    title: "Дом обнимает",
-    text: "Для вечера, когда хочется завернуться в плед, выключить уведомления и никуда не спешить.",
+    id:1,slug: "warm",name: "Тепло",mood: "Дом обнимает",description: "Для вечера, когда хочется завернуться в плед, выключить уведомления и никуда не спешить.",paper:"#f4ede2",ink:"#2a201b",accent:"#8a3f2d",soft:"#dec4a7",
     notes: ["ваниль", "сандал", "тонка"],
   },
   {
-    key: "fresh",
-    label: "Свежо",
-    title: "Окна настежь",
-    text: "Чистый воздух после дождя, прохладный лён и зелёные ветви. Лёгкость без сладости.",
+    id:2,slug: "fresh",name: "Свежо",mood: "Окна настежь",description: "Чистый воздух после дождя, прохладный лён и зелёные ветви. Лёгкость без сладости.",paper:"#edf4ef",ink:"#18322b",accent:"#397766",soft:"#c8ddd4",
     notes: ["ветивер", "нероли", "мох"],
   },
   {
-    key: "floral",
-    label: "Нежно",
-    title: "Цветы без повода",
-    text: "Не букет, а память о нём: прозрачные лепестки, пудровая дымка и мягкое утреннее солнце.",
+    id:3,slug: "floral",name: "Нежно",mood: "Цветы без повода",description: "Не букет, а память о нём: прозрачные лепестки, пудровая дымка и мягкое утреннее солнце.",paper:"#f7edf1",ink:"#3c2530",accent:"#a45a78",soft:"#ead0da",
     notes: ["пион", "ирис", "мускус"],
   },
   {
-    key: "deep",
-    label: "Глубоко",
-    title: "Свет после полуночи",
-    text: "Тёмное дерево, специи и едва заметный дым — камерный аромат с длинным послевкусием.",
+    id:4,slug: "deep",name: "Глубоко",mood: "Свет после полуночи",description: "Тёмное дерево, специи и едва заметный дым — камерный аромат с длинным послевкусием.",paper:"#e9e5df",ink:"#211d1a",accent:"#51463f",soft:"#c8beb1",
     notes: ["кедр", "кожа", "амбра"],
   },
 ];
@@ -63,7 +53,8 @@ export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState<Record<number, number>>({});
   const [favorites, setFavorites] = useState<number[]>([]);
-  const [activeScent, setActiveScent] = useState("warm");
+  const [categories,setCategories]=useState<Category[]>(defaultCategories);
+  const [activeScent, setActiveScent] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -76,10 +67,11 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/products").then((response) => response.ok ? response.json() : Promise.reject()).then((items) => {
       if (!Array.isArray(items) || !items.length) return;
-      setProducts(items.map((item, index) => ({ id:item.id, name:item.name, family:item.category, notes:item.notes, price:item.price, image:item.image, art:defaultProducts[index % defaultProducts.length].art })));
+      setProducts(items.map((item, index) => ({ id:item.id, name:item.name, family:item.category,categorySlug:item.categorySlug, notes:item.notes, price:item.price, image:item.image, art:defaultProducts[index % defaultProducts.length].art })));
     }).catch(() => undefined);
   }, []);
   useEffect(() => { fetch("/api/content").then((r) => r.ok ? r.json() : {}).then(setContent).catch(() => undefined); }, []);
+  useEffect(()=>{fetch("/api/categories").then(r=>r.ok?r.json():Promise.reject()).then(setCategories).catch(()=>undefined)},[]);
 
   useEffect(() => {
     document.body.style.overflow = cartOpen || menuOpen ? "hidden" : "";
@@ -92,7 +84,9 @@ export default function Home() {
   );
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const scent = scentProfiles.find((profile) => profile.key === activeScent) ?? scentProfiles[0];
+  const scent = categories.find((profile) => profile.slug === activeScent);
+  const visibleProducts=useMemo(()=>activeScent?[...products].sort((a,b)=>Number(b.categorySlug===activeScent)-Number(a.categorySlug===activeScent)):products,[products,activeScent]);
+  const themeStyle=scent?({"--paper":scent.paper,"--cream":scent.soft,"--ink":scent.ink,"--wine":scent.accent,"--apricot":scent.accent,"--sage":scent.soft,"--line":`${scent.ink}2b`} as CSSProperties):undefined;
 
   const addToCart = (product: Product) => {
     setCart((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }));
@@ -129,7 +123,7 @@ export default function Home() {
   };
 
   return (
-    <main>
+    <main className={scent?"mood-active":""} style={themeStyle}>
       <div className="announcement">
         <span>{c("announcement.main", "Бесплатная доставка от 4 500 ₽")}</span>
         <span className="announcement-note">{c("announcement.note", "Каждая свеча отлита вручную")}</span>
@@ -205,6 +199,15 @@ export default function Home() {
         <p>созданные медленно</p>
       </section>
 
+      <section className={`scent-section scent-${activeScent||"default"}`} id="scents">
+        <div className="scent-header"><span className="section-index">01 / настроение</span><h2>Как вы хотите <em>себя чувствовать?</em></h2></div>
+        <div className="scent-tabs" role="tablist" aria-label="Выберите настроение">
+          <button className={!activeScent?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent("")}>Как сейчас</button>
+          {categories.map(profile=><button key={profile.id} className={activeScent===profile.slug?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent(profile.slug)}>{profile.name}</button>)}
+        </div>
+        {scent&&<div className="scent-content"><div className="scent-orbit" aria-hidden="true"><div className="orbit-ring ring-one"/><div className="orbit-ring ring-two"/><span>тихо<br/>внутри</span></div><div className="scent-description"><span>ваше настроение</span><h3>{scent.mood}</h3><p>{scent.description}</p><div className="note-list">{scent.notes.map((note,index)=><span key={note}><b>0{index+1}</b>{note}</span>)}</div><a className="text-link" href="#catalog">Показать свечи <span>→</span></a></div></div>}
+      </section>
+
       <section className="catalog-section" id="catalog">
         <div className="section-heading">
           <div>
@@ -215,7 +218,7 @@ export default function Home() {
         </div>
 
         <div className="product-grid">
-          {products.map((product, index) => (
+          {visibleProducts.map((product, index) => (
             <article className="product-card" key={product.id}>
               <div className={`product-art art-${product.art}`}>
                 {product.image && <img className="product-photo" src={product.image} alt={product.name} loading="lazy" />}
@@ -259,40 +262,6 @@ export default function Home() {
             <div><strong>7</strong><span>этапов<br />ручной работы</span></div>
             <div><strong>48ч</strong><span>на полное<br />застывание</span></div>
             <div><strong>0%</strong><span>парафина<br />и фталатов</span></div>
-          </div>
-        </div>
-      </section>
-
-      <section className={`scent-section scent-${scent.key}`} id="scents">
-        <div className="scent-header">
-          <span className="section-index">02 / ароматы</span>
-          <h2>Как вы хотите <em>себя чувствовать?</em></h2>
-        </div>
-        <div className="scent-tabs" role="tablist" aria-label="Выберите настроение аромата">
-          {scentProfiles.map((profile) => (
-            <button
-              key={profile.key}
-              className={activeScent === profile.key ? "scent-tab active" : "scent-tab"}
-              onClick={() => setActiveScent(profile.key)}
-              role="tab"
-              aria-selected={activeScent === profile.key}
-            >{profile.label}</button>
-          ))}
-        </div>
-        <div className="scent-content" role="tabpanel">
-          <div className="scent-orbit" aria-hidden="true">
-            <div className="orbit-ring ring-one" />
-            <div className="orbit-ring ring-two" />
-            <span>тихо<br />внутри</span>
-          </div>
-          <div className="scent-description">
-            <span>ваше настроение</span>
-            <h3>{scent.title}</h3>
-            <p>{scent.text}</p>
-            <div className="note-list">
-              {scent.notes.map((note, index) => <span key={note}><b>0{index + 1}</b>{note}</span>)}
-            </div>
-            <a className="text-link" href="#catalog">Найти свечу <span>→</span></a>
           </div>
         </div>
       </section>

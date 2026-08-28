@@ -23,6 +23,8 @@ body {
 button, a { font: inherit; }
 a { color: inherit; text-decoration: none; }
 button { color: inherit; }
+main { background:var(--paper); color:var(--ink); transition:background-color .55s ease,color .55s ease; }
+.mood-active .site-header,.mood-active .catalog-section,.mood-active .about-section,.mood-active .newsletter { transition:background-color .55s ease,color .55s ease; }
 
 .announcement {
   min-height: 33px;
@@ -352,7 +354,7 @@ button { color: inherit; }
 .manifesto-facts span { font-size: 8px; line-height: 1.5; letter-spacing: .11em; text-transform: uppercase; color: rgba(255,249,237,.58); }
 
 /* Scent finder */
-.scent-section { --scent-a:#df8f65; --scent-b:#6c1637; padding: clamp(90px, 10vw, 150px) 6vw; overflow: hidden; transition: background .45s ease; background: #efe2d4; }
+.scent-section { --scent-a:var(--apricot); --scent-b:var(--wine); padding: clamp(90px, 10vw, 150px) 6vw; overflow: hidden; transition: background .45s ease; background: var(--cream); }
 .scent-fresh { --scent-a:#9cae9c; --scent-b:#32594e; background:#dfe8df; }
 .scent-floral { --scent-a:#d6abbc; --scent-b:#7d4061; background:#efe0e7; }
 .scent-deep { --scent-a:#9f705d; --scent-b:#332820; background:#d8c5b6; }
