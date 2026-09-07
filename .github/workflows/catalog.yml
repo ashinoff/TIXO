@@ -1,0 +1,40 @@
+name: Catalog and Amvera build
+
+on:
+  pull_request:
+  push:
+    branches: [feat/scents-and-storefront]
+
+permissions:
+  contents: read
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.5
+        env:
+          POSTGRES_DB: tixo_test
+          POSTGRES_USER: tixo_test
+          POSTGRES_PASSWORD: tixo_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tixo_test -d tixo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:catalog
+        env:
+          TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
+      - run: npm run build:amvera
+        env:
+          NEXT_TELEMETRY_DISABLED: 1

@@ -1,132 +1,102 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- production images are pre-compressed WebP assets */
 
-import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
-
-type Product = {
-  id: number;
-  name: string;
-  family: string;
-  notes: string;
-  price: number;
-  art: string;
-  badge?: string;
-  image?: string | null;
-  categorySlug?: string | null;
-};
-type Category={id:number;name:string;slug:string;mood:string;description:string;notes:string[];paper:string;ink:string;accent:string;soft:string};
-type SiteContent = Record<string, { value:string; kind:string }>;
-
-const defaultProducts: Product[] = [
-  { id: 1, name: "Ещё пять минут", family: "тёплый · древесный", notes: "ваниль · сандал · бобы тонка", price: 2490, art: "twist", badge: "хит" },
-  { id: 2, name: "Тёплый хлеб", family: "гурманский · мягкий", notes: "бриошь · кедр · морская соль", price: 2290, art: "ribbed" },
-  { id: 3, name: "После дождя", family: "свежий · зелёный", notes: "ветивер · мох · мокрый камень", price: 2590, art: "bubble", badge: "new" },
-  { id: 4, name: "Яблоко & дым", family: "пряный · дымный", notes: "печёное яблоко · кожа · камин", price: 2390, art: "arch" },
-  { id: 5, name: "Белые простыни", family: "чистый · воздушный", notes: "хлопок · нероли · белый чай", price: 2190, art: "shell" },
-  { id: 6, name: "Без спешки", family: "зелёный · сливочный", notes: "инжир · чай матча · кашемир", price: 2490, art: "knot" },
-];
-
-const defaultCategories:Category[] = [
-  {
-    id:1,slug: "warm",name: "Тепло",mood: "Дом обнимает",description: "Для вечера, когда хочется завернуться в плед, выключить уведомления и никуда не спешить.",paper:"#f4ede2",ink:"#2a201b",accent:"#8a3f2d",soft:"#dec4a7",
-    notes: ["ваниль", "сандал", "тонка"],
-  },
-  {
-    id:2,slug: "fresh",name: "Свежо",mood: "Окна настежь",description: "Чистый воздух после дождя, прохладный лён и зелёные ветви. Лёгкость без сладости.",paper:"#edf4ef",ink:"#18322b",accent:"#397766",soft:"#c8ddd4",
-    notes: ["ветивер", "нероли", "мох"],
-  },
-  {
-    id:3,slug: "floral",name: "Нежно",mood: "Цветы без повода",description: "Не букет, а память о нём: прозрачные лепестки, пудровая дымка и мягкое утреннее солнце.",paper:"#f7edf1",ink:"#3c2530",accent:"#a45a78",soft:"#ead0da",
-    notes: ["пион", "ирис", "мускус"],
-  },
-  {
-    id:4,slug: "deep",name: "Глубоко",mood: "Свет после полуночи",description: "Тёмное дерево, специи и едва заметный дым — камерный аромат с длинным послевкусием.",paper:"#e9e5df",ink:"#211d1a",accent:"#51463f",soft:"#c8beb1",
-    notes: ["кедр", "кожа", "амбра"],
-  },
-];
-
-const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
-const harmony:Category={id:0,name:"Гармония",slug:"harmony",mood:"Баланс внутри",description:"Спокойное состояние без крайностей: мягкий свет, ровное дыхание и ароматы, которые не спорят с пространством, а собирают его воедино.",notes:["баланс","уют","тишина"],paper:"#fbf8ef",ink:"#211d1a",accent:"#6c1637",soft:"#f2ecdb"};
+import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { availableVariants, cartKey, money, type CartLine, type Product, type Scent, type Variant } from "@/lib/catalog";
+import { ProductCard } from "./components/product-card";
+import { Modal } from "./components/modal";
+type SiteContent = Record<string, { value: string; kind: string }>;
 
 export default function Home() {
-  const [products, setProducts] = useState<Product[]>(defaultProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [scents, setScents] = useState<Scent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState<Record<number, number>>({});
+  const [cart, setCart] = useState<Record<string, CartLine & { product: Product; variant?: Variant }>>({});
   const [favorites, setFavorites] = useState<number[]>([]);
-  const [categories,setCategories]=useState<Category[]>(defaultCategories);
-  const [activeScent, setActiveScent] = useState("");
+  const [activeScent, setActiveScent] = useState<number | null>(null);
+  const [selections, setSelections] = useState<Record<number, number>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [orderError, setOrderError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const requestKey = useRef<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [content, setContent] = useState<SiteContent>({});
-  const c = (key:string, fallback:string) => content[key]?.value || fallback;
-
-  useEffect(() => {
-    fetch("/api/products").then((response) => response.ok ? response.json() : Promise.reject()).then((items) => {
-      if (!Array.isArray(items) || !items.length) return;
-      setProducts(items.map((item, index) => ({ id:item.id, name:item.name, family:item.category,categorySlug:item.categorySlug, notes:item.notes, price:item.price, image:item.image, art:defaultProducts[index % defaultProducts.length].art })));
-    }).catch(() => undefined);
+  const c = (key: string, fallback: string) => content[key]?.value || fallback;
+  const loadCatalog = useCallback(async () => {
+    try {
+      const responses = await Promise.all([fetch("/api/products", { cache: "no-store" }), fetch("/api/scents", { cache: "no-store" })]);
+      if (responses.some(response => !response.ok)) throw new Error();
+      const [items, profiles] = await Promise.all(responses.map(response => response.json()));
+      if (!Array.isArray(items) || !Array.isArray(profiles)) throw new Error();
+      setProducts(items); setScents(profiles.filter((scent: Scent) => scent.active)); setCatalogError("");
+    } catch { setCatalogError("Не удалось загрузить каталог. Попробуйте ещё раз."); }
+    finally { setLoading(false); }
   }, []);
-  useEffect(() => { fetch("/api/content").then((r) => r.ok ? r.json() : {}).then(setContent).catch(() => undefined); }, []);
-  useEffect(()=>{fetch("/api/categories").then(r=>r.ok?r.json():Promise.reject()).then(setCategories).catch(()=>undefined)},[]);
-
+  useEffect(() => { void loadCatalog(); fetch("/api/content").then(r => r.ok ? r.json() : {}).then(setContent).catch(() => undefined); return () => clearTimeout(toastTimer.current); }, [loadCatalog]);
   useEffect(() => {
-    document.body.style.overflow = cartOpen || menuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [cartOpen, menuOpen]);
-
-  const cartItems = useMemo(
-    () => products.filter((product) => cart[product.id]).map((product) => ({ ...product, quantity: cart[product.id] })),
-    [cart, products],
-  );
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", close); return () => document.removeEventListener("keydown", close);
+  }, [menuOpen]);
+  const cartItems = useMemo(() => Object.entries(cart).flatMap(([key, line]) => {
+    const live = products.find(p => p.id === line.productId);
+    const product = live ?? line.product;
+    const liveVariant = live?.variants.find(v => v.id === line.variantId);
+    const variant = liveVariant ?? line.variant;
+    const stock = !live ? 0 : product.hasVariants ? liveVariant?.stock ?? 0 : line.variantId === null ? product.stock : 0;
+    return [{ ...product, key, variant, variantId: line.variantId, quantity: line.quantity, availableStock: stock, image: variant?.image ?? product.image }];
+  }), [cart, products]);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const selectedScent = categories.find((profile) => profile.slug === activeScent);
-  const scent = selectedScent ?? harmony;
-  const visibleProducts=useMemo(()=>activeScent?[...products].sort((a,b)=>Number(b.categorySlug===activeScent)-Number(a.categorySlug===activeScent)):products,[products,activeScent]);
-  const themeStyle=selectedScent?({"--paper":scent.paper,"--cream":scent.soft,"--ink":scent.ink,"--wine":scent.accent,"--apricot":scent.accent,"--sage":scent.soft,"--line":`${scent.ink}2b`} as CSSProperties):undefined;
-
-  const addToCart = (product: Product) => {
-    setCart((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }));
-    setToast(`«${product.name}» уже в корзине`);
-    window.setTimeout(() => setToast(null), 2200);
+  const selectedScent = scents.find(profile => profile.id === activeScent);
+  const visibleProducts = products.filter(product => !selectedScent || availableVariants(product).some(variant => variant.scentId === selectedScent.id));
+  const scentPhoto = products.flatMap(product => availableVariants(product)).find(variant => variant.scentId === selectedScent?.id)?.image;
+  const notify = (message: string) => { clearTimeout(toastTimer.current); setToast(message); toastTimer.current = setTimeout(() => setToast(null), 2400); };
+  const addToCart = (product: Product, variant?: Variant) => {
+    const key = cartKey(product.id, variant?.id ?? null);
+    const quantity = (cart[key]?.quantity ?? 0) + 1;
+    const stock = product.hasVariants ? variant?.stock ?? 0 : product.stock;
+    if (quantity > stock || quantity > 99) { notify("В корзине уже всё доступное количество этого варианта"); return; }
+    requestKey.current = null;
+    setCart(current => ({ ...current, [key]: { productId: product.id, variantId: variant?.id ?? null, quantity, product, variant } }));
+    notify(`${product.name}${variant ? ` · ${variant.scent.name}` : ""} — в корзине`);
   };
-
-  const changeQuantity = (id: number, delta: number) => {
-    setCart((current) => {
-      const next = (current[id] ?? 0) + delta;
-      const updated = { ...current };
-      if (next <= 0) delete updated[id];
-      else updated[id] = next;
-      return updated;
+  const changeQuantity = (key: string, delta: number, stock: number) => {
+    requestKey.current = null;
+    setCart(current => {
+      const line = current[key]; if (!line) return current;
+      const quantity = line.quantity + delta; const next = { ...current };
+      if (quantity <= 0) delete next[key];
+      else if (quantity <= Math.min(stock, 99) || delta < 0) next[key] = { ...line, quantity };
+      return next;
     });
   };
-
-  const toggleFavorite = (id: number) => {
-    setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  };
-
-  const handleSubscribe = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubscribed(true);
-  };
-
+  const handleSubscribe = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSubscribed(true); };
+  const closeCart = () => { if (submittingRef.current) return; setCartOpen(false); setCheckoutOpen(false); setOrderPlaced(false); };
   const handleOrder = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setOrderError(""); const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/orders", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ customerName:form.get("name"), phone:form.get("phone"), email:form.get("email"), address:form.get("address"), delivery:form.get("delivery"), comment:form.get("comment"), items:cartItems.map((item) => ({ productId:item.id, quantity:item.quantity })) }) });
-    const data = await response.json();
-    if (!response.ok) { setOrderError(data.error || "Не удалось отправить заказ"); return; }
-    setOrderNumber(data.orderNumber); setOrderPlaced(true); setCart({});
+    event.preventDefault(); if (submittingRef.current || !cartItems.length) return;
+    submittingRef.current = true; setSubmitting(true); setOrderError("");
+    const form = new FormData(event.currentTarget);
+    requestKey.current ??= crypto.randomUUID();
+    try {
+      const response = await fetch("/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestKey: requestKey.current, customerName: form.get("name"), phone: form.get("phone"), email: form.get("email"), address: form.get("address"), delivery: form.get("delivery"), comment: form.get("comment"), items: cartItems.map(item => ({ productId: item.id, variantId: item.variantId, quantity: item.quantity })) }) });
+      const data = await response.json();
+      if (!response.ok) { setOrderError(data.error || "Не удалось отправить заказ"); if (response.status === 409) await loadCatalog(); return; }
+      setOrderNumber(data.orderNumber); setOrderPlaced(true); setCart({}); requestKey.current = null; await loadCatalog();
+    } catch { setOrderError("Связь прервалась. Нажмите «Отправить» ещё раз — повторный заказ не создастся."); }
+    finally { submittingRef.current = false; setSubmitting(false); }
   };
 
   return (
-    <main className={selectedScent?"mood-active":""} style={themeStyle}>
-      <div className="mood-magic" key={activeScent||"harmony"} aria-hidden="true"><i/><i/><i/></div>
+    <main className="storefront" style={{ "--scent-accent": selectedScent?.color ?? "#752e43" } as CSSProperties}>
       <div className="announcement">
         <span>{c("announcement.main", "Бесплатная доставка от 4 500 ₽")}</span>
         <span className="announcement-note">{c("announcement.note", "Каждая свеча отлита вручную")}</span>
@@ -154,7 +124,7 @@ export default function Home() {
           <a href="#delivery" onClick={() => setMenuOpen(false)}>Доставка</a>
         </nav>
 
-        <button className="cart-button" type="button" onClick={() => setCartOpen(true)} aria-label={`Открыть корзину, товаров: ${cartCount}`}>
+        <button className="cart-button" type="button" onClick={() => { setMenuOpen(false); setCartOpen(true); }} aria-label={`Открыть корзину, товаров: ${cartCount}`}>
           Корзина <span>{cartCount}</span>
         </button>
       </header>
@@ -164,7 +134,7 @@ export default function Home() {
           <div className="eyebrow"><span /> Сделано руками. Зажигается сердцем.</div>
           <h1>
             {c("hero.title", "Свет, который")}
-            <em>{c("hero.emphasis", "создаёт настроение")}</em>
+            <em>{c("hero.emphasis", "принимает форму")}</em>
           </h1>
           <p className="hero-lead">
             {c("hero.description", "Скульптурные свечи и авторские ароматы для тихих вечеров, долгих разговоров и дома, в который хочется возвращаться.")}
@@ -182,11 +152,7 @@ export default function Home() {
 
         <div className="hero-visual">
           <img src={c("image.hero", "/images/hero-candles.webp")} alt="Коллекция скульптурных свечей ТИХО" fetchPriority="high" />
-          <div className="hero-sticker">
-            <span>new</span>
-            <strong>08</strong>
-            <small>летняя<br />коллекция</small>
-          </div>
+          <a className="hero-sticker" href="#scents"><span>ваш аромат</span><strong>ваш</strong><small>цвет</small></a>
           <div className="hero-caption">
             <span>01</span>
             <p><strong>Тёплый свет.</strong><br />Умиротворяющий аромат.</p>
@@ -202,53 +168,28 @@ export default function Home() {
         <p>созданные медленно</p>
       </section>
 
-      <section className={`scent-section scent-${activeScent||"default"}`} id="scents">
-        <div className="scent-header"><span className="section-index">01 / настроение</span><h2>Как вы хотите <em>себя чувствовать?</em></h2></div>
-        <div className="scent-tabs" role="tablist" aria-label="Выберите настроение">
-          <button className={!activeScent?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent("")}>Гармония</button>
-          {categories.map(profile=><button key={profile.id} className={activeScent===profile.slug?"scent-tab active":"scent-tab"} onClick={()=>setActiveScent(profile.slug)}>{profile.name}</button>)}
+      <section className="scent-section" id="scents">
+        <div className="scent-header"><span className="section-index">01 / библиотека ароматов</span><h2>У тишины <em>есть свой цвет.</em></h2><p>Выберите аромат, затем форму свечи. Каждый аромат сохраняет свой цвет во всей коллекции.</p></div>
+        <div className="scent-tabs" role="group" aria-label="Фильтр по аромату">
+          <button className={!selectedScent ? "scent-tab active" : "scent-tab"} aria-pressed={!selectedScent} onClick={() => { setActiveScent(null); setSelections({}); }}>Все ароматы</button>
+          {scents.map(profile => <button key={profile.id} className={selectedScent?.id === profile.id ? "scent-tab active" : "scent-tab"} aria-pressed={selectedScent?.id === profile.id} onClick={() => { setActiveScent(profile.id); setSelections({}); }}><i style={{ background: profile.color }} />{profile.name}</button>)}
         </div>
-        <div className="scent-content" key={scent.slug}><div className="mood-aura" aria-hidden="true"><i/><i/><i/><div><small>{scent.name}</small><strong>{scent.mood}</strong></div></div><div className="scent-description"><span>ваше настроение</span><h3>{scent.mood}</h3><p>{scent.description}</p><div className="note-list">{scent.notes.map((note,index)=><span key={note}><b>0{index+1}</b>{note}</span>)}</div><a className="text-link" href="#catalog">Показать свечи <span>→</span></a></div></div>
+        <div className="scent-story" key={selectedScent?.id ?? "all"}>
+          <div className="scent-story-photo"><img src={scentPhoto || c("image.collection", "/images/collection-candles.webp")} alt={selectedScent ? `Свеча с ароматом ${selectedScent.name}` : "Коллекция свечей ТИХО"} loading="lazy" /></div>
+          <div className="scent-description"><span>{selectedScent ? "аромат коллекции" : "форма. цвет. аромат."}</span><h3>{selectedScent?.name ?? "Ваша свеча. Во всех оттенках."}</h3><p>{selectedScent?.description || "Скульптурный объект днём, мягкий свет вечером. Выберите форму, которая останется с вами, и аромат, к которому захочется возвращаться."}</p>
+            {selectedScent && <div className="scent-color-label"><i style={{ background: selectedScent.color }} /><span>{selectedScent.colorName}</span></div>}
+            <div className="note-list">{(selectedScent?.notes ?? []).map((note, index) => <span key={`${note}-${index}`}><b>{String(index + 1).padStart(2, "0")}</b>{note}</span>)}</div><a className="text-link" href="#catalog">Выбрать форму <span>↗</span></a>
+          </div>
+        </div>
       </section>
 
       <section className="catalog-section" id="catalog">
-        <div className="section-heading">
-          <div>
-            <span className="section-index">01 / каталог</span>
-            <h2>Наши <em>любимчики</em></h2>
-          </div>
-          <p>У каждой свечи свой характер. Выбирайте по настроению — аромат раскроется постепенно и останется с вами надолго.</p>
-        </div>
-
+        <div className="section-heading"><div><span className="section-index">02 / коллекция</span><h2>Найдите <em>свою форму</em></h2></div><p>Одна форма — разные оттенки. Нажмите на цвет в карточке, чтобы выбрать аромат свечи.</p></div>
+        <div className="catalog-caption"><span>{selectedScent ? selectedScent.name : "Вся коллекция"}</span><span>{loading ? "Загружаем коллекцию…" : `${visibleProducts.length} форм`}</span></div>
+        {catalogError && <div className="catalog-notice" role="alert">{catalogError}<button className="text-link" onClick={() => { setLoading(true); void loadCatalog(); }}>Повторить</button></div>}
+        {!loading && !catalogError && visibleProducts.length === 0 && <div className="catalog-notice">{selectedScent ? "Формы с этим ароматом пока готовятся. Посмотрите другие композиции." : "Новая коллекция скоро появится."}{selectedScent && <button className="text-link" onClick={() => setActiveScent(null)}>Все формы</button>}</div>}
         <div className="product-grid">
-          {visibleProducts.map((product, index) => (
-            <article className="product-card" key={product.id}>
-              <div className={`product-art art-${product.art}`}>
-                {product.image && <img className="product-photo" src={product.image} alt={product.name} loading="lazy" />}
-                <span className="art-number">0{index + 1}</span>
-                {product.badge && <span className="product-badge">{product.badge}</span>}
-                <button
-                  className={favorites.includes(product.id) ? "favorite favorite-active" : "favorite"}
-                  onClick={() => toggleFavorite(product.id)}
-                  aria-label={favorites.includes(product.id) ? `Убрать ${product.name} из избранного` : `Добавить ${product.name} в избранное`}
-                  aria-pressed={favorites.includes(product.id)}
-                >♡</button>
-                <div className="wax-form"><i /><b /></div>
-                <span className="art-shadow" />
-              </div>
-              <div className="product-info">
-                <div className="product-topline">
-                  <h3>{product.name}</h3>
-                  <strong>{money(product.price)}</strong>
-                </div>
-                <p className="product-family">{product.family}</p>
-                <p className="product-notes">{product.notes}</p>
-                <button className="add-button" onClick={() => addToCart(product)}>
-                  Добавить в корзину <span>＋</span>
-                </button>
-              </div>
-            </article>
-          ))}
+          {visibleProducts.map((product, index) => <ProductCard key={product.id} product={product} index={index} scentId={selections[product.id] ?? selectedScent?.id} favorite={favorites.includes(product.id)} onSelect={id => setSelections(current => ({ ...current, [product.id]: id }))} onFavorite={() => setFavorites(current => current.includes(product.id) ? current.filter(id => id !== product.id) : [...current, product.id])} onAdd={variant => addToCart(product, variant)} />)}
         </div>
       </section>
 
@@ -344,18 +285,18 @@ export default function Home() {
         <div className="footer-bottom"><span>© 2026 ТИХО</span><span>Политика конфиденциальности</span><span>* Instagram принадлежит Meta, признанной экстремистской организацией в РФ</span></div>
       </footer>
 
-      <div className={cartOpen ? "cart-overlay visible" : "cart-overlay"} onClick={() => { setCartOpen(false); setCheckoutOpen(false); }} />
-      <aside className={cartOpen ? "cart-drawer cart-open" : "cart-drawer"} aria-hidden={!cartOpen} aria-label="Корзина">
-        <div className="cart-header"><div><span>ваш выбор</span><h2>Корзина <em>({cartCount})</em></h2></div><button onClick={() => { setCartOpen(false); setCheckoutOpen(false); }} aria-label="Закрыть корзину">×</button></div>
+      {cartOpen && <Modal className="cart-drawer cart-open" label="Корзина" onClose={closeCart}>
+        <div inert={checkoutOpen || undefined}>
+        <div className="cart-header"><div><span>ваш выбор</span><h2>Корзина <em>({cartCount})</em></h2></div><button onClick={closeCart} aria-label="Закрыть корзину">×</button></div>
         {cartItems.length === 0 ? (
-          <div className="empty-cart"><div className="empty-flame">♢</div><h3>Здесь пока тихо</h3><p>Добавьте свечу, которая совпала с вашим настроением.</p><button className="button button-dark" onClick={() => setCartOpen(false)}>Перейти в каталог</button></div>
+          <div className="empty-cart"><div className="empty-flame">♢</div><h3>Здесь пока тихо</h3><p>Выберите форму и любимый аромат.</p><button className="button button-dark" onClick={() => setCartOpen(false)}>Перейти в каталог</button></div>
         ) : (
           <>
             <div className="cart-items">
               {cartItems.map((item) => (
-                <article className="cart-item" key={item.id}>
-                  <div className={`cart-thumb art-${item.art}`}><div className="wax-form"><i /></div></div>
-                  <div className="cart-item-copy"><h3>{item.name}</h3><p>{item.notes}</p><div className="quantity"><button onClick={() => changeQuantity(item.id, -1)} aria-label={`Уменьшить количество ${item.name}`}>−</button><span>{item.quantity}</span><button onClick={() => changeQuantity(item.id, 1)} aria-label={`Увеличить количество ${item.name}`}>＋</button></div></div>
+                <article className="cart-item" key={item.key}>
+                  <div className="cart-thumb">{item.image && <img src={item.image} alt={item.name} />}</div>
+                  <div className="cart-item-copy"><h3>{item.name}</h3><p>{item.variant ? `${item.variant.scent.name} · ${item.variant.scent.colorName}` : item.notes}</p>{item.quantity > item.availableStock && <p className="stock-error">Осталось {item.availableStock} шт.</p>}<div className="quantity"><button onClick={() => changeQuantity(item.key, -1, item.availableStock)} aria-label={`Уменьшить количество ${item.name}`}>−</button><span>{item.quantity}</span><button disabled={item.quantity >= Math.min(item.availableStock, 99)} onClick={() => changeQuantity(item.key, 1, item.availableStock)} aria-label={`Увеличить количество ${item.name}`}>＋</button></div></div>
                   <strong>{money(item.price * item.quantity)}</strong>
                 </article>
               ))}
@@ -363,31 +304,32 @@ export default function Home() {
             <div className="cart-footer">
               <div className="cart-total"><span>Итого</span><strong>{money(cartTotal)}</strong></div>
               <p>{cartTotal >= 4500 ? "Доставка будет бесплатной ♡" : `До бесплатной доставки ещё ${money(4500 - cartTotal)}`}</p>
-              <button className="button button-dark checkout-button" onClick={() => setCheckoutOpen(true)}>Перейти к оформлению <span>→</span></button>
+              <button className="button button-dark checkout-button" disabled={cartItems.some(item => item.quantity > item.availableStock)} onClick={() => { setOrderPlaced(false); setOrderError(""); setCheckoutOpen(true); }}>Перейти к оформлению <span>→</span></button>
               <small>Менеджер уточнит доставку перед оплатой</small>
             </div>
           </>
         )}
 
-        <div className={checkoutOpen ? "checkout-panel checkout-panel-open" : "checkout-panel"} aria-hidden={!checkoutOpen}>
+        </div>
+        {checkoutOpen && <div className="checkout-panel checkout-panel-open">
           {!orderPlaced ? (
             <>
               <div className="checkout-heading">
-                <button onClick={() => setCheckoutOpen(false)} aria-label="Вернуться в корзину">←</button>
+                <button autoFocus disabled={submitting} onClick={() => setCheckoutOpen(false)} aria-label="Вернуться в корзину">←</button>
                 <div><span>почти готово</span><h2>Оформление</h2></div>
               </div>
-              <form className="checkout-form" onSubmit={handleOrder}>
-                <label>Как к вам обращаться?<input type="text" name="name" placeholder="Имя" required /></label>
-                <label>Телефон<input type="tel" name="phone" placeholder="+7 999 000-00-00" required /></label>
-                <label>Email<input type="email" name="email" placeholder="name@example.ru" required /></label>
-                <label>Адрес доставки<textarea name="address" placeholder="Город, улица, дом, квартира или удобный пункт выдачи" required /></label>
+              <form className="checkout-form" onSubmit={handleOrder}><fieldset className="checkout-fields" disabled={submitting}>
+                <label>Как к вам обращаться?<input type="text" name="name" maxLength={160} autoComplete="name" placeholder="Имя" required /></label>
+                <label>Телефон<input type="tel" name="phone" maxLength={40} autoComplete="tel" placeholder="+7 999 000-00-00" required /></label>
+                <label>Email<input type="email" name="email" maxLength={254} autoComplete="email" placeholder="name@example.ru" required /></label>
+                <label>Адрес доставки<textarea name="address" maxLength={1000} autoComplete="street-address" placeholder="Город, улица, дом, квартира или удобный пункт выдачи" required /></label>
                 <fieldset><legend>Как доставить?</legend><label><input type="radio" name="delivery" value="Пункт выдачи" defaultChecked /> Пункт выдачи</label><label><input type="radio" name="delivery" value="Курьером" /> Курьером</label></fieldset>
-                <label>Комментарий<textarea name="comment" placeholder="Пожелания к заказу (необязательно)" /></label>
+                <label>Комментарий<textarea name="comment" maxLength={2000} placeholder="Пожелания к заказу (необязательно)" /></label>
                 <div className="checkout-summary"><span>{cartCount} шт.</span><strong>{money(cartTotal)}</strong></div>
-                {orderError && <p className="checkout-error">{orderError}</p>}
-                <button className="button button-dark checkout-button" type="submit">Отправить заявку <span>→</span></button>
+                {orderError && <p className="checkout-error" role="alert">{orderError}</p>}
+                <button className="button button-dark checkout-button" disabled={submitting || cartItems.some(item => item.quantity > item.availableStock) || !cartItems.length} type="submit">{submitting ? "Отправляем…" : "Отправить заявку"} <span>→</span></button>
                 <p>Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности.</p>
-              </form>
+              </fieldset></form>
             </>
           ) : (
             <div className="order-success">
@@ -397,8 +339,8 @@ export default function Home() {
               <button className="button button-dark" onClick={() => { setOrderPlaced(false); setCheckoutOpen(false); setCartOpen(false); }}>Вернуться на сайт</button>
             </div>
           )}
-        </div>
-      </aside>
+        </div>}
+      </Modal>}
 
       <div className={toast ? "toast toast-visible" : "toast"} role="status">{toast}<span>✓</span></div>
     </main>

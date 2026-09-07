@@ -2,11 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Арома-свечи ручной работы",
+  title: "ТИХО — скульптурные свечи и ароматы для дома",
   description: "ТИХО — скульптурные свечи и авторские ароматы, созданные вручную.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

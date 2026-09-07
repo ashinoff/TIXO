@@ -1,3 +1,6 @@
+import { deleteOrder } from "@/lib/server/orders";
+import { integer } from "@/lib/server/validation";
+import { apiError } from "@/lib/server/http";
 import { isAdmin } from "@/lib/server/auth";
 import { ensureSchema, getPool, mapOrder } from "@/lib/server/db";
 import { NextResponse } from "next/server";
@@ -14,7 +17,8 @@ export async function PATCH(request:Request, context:{params:Promise<{id:string}
 
 export async function DELETE(_request:Request, context:{params:Promise<{id:string}>}) {
   if (!await isAdmin()) return NextResponse.json({ error:"Требуется вход" }, { status:401 });
-  await ensureSchema(); const { id } = await context.params;
-  const result = await getPool().query("DELETE FROM orders WHERE id=$1", [id]);
-  return result.rowCount ? NextResponse.json({ ok:true }) : NextResponse.json({ error:"Заказ не найден" }, { status:404 });
+  try {
+    await deleteOrder(integer((await context.params).id, "Заказ", 1));
+    return NextResponse.json({ ok: true });
+  } catch (error) { return apiError(error); }
 }
