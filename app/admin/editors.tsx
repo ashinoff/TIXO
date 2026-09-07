@@ -1,13 +1,21 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-import { FormEvent, useEffect, useState } from "react";
-import { Product, Scent } from "@/lib/catalog";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { candleShapes, productShape, type CandleShape, type Product, type Scent } from "@/lib/catalog";
 import { Modal } from "../components/modal";
+import { CandlePreview } from "../components/candle-preview";
 
 export function ImagePreview({ file, src, alt = "" }: { file?: File | null; src?: string | null; alt?: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => { if (!file) { setUrl(null); return; } const next = URL.createObjectURL(file); setUrl(next); return () => URL.revokeObjectURL(next); }, [file]);
-  return url || src ? <img src={url || src || ""} alt={alt} /> : <span className="image-empty">Добавить фото</span>;
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    if (!file) { if (src) element.src = src; return; }
+    const url = URL.createObjectURL(file);
+    element.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file, src]);
+  return file || src ? <img ref={ref} src={src || undefined} alt={alt} /> : <span className="image-empty">Добавить фото</span>;
 }
 
 type DraftVariant = { id?: number; scentId: number; stock: number; expectedStock?: number; active: boolean; image: string | null; useMainImage: boolean; file?: File };
@@ -19,6 +27,7 @@ export function ProductEditor({ product, scents, onSave, onClose }: { product: P
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState("");
+  const [previewColor, setPreviewColor] = useState(scents.find(s => s.active)?.color ?? "#b82035");
   const updateVariant = (scentId: number, changes: Partial<DraftVariant>) => setVariants(current => current.map(v => v.scentId === scentId ? { ...v, ...changes } : v));
   const save = async (event: FormEvent) => {
     event.preventDefault(); if (saving) return; setSaving(true); setError("");
@@ -26,6 +35,7 @@ export function ProductEditor({ product, scents, onSave, onClose }: { product: P
     for (const key of ["name", "notes", "price", "published"] as const) form.set(key, String(draft[key]));
     form.set("stock", String(variants.length ? variants.reduce((sum, v) => sum + v.stock, 0) : draft.stock));
     form.set("expectedStock", String(product.stock));
+    form.set("shape", productShape(draft));
     form.set("variants", JSON.stringify(variants.map(({ scentId, stock, expectedStock, active, useMainImage }) => ({ scentId, stock, expectedStock, active, useMainImage }))));
     if (image) form.set("image", image);
     variants.forEach(v => { if (v.file) form.set(`variantImage:${v.scentId}`, v.file); });
@@ -37,12 +47,16 @@ export function ProductEditor({ product, scents, onSave, onClose }: { product: P
     <form onSubmit={save}>
       <header><div><span className="admin-kicker">Форма свечи</span><h2>{product.id ? "Редактировать" : "Новая форма"}</h2></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
       <fieldset disabled={saving} className="editor-fields">
-        <label className="image-upload"><ImagePreview file={image} src={product.image} /><span>Основная фотография</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setImage(e.target.files?.[0])} /></label>
+        <div className="editor-preview"><CandlePreview shape={productShape(draft)} color={previewColor} label="Предпросмотр формы и цвета" /><div className="editor-preview-colors" role="group" aria-label="Цвет предпросмотра">{scents.filter(s => s.active).map(s => <button type="button" key={s.id} style={{ background: s.color }} aria-label={s.colorName} aria-pressed={previewColor === s.color} onClick={() => setPreviewColor(s.color)} />)}</div></div>
+        <label>Форма для предпросмотра<select value={productShape(draft)} onChange={e => setDraft({ ...draft, shape: e.target.value as CandleShape })}>{Object.entries(candleShapes).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
+        <label className="image-upload"><ImagePreview file={image} src={product.image} /><span>Фотография формы (необязательно)</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setImage(e.target.files?.[0])} /></label>
         <label>Название формы<input required maxLength={160} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="Например, Ракушка" /></label>
         <label>Описание формы<textarea maxLength={2000} value={draft.notes} onChange={e => setDraft({ ...draft, notes: e.target.value })} placeholder="Размер, вес, детали свечи" /></label>
-        <div className="editor-row"><label>Цена, ₽<input type="number" min="0" max="10000000" step="1" required value={draft.price} onChange={e => setDraft({ ...draft, price: Number(e.target.value) })} /></label><label>{variants.length ? "Всего свечей" : "Остаток исходного варианта"}<input type="number" min="0" max="1000000" step="1" required readOnly={variants.length > 0} value={variants.length ? variants.reduce((sum, v) => sum + v.stock, 0) : draft.stock} onChange={e => setDraft({ ...draft, stock: Number(e.target.value) })} /></label></div>
-        <div className="variant-editor-heading"><h3>Ароматы этой формы</h3><p>Цвет берётся из общего справочника. Для каждого аромата загрузите фото свечи этого цвета и укажите количество.</p></div>
-        {!product.hasVariants && product.id > 0 && <p className="editor-hint">У исходного варианта {product.stock} шт. Когда добавите ароматы, распределите доступные свечи по их остаткам.</p>}
+        <div className="editor-row"><label>Цена, ₽<input type="number" min="0" max="10000000" step="1" required value={draft.price} onChange={e => setDraft({ ...draft, price: Number(e.target.value) })} /></label><label>{variants.length ? "Всего свечей" : "Общий остаток, шт."}<input type="number" min="0" max="1000000" step="1" required readOnly={variants.length > 0} value={variants.length ? variants.reduce((sum, v) => sum + v.stock, 0) : draft.stock} onChange={e => setDraft({ ...draft, stock: Number(e.target.value) })} /></label></div>
+        {!variants.length && <p className="editor-hint">Все включённые ароматы уже доступны для этой формы. Остаток общий: покупка свечи любого цвета уменьшает его на одну штуку.</p>}
+        <details className="stock-details" open={product.hasVariants || undefined}><summary>Отдельные остатки по ароматам (необязательно)</summary>
+        <div className="variant-editor-heading"><p>Если свечи заранее отлиты в разных цветах, можно вести количество отдельно. Тогда заказывать можно только добавленные ниже варианты. Фотографии необязательны — предпросмотр работает автоматически.</p></div>
+        {!product.hasVariants && <p className="editor-hint">При переходе на отдельные остатки распределите общее количество между цветами.</p>}
         {variants.map(variant => {
           const scent = scents.find(s => s.id === variant.scentId);
           if (!scent) return null;
@@ -52,6 +66,7 @@ export function ProductEditor({ product, scents, onSave, onClose }: { product: P
           </section>;
         })}
         {scents.length ? <div className="add-variant"><label className="sr-only" htmlFor="add-scent">Добавить аромат</label><select id="add-scent" value={adding} onChange={e => setAdding(e.target.value)}><option value="">Выберите аромат</option>{scents.filter(s => !variants.some(v => v.scentId === s.id)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.colorName}{!s.active ? " (отключён)" : ""}</option>)}</select><button type="button" disabled={!adding} onClick={() => { setVariants(current => [...current, { scentId: Number(adding), stock: 0, active: true, image: null, useMainImage: false }]); setAdding(""); }}>Добавить</button></div> : <p className="editor-hint">Сначала создайте ароматы в разделе «Ароматы». Эту форму можно сохранить и вернуться к вариантам позже.</p>}
+        </details>
         <label className="inline-check"><input type="checkbox" checked={draft.published} onChange={e => setDraft({ ...draft, published: e.target.checked })} />Опубликовать форму на сайте</label>
       </fieldset>
       {error && <p className="editor-error" role="alert">{error}</p>}
@@ -75,7 +90,7 @@ export function ScentEditor({ scent, onSave, onClose }: { scent: Scent; onSave: 
       <label>Ноты через запятую<input value={notes} onChange={e => setNotes(e.target.value)} placeholder="вишня, миндаль, ваниль" /></label>
       <div className="editor-row"><label>Цвет свечи<input type="color" value={draft.color} onChange={e => setDraft({ ...draft, color: e.target.value })} /></label><label>Код цвета<input required pattern="#[0-9a-fA-F]{6}" maxLength={7} value={draft.color} onChange={e => setDraft({ ...draft, color: e.target.value })} /></label></div>
       <label>Название цвета<input required maxLength={80} value={draft.colorName} onChange={e => setDraft({ ...draft, colorName: e.target.value })} placeholder="Например, Вишнёвый" /></label>
-      <p className="editor-hint">Этот цвет соответствует одному аромату во всех формах. После смены цвета проверьте фотографии связанных вариантов.</p>
+      <p className="editor-hint">Цвет автоматически изменится у всех форм на витрине. Названия и ноты стартовых ароматов можно заменить на ваши.</p>
       <label className="inline-check"><input type="checkbox" checked={draft.active} onChange={e => setDraft({ ...draft, active: e.target.checked })} />Аромат доступен на сайте</label>
     </fieldset>
     {error && <p className="editor-error" role="alert">{error}</p>}

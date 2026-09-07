@@ -7,9 +7,11 @@ export const runtime = "nodejs";
 
 export async function GET() {
   if (!await isAdmin()) return NextResponse.json({ error:"Требуется вход" }, { status:401 });
-  await ensureSchema();
-  const result = await getPool().query("SELECT * FROM orders ORDER BY created_at DESC");
-  return NextResponse.json(result.rows.map(mapOrder));
+  try {
+    await ensureSchema();
+    const result = await getPool().query("SELECT * FROM orders ORDER BY created_at DESC");
+    return NextResponse.json(result.rows.map(mapOrder));
+  } catch (error) { return apiError(error); }
 }
 
 export async function POST(request:Request) {

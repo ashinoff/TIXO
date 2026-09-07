@@ -2,9 +2,10 @@
 /* eslint-disable @next/next/no-img-element -- production images are pre-compressed WebP assets */
 
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { availableVariants, cartKey, money, type CartLine, type Product, type Scent, type Variant } from "@/lib/catalog";
+import { cartKey, money, productShape, type CartLine, type Product, type Scent, type Variant } from "@/lib/catalog";
 import { ProductCard } from "./components/product-card";
 import { Modal } from "./components/modal";
+import { CandlePreview } from "./components/candle-preview";
 type SiteContent = Record<string, { value: string; kind: string }>;
 
 export default function Home() {
@@ -14,10 +15,9 @@ export default function Home() {
   const [catalogError, setCatalogError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState<Record<string, CartLine & { product: Product; variant?: Variant }>>({});
+  const [cart, setCart] = useState<Record<string, CartLine & { product: Product; variant?: Variant; scent: Scent }>>({});
   const [favorites, setFavorites] = useState<number[]>([]);
   const [activeScent, setActiveScent] = useState<number | null>(null);
-  const [selections, setSelections] = useState<Record<number, number>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -30,16 +30,14 @@ export default function Home() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [content, setContent] = useState<SiteContent>({});
   const c = (key: string, fallback: string) => content[key]?.value || fallback;
-  const loadCatalog = useCallback(async () => {
-    try {
-      const responses = await Promise.all([fetch("/api/products", { cache: "no-store" }), fetch("/api/scents", { cache: "no-store" })]);
-      if (responses.some(response => !response.ok)) throw new Error();
-      const [items, profiles] = await Promise.all(responses.map(response => response.json()));
-      if (!Array.isArray(items) || !Array.isArray(profiles)) throw new Error();
-      setProducts(items); setScents(profiles.filter((scent: Scent) => scent.active)); setCatalogError("");
-    } catch { setCatalogError("Не удалось загрузить каталог. Попробуйте ещё раз."); }
-    finally { setLoading(false); }
-  }, []);
+  const loadCatalog = useCallback(() => Promise.all([
+    fetch("/api/products", { cache: "no-store" }), fetch("/api/scents", { cache: "no-store" }),
+  ]).then(async responses => {
+    if (responses.some(response => !response.ok)) throw new Error();
+    const [items, profiles] = await Promise.all(responses.map(response => response.json()));
+    if (!Array.isArray(items) || !Array.isArray(profiles)) throw new Error();
+    setProducts(items); setScents(profiles.filter((scent: Scent) => scent.active)); setCatalogError("");
+  }).catch(() => setCatalogError("Не удалось загрузить каталог. Попробуйте ещё раз.")).finally(() => setLoading(false)), []);
   useEffect(() => { void loadCatalog(); fetch("/api/content").then(r => r.ok ? r.json() : {}).then(setContent).catch(() => undefined); return () => clearTimeout(toastTimer.current); }, [loadCatalog]);
   useEffect(() => {
     if (!menuOpen) return;
@@ -51,23 +49,25 @@ export default function Home() {
     const product = live ?? line.product;
     const liveVariant = live?.variants.find(v => v.id === line.variantId);
     const variant = liveVariant ?? line.variant;
-    const stock = !live ? 0 : product.hasVariants ? liveVariant?.stock ?? 0 : line.variantId === null ? product.stock : 0;
-    return [{ ...product, key, variant, variantId: line.variantId, quantity: line.quantity, availableStock: stock, image: variant?.image ?? product.image }];
-  }), [cart, products]);
+    const scentAvailable = scents.some(scent => scent.id === line.scent.id && scent.active);
+    const stock = !live || !scentAvailable ? 0 : product.hasVariants ? (liveVariant?.active && liveVariant.scent.active ? liveVariant.stock : 0) : line.variantId === null ? product.stock : 0;
+    const otherQuantity = Object.entries(cart).reduce((sum, [otherKey, other]) => sum + (otherKey !== key && other.productId === line.productId && other.variantId === line.variantId ? other.quantity : 0), 0);
+    return [{ ...product, key, variant, scent: line.scent, scentId: line.scent.id, variantId: line.variantId, quantity: line.quantity, availableStock: Math.max(0, stock - otherQuantity), image: variant?.image ?? product.image }];
+  }), [cart, products, scents]);
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const selectedScent = scents.find(profile => profile.id === activeScent);
-  const visibleProducts = products.filter(product => !selectedScent || availableVariants(product).some(variant => variant.scentId === selectedScent.id));
-  const scentPhoto = products.flatMap(product => availableVariants(product)).find(variant => variant.scentId === selectedScent?.id)?.image;
+  const selectedScent = scents.find(profile => profile.id === activeScent) ?? scents[0];
   const notify = (message: string) => { clearTimeout(toastTimer.current); setToast(message); toastTimer.current = setTimeout(() => setToast(null), 2400); };
   const addToCart = (product: Product, variant?: Variant) => {
-    const key = cartKey(product.id, variant?.id ?? null);
+    if (!selectedScent) return;
+    const key = cartKey(product.id, variant?.id ?? null, selectedScent.id);
     const quantity = (cart[key]?.quantity ?? 0) + 1;
     const stock = product.hasVariants ? variant?.stock ?? 0 : product.stock;
-    if (quantity > stock || quantity > 99) { notify("В корзине уже всё доступное количество этого варианта"); return; }
+    const inCart = Object.values(cart).reduce((sum, line) => sum + (line.productId === product.id && line.variantId === (variant?.id ?? null) ? line.quantity : 0), 0);
+    if (inCart + 1 > stock || quantity > 99) { notify("В корзине уже всё доступное количество этой формы"); return; }
     requestKey.current = null;
-    setCart(current => ({ ...current, [key]: { productId: product.id, variantId: variant?.id ?? null, quantity, product, variant } }));
-    notify(`${product.name}${variant ? ` · ${variant.scent.name}` : ""} — в корзине`);
+    setCart(current => ({ ...current, [key]: { productId: product.id, variantId: variant?.id ?? null, scentId: selectedScent.id, quantity, product, variant, scent: selectedScent } }));
+    notify(`${product.name} · ${selectedScent.name} — в корзине`);
   };
   const changeQuantity = (key: string, delta: number, stock: number) => {
     requestKey.current = null;
@@ -87,7 +87,7 @@ export default function Home() {
     const form = new FormData(event.currentTarget);
     requestKey.current ??= crypto.randomUUID();
     try {
-      const response = await fetch("/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestKey: requestKey.current, customerName: form.get("name"), phone: form.get("phone"), email: form.get("email"), address: form.get("address"), delivery: form.get("delivery"), comment: form.get("comment"), items: cartItems.map(item => ({ productId: item.id, variantId: item.variantId, quantity: item.quantity })) }) });
+      const response = await fetch("/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestKey: requestKey.current, customerName: form.get("name"), phone: form.get("phone"), email: form.get("email"), address: form.get("address"), delivery: form.get("delivery"), comment: form.get("comment"), items: cartItems.map(item => ({ productId: item.id, variantId: item.variantId, scentId: item.scentId, quantity: item.quantity })) }) });
       const data = await response.json();
       if (!response.ok) { setOrderError(data.error || "Не удалось отправить заказ"); if (response.status === 409) await loadCatalog(); return; }
       setOrderNumber(data.orderNumber); setOrderPlaced(true); setCart({}); requestKey.current = null; await loadCatalog();
@@ -168,29 +168,27 @@ export default function Home() {
         <p>созданные медленно</p>
       </section>
 
-      <section className="scent-section" id="scents">
-        <div className="scent-header"><span className="section-index">01 / библиотека ароматов</span><h2>У тишины <em>есть свой цвет.</em></h2><p>Выберите аромат, затем форму свечи. Каждый аромат сохраняет свой цвет во всей коллекции.</p></div>
-        <div className="scent-tabs" role="group" aria-label="Фильтр по аромату">
-          <button className={!selectedScent ? "scent-tab active" : "scent-tab"} aria-pressed={!selectedScent} onClick={() => { setActiveScent(null); setSelections({}); }}>Все ароматы</button>
-          {scents.map(profile => <button key={profile.id} className={selectedScent?.id === profile.id ? "scent-tab active" : "scent-tab"} aria-pressed={selectedScent?.id === profile.id} onClick={() => { setActiveScent(profile.id); setSelections({}); }}><i style={{ background: profile.color }} />{profile.name}</button>)}
-        </div>
-        <div className="scent-story" key={selectedScent?.id ?? "all"}>
-          <div className="scent-story-photo"><img src={scentPhoto || c("image.collection", "/images/collection-candles.webp")} alt={selectedScent ? `Свеча с ароматом ${selectedScent.name}` : "Коллекция свечей ТИХО"} loading="lazy" /></div>
-          <div className="scent-description"><span>{selectedScent ? "аромат коллекции" : "форма. цвет. аромат."}</span><h3>{selectedScent?.name ?? "Ваша свеча. Во всех оттенках."}</h3><p>{selectedScent?.description || "Скульптурный объект днём, мягкий свет вечером. Выберите форму, которая останется с вами, и аромат, к которому захочется возвращаться."}</p>
-            {selectedScent && <div className="scent-color-label"><i style={{ background: selectedScent.color }} /><span>{selectedScent.colorName}</span></div>}
-            <div className="note-list">{(selectedScent?.notes ?? []).map((note, index) => <span key={`${note}-${index}`}><b>{String(index + 1).padStart(2, "0")}</b>{note}</span>)}</div><a className="text-link" href="#catalog">Выбрать форму <span>↗</span></a>
-          </div>
-        </div>
-      </section>
-
       <section className="catalog-section" id="catalog">
-        <div className="section-heading"><div><span className="section-index">02 / коллекция</span><h2>Найдите <em>свою форму</em></h2></div><p>Одна форма — разные оттенки. Нажмите на цвет в карточке, чтобы выбрать аромат свечи.</p></div>
-        <div className="catalog-caption"><span>{selectedScent ? selectedScent.name : "Вся коллекция"}</span><span>{loading ? "Загружаем коллекцию…" : `${visibleProducts.length} форм`}</span></div>
-        {catalogError && <div className="catalog-notice" role="alert">{catalogError}<button className="text-link" onClick={() => { setLoading(true); void loadCatalog(); }}>Повторить</button></div>}
-        {!loading && !catalogError && visibleProducts.length === 0 && <div className="catalog-notice">{selectedScent ? "Формы с этим ароматом пока готовятся. Посмотрите другие композиции." : "Новая коллекция скоро появится."}{selectedScent && <button className="text-link" onClick={() => setActiveScent(null)}>Все формы</button>}</div>}
-        <div className="product-grid">
-          {visibleProducts.map((product, index) => <ProductCard key={product.id} product={product} index={index} scentId={selections[product.id] ?? selectedScent?.id} favorite={favorites.includes(product.id)} onSelect={id => setSelections(current => ({ ...current, [product.id]: id }))} onFavorite={() => setFavorites(current => current.includes(product.id) ? current.filter(id => id !== product.id) : [...current, product.id])} onAdd={variant => addToCart(product, variant)} />)}
+        <div className="collection-heading"><div><span className="section-index">01 / соберите свою свечу</span><h2>Один аромат.<br /><em>Любая форма.</em></h2></div><p>Начните с аромата — вся коллекция<br />окрасится в его цвет.</p></div>
+        <div className="scent-picker" id="scents">
+          <div className="picker-heading"><span>01 — Аромат и цвет</span><span>Выбор для всей коллекции</span></div>
+          <div className="scent-options" role="group" aria-label="Аромат всей коллекции">
+            {scents.map((profile, index) => <button key={profile.id} className={`scent-option${selectedScent?.id === profile.id ? " selected" : ""}`} aria-pressed={selectedScent?.id === profile.id} onClick={() => setActiveScent(profile.id)}>
+              <span className="scent-option-dot" style={{ background: profile.color }}><span aria-hidden="true">{selectedScent?.id === profile.id ? "✓" : ""}</span></span>
+              <span className="scent-option-text"><strong>{profile.name}</strong><small>{profile.colorName}</small></span><span className="scent-option-index">{String(index + 1).padStart(2, "0")}</span>
+            </button>)}
+          </div>
+          {selectedScent && <div className="selected-composition" aria-live="polite"><span><i style={{ background: selectedScent.color }} />{selectedScent.name}</span><p>{selectedScent.description}</p><small>{selectedScent.notes.join(" · ")}</small></div>}
+          {!loading && !catalogError && !scents.length && <p className="catalog-notice">Ароматы скоро появятся в коллекции.</p>}
         </div>
+        <div className="catalog-caption"><span>02 — Выберите форму</span><span>{loading ? "Загружаем коллекцию…" : `${products.length} форм · ${selectedScent?.colorName ?? "коллекция"}`}</span></div>
+        {catalogError && <div className="catalog-notice" role="alert">{catalogError}<button className="text-link" onClick={() => { setLoading(true); void loadCatalog(); }}>Повторить</button></div>}
+        {!loading && !catalogError && products.length === 0 && <div className="catalog-notice">Новая коллекция скоро появится.</div>}
+        {loading && !products.length && <div className="catalog-loading" role="status">Готовим вашу коллекцию…</div>}
+        <div className="product-grid">
+          {products.map((product, index) => <ProductCard key={product.id} product={product} index={index} scent={selectedScent} favorite={favorites.includes(product.id)} onFavorite={() => setFavorites(current => current.includes(product.id) ? current.filter(id => id !== product.id) : [...current, product.id])} onAdd={variant => addToCart(product, variant)} />)}
+        </div>
+        <p className="preview-note">На карточках — предпросмотр формы и цвета. Оттенок воска может немного отличаться в зависимости от освещения.</p>
       </section>
 
       <section className="manifesto">
@@ -295,8 +293,8 @@ export default function Home() {
             <div className="cart-items">
               {cartItems.map((item) => (
                 <article className="cart-item" key={item.key}>
-                  <div className="cart-thumb">{item.image && <img src={item.image} alt={item.name} />}</div>
-                  <div className="cart-item-copy"><h3>{item.name}</h3><p>{item.variant ? `${item.variant.scent.name} · ${item.variant.scent.colorName}` : item.notes}</p>{item.quantity > item.availableStock && <p className="stock-error">Осталось {item.availableStock} шт.</p>}<div className="quantity"><button onClick={() => changeQuantity(item.key, -1, item.availableStock)} aria-label={`Уменьшить количество ${item.name}`}>−</button><span>{item.quantity}</span><button disabled={item.quantity >= Math.min(item.availableStock, 99)} onClick={() => changeQuantity(item.key, 1, item.availableStock)} aria-label={`Увеличить количество ${item.name}`}>＋</button></div></div>
+                  <div className="cart-thumb"><CandlePreview shape={productShape(item)} color={item.scent.color} label={`${item.name}, ${item.scent.colorName}`} /></div>
+                  <div className="cart-item-copy"><h3>{item.name}</h3><p>{item.scent.name} · {item.scent.colorName}</p>{item.quantity > item.availableStock && <p className="stock-error">Осталось {item.availableStock} шт.</p>}<div className="quantity"><button onClick={() => changeQuantity(item.key, -1, item.availableStock)} aria-label={`Уменьшить количество ${item.name}`}>−</button><span>{item.quantity}</span><button disabled={item.quantity >= Math.min(item.availableStock, 99)} onClick={() => changeQuantity(item.key, 1, item.availableStock)} aria-label={`Увеличить количество ${item.name}`}>＋</button></div></div>
                   <strong>{money(item.price * item.quantity)}</strong>
                 </article>
               ))}

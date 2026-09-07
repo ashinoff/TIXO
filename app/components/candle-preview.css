@@ -1,0 +1,30 @@
+@property --wax { syntax:"<color>"; inherits:true; initial-value:#b82035; }
+.wax-stage { --wax-light:color-mix(in srgb,var(--wax),#fff 32%); --wax-shade:color-mix(in srgb,var(--wax),#000 30%); --wax-deep:color-mix(in srgb,var(--wax),#000 48%); position:relative; width:100%; height:100%; container-type:inline-size; transition:--wax .75s ease; }
+.wax-ground { position:absolute; width:53%; height:6%; left:26%; bottom:15%; border-radius:50%; background:#33201724; filter:blur(12px); transform:rotate(-8deg); }
+.wax-object { position:absolute; left:50%; bottom:19%; width:38%; height:53%; transform:translateX(-50%); filter:drop-shadow(12px 10px 6px #33201718); transition:transform .7s cubic-bezier(.2,.7,.2,1); }
+.wax-body { width:100%; height:100%; position:relative; background:var(--wax); box-shadow:inset -9px -5px 17px #0002,inset 6px 0 9px #fff2; }
+.wax-wick { position:absolute; bottom:calc(100% - 2px); left:50%; width:2px; height:5%; min-height:7px; background:linear-gradient(90deg,#322c26,#716352); border-radius:2px; transform:rotate(7deg); transform-origin:bottom; }
+.wax-twist .wax-object { width:29%; height:57%; transform:translateX(-50%) rotate(-5deg); }
+.wax-twist .wax-body { border-radius:48% 48% 14% 14% / 12% 12% 5% 5%; background:repeating-linear-gradient(126deg,var(--wax-shade) 0,var(--wax) 3cqw,var(--wax-light) 6cqw,var(--wax-shade) 7.3cqw); }
+.wax-twist .wax-body::after { content:""; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(90deg,#0002,transparent 30%,#fff2 45%,transparent 70%,#0003); }
+.wax-ribbed .wax-object { height:54%; width:36%; }
+.wax-ribbed .wax-body { border-radius:50% / 4%; background:repeating-linear-gradient(90deg,var(--wax-shade) 0,var(--wax-light) 1.15cqw,var(--wax) 2.2cqw,var(--wax-shade) 2.7cqw); }
+.wax-ribbed .wax-body::before { content:""; position:absolute; top:0; width:100%; height:5%; border-radius:50%; background:linear-gradient(155deg,var(--wax-light),var(--wax)); box-shadow:0 1px 1px #0002; }
+.wax-bubble .wax-object { width:49%; height:auto; aspect-ratio:1; bottom:22%; }
+.wax-bubbles { display:grid; grid-template-columns:repeat(3,1fr); height:100%; transform:rotate(-7deg); filter:drop-shadow(3px 5px 2px #0002); }
+.wax-bubbles b { aspect-ratio:1; border-radius:45%; margin:-1px; background:radial-gradient(circle at 32% 27%,var(--wax-light),var(--wax) 48%,var(--wax-shade) 83%,var(--wax-deep)); box-shadow:inset -1px -2px 2px #0001; }
+.wax-arch .wax-object { width:46%; height:48%; }
+.wax-arch .wax-body { border-radius:48% 48% 3% 3%; background:linear-gradient(100deg,var(--wax-light),var(--wax) 30%,var(--wax-shade)); }
+.wax-arch .wax-body b { position:absolute; left:28%; right:28%; bottom:0; height:60%; border-radius:50% 50% 0 0; background:var(--preview-surface,#ede7dd); box-shadow:-5px -4px 0 var(--wax-shade),-8px -7px 0 var(--wax-light); }
+.wax-shell .wax-object { width:57%; height:42%; bottom:22%; }
+.wax-shell .wax-wick { bottom:89%; }
+.wax-fan { position:absolute; inset:0; }
+.wax-fan b { position:absolute; height:92%; width:23%; bottom:0; left:38.5%; border-radius:55% 55% 35% 35%; transform:rotate(calc(var(--rib) * 17deg)); transform-origin:50% 90%; background:linear-gradient(90deg,var(--wax-shade),var(--wax-light) 40%,var(--wax) 63%,var(--wax-shade)); box-shadow:1px 0 1px #0001; }
+.wax-fan::after { content:""; position:absolute; bottom:0; left:34%; width:32%; height:16%; border-radius:50% 50% 35% 35%; background:linear-gradient(var(--wax),var(--wax-shade)); }
+.wax-knot .wax-object { width:55%; height:40%; bottom:25%; }
+.wax-knot .wax-wick { left:35%; bottom:90%; }
+.wax-loops { position:absolute; inset:0; }
+.wax-loops b { position:absolute; width:74%; height:82%; top:10%; border:7cqw solid var(--wax); border-radius:48%; box-shadow:inset 2px 3px 4px var(--wax-shade),inset -2px -2px 3px var(--wax-light),3px 4px 7px #0002,-3px -3px 0 var(--wax-light); transform:rotate(42deg); }
+.wax-loops b:first-child { left:0; }.wax-loops b:last-child { right:0; transform:rotate(-42deg); }
+@media(hover:hover) and (prefers-reduced-motion:no-preference) { .product-art:hover .wax-object { transform:translateX(-50%) translateY(-6px) rotate(-3deg); } }
+@media(prefers-reduced-motion:reduce) { .wax-stage,.wax-object { transition:none; } }

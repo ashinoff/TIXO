@@ -9,9 +9,9 @@ function sign(value: string) { return createHmac("sha256", secret()).update(valu
 
 export async function isAdmin() {
   const token = (await cookies()).get(COOKIE)?.value;
-  if (!token) return false;
+  if (!token || !process.env.SESSION_SECRET) return false;
   const [expires, signature] = token.split(".");
-  if (!expires || !signature || Number(expires) < Date.now()) return false;
+  if (!/^\d+$/.test(expires ?? "") || !/^[0-9a-f]{64}$/.test(signature ?? "") || Number(expires) < Date.now()) return false;
   const expected = sign(expires);
   return signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }

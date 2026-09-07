@@ -6,8 +6,11 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const admin = new URL(request.url).searchParams.get("admin") === "1" && await isAdmin();
-  return NextResponse.json(await listProducts(admin));
+  try {
+    const admin = new URL(request.url).searchParams.get("admin") === "1";
+    if (admin && !await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
+    return NextResponse.json(await listProducts(admin));
+  } catch (error) { return apiError(error); }
 }
 
 export async function POST(request: Request) {

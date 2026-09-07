@@ -42,15 +42,16 @@ export function parseOrder(body: Record<string, unknown>) {
   const requestKey = body.requestKey === undefined ? null : textValue(body.requestKey, "Номер запроса", 36);
   if (requestKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) throw new InputError("Некорректный номер запроса");
   if (!Array.isArray(body.items) || !body.items.length || body.items.length > 100) throw new InputError("Проверьте состав заказа");
-  const lines = new Map<string, { productId: number; variantId: number | null; quantity: number }>();
+  const lines = new Map<string, { productId: number; variantId: number | null; scentId?: number; quantity: number }>();
   for (const value of body.items) {
     if (!value || typeof value !== "object") throw new InputError("Проверьте состав заказа");
     const productId = integer(value.productId, "Товар", 1);
     const variantId = value.variantId == null ? null : integer(value.variantId, "Вариант", 1);
-    const key = `${productId}:${variantId}`;
+    const scentId = value.scentId == null ? undefined : integer(value.scentId, "Аромат", 1);
+    const key = `${productId}:${variantId}:${scentId ?? ""}`;
     const quantity = integer(value.quantity, "Количество", 1, 99) + (lines.get(key)?.quantity ?? 0);
     if (quantity > 99) throw new InputError("Не более 99 свечей одного варианта в заказе");
-    lines.set(key, { productId, variantId, quantity });
+    lines.set(key, { productId, variantId, ...(scentId ? { scentId } : {}), quantity });
   }
   return { customerName, phone, email, address, delivery, comment, requestKey, items: [...lines.values()] };
 }
