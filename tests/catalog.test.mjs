@@ -40,7 +40,7 @@ test('invalid quantities and partial malformed carts are rejected, duplicates ar
   assert.notEqual(cartKey(1, 3), cartKey(1, 4));
 });
 
-test('one selected aroma drives a variant, and hidden or unphotographed variants stay unavailable', () => {
+test('one selected aroma drives a variant, and hidden variants stay unavailable without substituting another scent', () => {
   const scent = { id:1, active:true, name:'Аромат', color:'#aabbcc', colorName:'Голубой', description:'', notes:[] };
   const product = { variants: [
     { id:11, scentId:1, active:true, stock:0, image:'/one.webp', scent },
@@ -50,7 +50,10 @@ test('one selected aroma drives a variant, and hidden or unphotographed variants
   ] };
   assert.equal(selectVariant(product).id, 12);
   assert.equal(selectVariant(product, 1).id, 11);
-  assert.deepEqual(availableVariants(product).map(v => v.id), [11,12]);
+  assert.deepEqual(availableVariants(product).map(v => v.id), [11,12,14]);
+  assert.equal(selectVariant(product, 3), undefined);
+  assert.equal(selectVariant(product, 99), undefined);
+  assert.notEqual(cartKey(1, null, 1), cartKey(1, null, 2));
   const data = parseScent({ ...scent, color:'#AABBCC' });
   assert.equal(data.color, '#aabbcc');
   assert.throws(() => parseScent({ ...scent, color:'red' }));
@@ -95,29 +98,54 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
   };
   await t.test('additive migration preserves existing rows, photos, content, order items and stock', async () => {
     await Promise.all([domain.ensureSchema(), domain.ensureSchema()]);
-    assert.deepEqual((await pool.query('SELECT * FROM products')).rows, before);
+    assert.deepEqual((await pool.query('SELECT * FROM products')).rows.map(({shape,...row}) => row), before);
     assert.equal((await pool.query("SELECT value FROM site_content WHERE key='hero.title'")).rows[0].value, 'Сохранённый заголовок');
     originalOrder = domain.mapOrder((await pool.query("SELECT * FROM orders WHERE order_number='OLD-01'")).rows[0]);
     assert.equal(originalOrder.stockReserved, false);
     assert.equal(originalOrder.items[0].name, 'Старое название');
-    assert.equal((await pool.query('SELECT * FROM scents')).rows.length, 0);
+    assert.deepEqual((await pool.query('SELECT color_name FROM scents ORDER BY id')).rows.map(row => row.color_name), ['Красный','Чёрный','Белый','Розовый']);
+    await pool.query("UPDATE scents SET name='Мой красный аромат', active=FALSE WHERE color_name='Красный'");
     globalThis.tihoSchemaReady = undefined; await domain.ensureSchema();
-    assert.deepEqual((await pool.query('SELECT * FROM products')).rows, before);
+    assert.equal((await pool.query('SELECT * FROM scents')).rows.length, 4);
+    assert.equal((await pool.query("SELECT active FROM scents WHERE name='Мой красный аромат'")).rows[0].active, false);
+    await pool.query("UPDATE scents SET active=TRUE WHERE color_name='Красный'");
+    assert.deepEqual((await pool.query('SELECT * FROM products')).rows.map(({shape,...row}) => row), before);
   });
-  await t.test('legacy products remain purchasable and old order deletion does not change stock', async () => {
-    const order = await createOrder(orderBody([{ productId:1, quantity:2 }]));
+  await t.test('all four scents work with existing forms without photos or setup; stock stays shared', async () => {
+    const defaults = (await pool.query('SELECT id FROM scents ORDER BY id')).rows.map(row => Number(row.id));
+    const order = await createOrder(orderBody(defaults.map(scentId => ({ productId:1, scentId, quantity:1 }))));
+    assert.equal(order.items.length, 4);
+    assert.deepEqual(order.items.map(item => item.colorName), ['Красный','Чёрный','Белый','Розовый']);
+    await assert.rejects(createOrder(orderBody([{productId:1, scentId:99999, quantity:1}])), /аромат/);
     assert.equal(order.items[0].variantId, null);
-    assert.equal((await domain.listProducts())[0].stock, 10);
+    assert.equal((await domain.listProducts())[0].stock, 8);
     await deleteOrder(order.id);
     await deleteOrder(originalOrder.id);
     assert.equal((await domain.listProducts())[0].stock, 12);
   });
-  await t.test('global color is unique and real images are required for enabled variants', async () => {
+  await t.test('different scents cannot oversell the shared last unit, including concurrent requests', async () => {
+    const ids = (await pool.query('SELECT id FROM scents ORDER BY id')).rows.map(row => Number(row.id));
+    await pool.query('UPDATE products SET stock=1 WHERE id=1');
+    await assert.rejects(createOrder(orderBody([{productId:1,scentId:ids[0],quantity:1},{productId:1,scentId:ids[1],quantity:1}])), error => error.status === 409);
+    assert.equal((await domain.listProducts())[0].stock,1);
+    const results = await Promise.allSettled(ids.slice(0,2).map(scentId => createOrder(orderBody([{productId:1,scentId,quantity:1}]))));
+    assert.equal(results.filter(result => result.status === 'fulfilled').length,1);
+    assert.equal(results.filter(result => result.status === 'rejected').length,1);
+    const placed = results.find(result => result.status === 'fulfilled').value;
+    await deleteOrder(placed.id);
+    assert.equal((await domain.listProducts())[0].stock,1);
+    await pool.query('UPDATE scents SET active=FALSE WHERE id=$1',[ids[0]]);
+    await assert.rejects(createOrder(orderBody([{productId:1,scentId:ids[0],quantity:1}])), /аромат/);
+    await pool.query('UPDATE scents SET active=TRUE WHERE id=$1',[ids[0]]);
+    await pool.query('UPDATE products SET stock=12 WHERE id=1');
+  });
+  await t.test('global color is unique, preview shapes are validated and variant photos are optional', async () => {
     const insert = async (name, color) => Number((await pool.query("INSERT INTO scents(name,color,color_name,description,notes) VALUES($1,$2,$1,'Композиция',ARRAY['нота']) RETURNING id", [name,color])).rows[0].id);
     red = await insert('Вишня', '#c73548'); blue = await insert('Море', '#517e9a');
     await assert.rejects(insert('Другой аромат','#c73548'), error => error.code === '23505');
     const old = (await domain.listProducts(true))[0];
-    await assert.rejects(saveProduct(formFor(old,[{ scentId:red,stock:3,active:true }]), 1), /фотографию/);
+    const invalid = formFor(old, []); invalid.set('shape','invalid');
+    await assert.rejects(saveProduct(invalid, 1), /форму/);
     assert.equal((await domain.listProducts(true))[0].hasVariants, false);
     const form = formFor(old,[{ scentId:red,stock:3,active:true },{ scentId:blue,stock:4,active:true }]);
     form.set(`variantImage:${red}`, imageFile()); form.set(`variantImage:${blue}`, imageFile());
@@ -126,9 +154,13 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     assert.equal(product.image, before[0].image);
     assert.notEqual(product.variants[0].image, product.variants[1].image);
     const second = formFor({name:'Другая форма',notes:'Детали',price:2000,stock:0,published:true},[{scentId:red,stock:2,active:true}]);
-    second.set(`variantImage:${red}`,imageFile());
+    second.set('shape','shell');
     const shape = await saveProduct(second);
     assert.equal(shape.variants[0].scent.color,product.variants[0].scent.color);
+    assert.equal(shape.shape, "shell");
+    assert.equal(shape.variants[0].image, null);
+    const previewOrder = await createOrder(orderBody([{productId:shape.id,variantId:shape.variants[0].id,quantity:1}]));
+    await deleteOrder(previewOrder.id);
   });
   await t.test('mixed invalid order rolls back; chosen variants remain separate and price is server-owned', async () => {
     const [a,b] = product.variants;

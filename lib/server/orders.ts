@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { OrderItem } from "../catalog";
+import { productShape, type CandleShape } from "../catalog";
 import { ensureSchema, getPool, mapOrder } from "./db";
 import { InputError, parseOrder } from "./validation";
 
@@ -20,6 +21,7 @@ export async function createOrder(body: Record<string, unknown>) {
     const variants = await db.query(`SELECT v.*, s.name AS scent_name, s.color, s.color_name, s.active AS scent_active
       FROM product_variants v JOIN scents s ON s.id=v.scent_id
       WHERE v.product_id=ANY($1::bigint[]) ORDER BY v.id FOR UPDATE OF v FOR SHARE OF s`, [ids]);
+    const scents = await db.query("SELECT * FROM scents WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.scentId ? [line.scentId] : []))]]);
     const items: OrderItem[] = [];
     for (const line of order.items) {
       const product = products.rows.find(p => Number(p.id) === line.productId);
@@ -27,16 +29,21 @@ export async function createOrder(body: Record<string, unknown>) {
       const choices = variants.rows.filter(v => Number(v.product_id) === line.productId);
       const variant = line.variantId === null ? null : choices.find(v => Number(v.id) === line.variantId);
       if ((choices.length && !variant) || (line.variantId !== null && !variant)) throw new InputError(`Выберите доступный аромат для «${product.name}»`, 409);
-      if (variant && (!variant.active || !variant.scent_active || !variant.image)) throw new InputError(`Этот аромат «${product.name}» больше недоступен`, 409);
+      if (variant && (!variant.active || !variant.scent_active || (line.scentId && Number(variant.scent_id) !== line.scentId))) throw new InputError(`Этот аромат «${product.name}» больше недоступен`, 409);
+      const scent = variant ? { id: variant.scent_id, name: variant.scent_name, color: variant.color, color_name: variant.color_name } : scents.rows.find(s => Number(s.id) === line.scentId && s.active);
+      if (!scent) throw new InputError(`Выберите доступный аромат для «${product.name}»`, 409);
       const stock = variant ? variant.stock : product.stock;
-      if (line.quantity > stock) throw new InputError(`«${product.name}»${variant ? `, ${variant.scent_name}` : ""}: осталось ${stock} шт.`, 409);
+      if (line.quantity > stock) throw new InputError(`«${product.name}»: доступно ещё ${stock} шт. для этого заказа.`, 409);
       items.push({ productId: line.productId, variantId: variant ? Number(variant.id) : null, name: product.name,
-        ...(variant ? { scentName: variant.scent_name, color: variant.color, colorName: variant.color_name } : {}),
+        scentId: Number(scent.id), scentName: scent.name, color: scent.color, colorName: scent.color_name,
+        shape: productShape({ id: Number(product.id), shape: product.shape as CandleShape | undefined }),
         image: variant?.image ?? product.image, price: product.price, quantity: line.quantity });
       if (variant) {
         await db.query("UPDATE product_variants SET stock=stock-$1,updated_at=NOW() WHERE id=$2", [line.quantity, variant.id]);
+        variant.stock -= line.quantity;
       } else {
         await db.query("UPDATE products SET stock=stock-$1,updated_at=NOW() WHERE id=$2", [line.quantity, product.id]);
+        product.stock -= line.quantity;
       }
     }
     await db.query(`UPDATE products p SET stock=(SELECT SUM(stock) FROM product_variants WHERE product_id=p.id),updated_at=NOW()

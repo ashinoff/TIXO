@@ -1,6 +1,7 @@
 import { ensureSchema, getPool, listProducts } from "./db";
 import { saveImage, removeImage } from "./uploads";
 import { InputError, integer, textValue } from "./validation";
+import { candleShapes } from "../catalog";
 
 type VariantInput = { scentId: number; stock: number; expectedStock?: number; active: boolean; useMainImage: boolean };
 
@@ -10,6 +11,8 @@ export async function saveProduct(form: FormData, id?: number) {
   const price = integer(form.get("price"), "Цена", 0, 10000000);
   const stock = integer(form.get("stock"), "Остаток", 0, 1000000);
   const published = form.get("published") === "true";
+  const shape = form.get("shape");
+  if (shape !== null && (typeof shape !== "string" || !Object.hasOwn(candleShapes, shape))) throw new InputError("Выберите форму для предпросмотра");
   const payload = form.get("variants");
   let variants: VariantInput[] | undefined;
   if (payload !== null) {
@@ -54,11 +57,11 @@ export async function saveProduct(form: FormData, id?: number) {
       if (before && variant.expectedStock === undefined) throw new InputError("Обновите карточку перед сохранением остатков", 409);
       if (before && variant.expectedStock !== before.stock) throw new InputError("Остаток варианта изменился после нового заказа. Откройте карточку заново.", 409);
       const variantImage = await upload(form.get(`variantImage:${variant.scentId}`)) ?? (variant.useMainImage ? image : before?.image ?? null);
-      if (variant.active && !variantImage) throw new InputError("Добавьте фотографию для каждого включённого аромата или используйте основное фото");
       await db.query(`INSERT INTO product_variants(product_id,scent_id,stock,image,active) VALUES($1,$2,$3,$4,$5)
         ON CONFLICT(product_id,scent_id) DO UPDATE SET stock=EXCLUDED.stock,image=EXCLUDED.image,active=EXCLUDED.active,updated_at=NOW()`,
       [productId, variant.scentId, variant.stock, variantImage, variant.active]);
     }
+    if (shape) await db.query("UPDATE products SET shape=$1 WHERE id=$2", [shape, productId]);
     if ((variants?.length ?? existing.length) > 0) {
       await db.query("UPDATE products SET stock=(SELECT COALESCE(SUM(stock),0) FROM product_variants WHERE product_id=$1) WHERE id=$1", [productId]);
     } else {

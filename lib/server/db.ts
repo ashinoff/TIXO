@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { Product, OrderItem, Scent, Variant } from "../catalog";
+import { candleShapes, productShape, type CandleShape } from "../catalog";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
@@ -81,6 +82,18 @@ export async function ensureSchema() {
     )`);
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_name_unique ON scents (LOWER(name))");
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_color_unique ON scents (LOWER(color))");
+    await db.query("CREATE TABLE IF NOT EXISTS app_migrations (key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+    const presets = await db.query("INSERT INTO app_migrations(key) VALUES('global-scents-v1') ON CONFLICT DO NOTHING RETURNING key");
+    if (presets.rowCount) {
+      const colors = [
+        ["Вишня и миндаль", "Спелая вишня, мягкий миндаль и тёплая ваниль.", ["вишня", "миндаль", "ваниль"], "#b82035", "Красный"],
+        ["Сандал и дым", "Сухое дерево, пряный кардамон и лёгкий дым.", ["сандал", "кардамон", "дым"], "#222225", "Чёрный"],
+        ["Белая ваниль", "Нежная ваниль с нотами хлопка и белого мускуса.", ["ваниль", "хлопок", "белый мускус"], "#f7f5ef", "Белый"],
+        ["Роза и пион", "Свежие лепестки розы и пиона с пудровым послевкусием.", ["роза", "пион", "пудра"], "#e7a0b5", "Розовый"],
+      ];
+      for (const row of colors) await db.query("INSERT INTO scents(name,description,notes,color,color_name) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING", row);
+    }
+    await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS shape TEXT");
     await db.query(`CREATE TABLE IF NOT EXISTS product_variants (
       id BIGSERIAL PRIMARY KEY, product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       scent_id BIGINT NOT NULL REFERENCES scents(id) ON DELETE RESTRICT,
@@ -100,7 +113,7 @@ export async function ensureSchema() {
 }
 
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
-  return { id:Number(row.id), name:String(row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[] };
+  return { id:Number(row.id), name:String(row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[], shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : productShape({id:Number(row.id)}) };
 }
 export function mapCategory(row:Record<string,unknown>):StoredCategory{return{id:Number(row.id),name:String(row.name),slug:String(row.slug),mood:String(row.mood),description:String(row.description),notes:Array.isArray(row.notes)?row.notes.map(String):[],paper:String(row.paper),ink:String(row.ink),accent:String(row.accent),soft:String(row.soft)}}
 
@@ -128,7 +141,7 @@ export async function listProducts(admin = false, id?: number): Promise<Product[
     WHERE ($1::boolean OR p.published=TRUE) AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
   const variants = await getPool().query(`SELECT v.*, to_jsonb(s) AS scent FROM product_variants v
     JOIN scents s ON s.id=v.scent_id WHERE v.product_id=ANY($1::bigint[])
-    AND ($2::boolean OR (v.active AND s.active AND v.image IS NOT NULL)) ORDER BY v.id`, [result.rows.map(row => row.id), admin]);
+    AND ($2::boolean OR (v.active AND s.active)) ORDER BY v.id`, [result.rows.map(row => row.id), admin]);
   return result.rows.map(row => {
     const product = mapProduct(row);
     product.variants = variants.rows.filter(variant => Number(variant.product_id) === product.id).map(mapVariant);
