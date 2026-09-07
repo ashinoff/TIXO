@@ -1,16 +1,14 @@
 import { Pool } from "pg";
+import type { Product, OrderItem, Scent, Variant } from "../catalog";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
-export type StoredProduct = {
-  id: number; name: string; category: string; notes: string; price: number;
-  stock: number; published: boolean; image: string | null; categoryId:number|null; categorySlug:string|null;
-};
+export type StoredProduct = Product;
 export type StoredCategory={id:number;name:string;slug:string;mood:string;description:string;notes:string[];paper:string;ink:string;accent:string;soft:string};
 
 export type StoredOrder = {
   id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string;
-  delivery:string; comment:string; items:Array<{ productId:number; name:string; price:number; quantity:number }>;
+  delivery:string; comment:string; items:OrderItem[]; stockReserved:boolean;
   total:number; status:"new"|"in_progress"|"completed"; createdAt:string;
 };
 
@@ -22,7 +20,10 @@ export function getPool() {
 
 export async function ensureSchema() {
   global.tihoSchemaReady ??= (async () => {
-    const db = getPool();
+    const db = await getPool().connect();
+    try {
+    await db.query("BEGIN");
+    await db.query("SELECT pg_advisory_xact_lock(84173026)");
     await db.query(`CREATE TABLE IF NOT EXISTS products (
       id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL,
       notes TEXT NOT NULL, price INTEGER NOT NULL CHECK (price >= 0),
@@ -72,15 +73,66 @@ export async function ensureSchema() {
     await db.query("UPDATE products SET category_id=(SELECT id FROM categories WHERE slug='warm') WHERE category_id IS NULL AND (category ILIKE 'тёпл%' OR category ILIKE 'гурман%')");
     await db.query("UPDATE products SET category_id=(SELECT id FROM categories WHERE slug='fresh') WHERE category_id IS NULL AND (category ILIKE 'свеж%' OR category ILIKE 'чист%' OR category ILIKE 'зелён%')");
     await db.query("UPDATE products SET category_id=(SELECT id FROM categories WHERE slug='deep') WHERE category_id IS NULL AND category ILIKE 'прян%'");
-  })();
+    await db.query(`CREATE TABLE IF NOT EXISTS scents (
+      id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+      notes TEXT[] NOT NULL DEFAULT '{}', color TEXT NOT NULL CHECK (color ~ '^#[0-9a-f]{6}$'),
+      color_name TEXT NOT NULL, active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_name_unique ON scents (LOWER(name))");
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_color_unique ON scents (LOWER(color))");
+    await db.query(`CREATE TABLE IF NOT EXISTS product_variants (
+      id BIGSERIAL PRIMARY KEY, product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      scent_id BIGINT NOT NULL REFERENCES scents(id) ON DELETE RESTRICT,
+      stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0), image TEXT,
+      active BOOLEAN NOT NULL DEFAULT TRUE, UNIQUE(product_id, scent_id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await db.query("CREATE INDEX IF NOT EXISTS product_variants_scent_idx ON product_variants (scent_id)");
+    await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE");
+    await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT");
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key_unique ON orders (request_key) WHERE request_key IS NOT NULL");
+    await db.query("COMMIT");
+    } catch (error) { await db.query("ROLLBACK"); throw error; }
+    finally { db.release(); }
+  })().catch(error => { global.tihoSchemaReady = undefined; throw error; });
   return global.tihoSchemaReady;
 }
 
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
-  return { id:Number(row.id), name:String(row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null };
+  return { id:Number(row.id), name:String(row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[] };
 }
 export function mapCategory(row:Record<string,unknown>):StoredCategory{return{id:Number(row.id),name:String(row.name),slug:String(row.slug),mood:String(row.mood),description:String(row.description),notes:Array.isArray(row.notes)?row.notes.map(String):[],paper:String(row.paper),ink:String(row.ink),accent:String(row.accent),soft:String(row.soft)}}
 
 export function mapOrder(row: Record<string, unknown>): StoredOrder {
-  return { id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], createdAt:new Date(String(row.created_at)).toISOString() };
+  return { id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
+}
+
+export function mapScent(row: Record<string, unknown>): Scent {
+  return { id: Number(row.id), name: String(row.name), description: String(row.description),
+    notes: Array.isArray(row.notes) ? row.notes.map(String) : [], color: String(row.color),
+    colorName: String(row.color_name), active: Boolean(row.active) };
+}
+
+export function mapVariant(row: Record<string, unknown>): Variant {
+  return { id: Number(row.id), scentId: Number(row.scent_id), stock: Number(row.stock),
+    image: row.image ? String(row.image) : null, active: Boolean(row.active),
+    scent: mapScent(row.scent as Record<string, unknown>) };
+}
+
+export async function listProducts(admin = false, id?: number): Promise<Product[]> {
+  await ensureSchema();
+  const result = await getPool().query(`SELECT p.*, c.name AS category_name, c.slug AS category_slug,
+    EXISTS(SELECT 1 FROM product_variants v WHERE v.product_id=p.id) AS has_variants
+    FROM products p LEFT JOIN categories c ON c.id=p.category_id
+    WHERE ($1::boolean OR p.published=TRUE) AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
+  const variants = await getPool().query(`SELECT v.*, to_jsonb(s) AS scent FROM product_variants v
+    JOIN scents s ON s.id=v.scent_id WHERE v.product_id=ANY($1::bigint[])
+    AND ($2::boolean OR (v.active AND s.active AND v.image IS NOT NULL)) ORDER BY v.id`, [result.rows.map(row => row.id), admin]);
+  return result.rows.map(row => {
+    const product = mapProduct(row);
+    product.variants = variants.rows.filter(variant => Number(variant.product_id) === product.id).map(mapVariant);
+    if (product.hasVariants) product.stock = product.variants.filter(v => admin || (v.active && v.scent.active)).reduce((sum, v) => sum + v.stock, 0);
+    return product;
+  });
 }
