@@ -6,6 +6,7 @@ import { cartKey, money, productShape, type CartLine, type Product, type Scent, 
 import { ProductCard } from "./components/product-card";
 import { Modal } from "./components/modal";
 import { CandlePreview } from "./components/candle-preview";
+import "./components/scent-selector.css";
 type SiteContent = Record<string, { value: string; kind: string }>;
 
 export default function Home() {
@@ -18,6 +19,7 @@ export default function Home() {
   const [cart, setCart] = useState<Record<string, CartLine & { product: Product; variant?: Variant; scent: Scent }>>({});
   const [favorites, setFavorites] = useState<number[]>([]);
   const [activeScent, setActiveScent] = useState<number | null>(null);
+  const [extinguishedScent, setExtinguishedScent] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -57,6 +59,11 @@ export default function Home() {
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
   const selectedScent = scents.find(profile => profile.id === activeScent) ?? scents[0];
+  const chooseScent = (id: number) => {
+    if (id === selectedScent?.id) return;
+    setExtinguishedScent(selectedScent?.id ?? null);
+    setActiveScent(id);
+  };
   const notify = (message: string) => { clearTimeout(toastTimer.current); setToast(message); toastTimer.current = setTimeout(() => setToast(null), 2400); };
   const addToCart = (product: Product, variant?: Variant) => {
     if (!selectedScent) return;
@@ -114,7 +121,7 @@ export default function Home() {
         </button>
 
         <a className="wordmark" href="#top" aria-label="ТИХО — на главную">
-          ТИХО<span>●</span>
+          ТИХО
         </a>
 
         <nav className={menuOpen ? "nav nav-open" : "nav"}>
@@ -173,9 +180,18 @@ export default function Home() {
         <div className="scent-picker" id="scents">
           <div className="picker-heading"><span>01 — Аромат и цвет</span><span>Выбор для всей коллекции</span></div>
           <div className="scent-options" role="group" aria-label="Аромат всей коллекции">
-            {scents.map((profile, index) => <button key={profile.id} className={`scent-option${selectedScent?.id === profile.id ? " selected" : ""}`} aria-pressed={selectedScent?.id === profile.id} onClick={() => setActiveScent(profile.id)}>
-              <span className="scent-option-dot" style={{ background: profile.color }}><span aria-hidden="true">{selectedScent?.id === profile.id ? "✓" : ""}</span></span>
-              <span className="scent-option-text"><strong>{profile.name}</strong><small>{profile.colorName}</small></span><span className="scent-option-index">{String(index + 1).padStart(2, "0")}</span>
+            {scents.map(profile => <button key={profile.id} type="button" className={`scent-option${selectedScent?.id === profile.id ? " selected" : ""}${extinguishedScent === profile.id ? " just-extinguished" : ""}`} style={{ "--sample-wax": profile.color } as CSSProperties} aria-pressed={selectedScent?.id === profile.id} aria-label={`${profile.name}, ${profile.colorName}`} onClick={() => chooseScent(profile.id)}>
+              <span className="scent-candle" aria-hidden="true">
+                <span className="scent-candle-halo" />
+                <span className="scent-candle-flame"><span /></span>
+                <span className="scent-candle-wick" />
+                <span className="scent-candle-wax" />
+                <svg className="scent-candle-smoke" viewBox="0 0 32 56" fill="none" onAnimationEnd={event => { if (event.target === event.currentTarget) setExtinguishedScent(current => current === profile.id ? null : current); }}>
+                  <path d="M16 53C6 44 24 37 17 29S9 15 18 4" />
+                  <path d="M20 48C11 39 28 31 21 23S16 12 22 6" />
+                </svg>
+              </span>
+              <span className="scent-option-text"><strong>{profile.name}</strong><small>{profile.colorName}</small></span>
             </button>)}
           </div>
           {selectedScent && <div className="selected-composition" aria-live="polite"><span><i style={{ background: selectedScent.color }} />{selectedScent.name}</span><p>{selectedScent.description}</p><small>{selectedScent.notes.join(" · ")}</small></div>}
@@ -275,7 +291,7 @@ export default function Home() {
 
       <footer>
         <div className="footer-top">
-          <a className="footer-wordmark" href="#top">ТИХО<span>●</span></a>
+          <a className="footer-wordmark" href="#top">ТИХО</a>
           <p>Свечи для дома,<br />в котором хорошо.</p>
           <div className="footer-links"><a href="#catalog">Каталог</a><a href="#about">О бренде</a><a href="#delivery">Доставка</a><a href="#delivery">Оплата</a></div>
           <div className="footer-links"><a href="mailto:hello@tiho-candles.ru">Email</a><a href="#top">Telegram</a><a href="#top">Instagram*</a><a href="/admin">Управление</a></div>

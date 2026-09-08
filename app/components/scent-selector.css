@@ -1,0 +1,147 @@
+/* One lit candle identifies the selected scent. Native buttons retain keyboard support. */
+.scent-options {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px;
+}
+.scent-option {
+  --sample-wax:#f7f5ef;
+  position:relative;
+  isolation:isolate;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  min-width:0;
+  min-height:124px;
+  padding:20px 18px;
+  border:1px solid #28221f18;
+  border-radius:18px;
+  background:#f3efe8;
+  color:var(--ink);
+  text-align:left;
+  -webkit-appearance:none;
+  appearance:none;
+  transition:background-color .5s ease,border-color .5s ease,transform .25s ease;
+}
+.scent-option::before {
+  content:"";
+  position:absolute;
+  inset:-1px;
+  z-index:-1;
+  pointer-events:none;
+  border-radius:inherit;
+  background:radial-gradient(ellipse at 20% 32%,#efc8992b,transparent 72%);
+  opacity:0;
+  transition:opacity .65s ease;
+}
+.scent-option.selected { border-color:#9b85705e; background:#fffdf8; }
+.scent-option.selected::before { opacity:1; }
+.scent-option:focus-visible { outline:2px solid var(--wine); outline-offset:4px; }
+.scent-option:active { transform:scale(.985); }
+.scent-option-text { display:grid; align-content:center; gap:8px; min-width:0; }
+.scent-option-text strong { font-size:14px; font-weight:500; line-height:1.45;  }
+.scent-option-text small { font-size:12px; font-weight:400; line-height:1.4; color:#817266;  }
+.scent-candle { position:relative; display:block; flex:0 0 42px; height:78px; }
+.scent-candle::after { content:""; position:absolute; bottom:1px; left:0; width:44px; height:6px; border-radius:50%; background:radial-gradient(ellipse,#49342120,transparent 70%); }
+.scent-candle-wax {
+  position:absolute;
+  left:6px;
+  bottom:5px;
+  width:30px;
+  height:41px;
+  border-radius:50% / 7%;
+  border:1px solid color-mix(in srgb,var(--sample-wax),#756759 16%);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--sample-wax),#000 12%),var(--sample-wax) 22%,color-mix(in srgb,var(--sample-wax),#fff 22%) 48%,var(--sample-wax) 76%,color-mix(in srgb,var(--sample-wax),#000 20%));
+  box-shadow:3px 5px 9px #49342116;
+}
+.scent-candle-wax::before {
+  content:"";
+  position:absolute;
+  left:-1px;
+  right:-1px;
+  top:-2px;
+  height:5px;
+  border-radius:50%;
+  border:1px solid #75675918;
+  background:color-mix(in srgb,var(--sample-wax),#fff 30%);
+}
+.scent-candle-wax::after { content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:linear-gradient(120deg,#fff8,#ffdeae40 30%,transparent 65%); opacity:0; transition:opacity .75s ease; }
+.scent-option.selected .scent-candle-wax::after { opacity:1; }
+.scent-candle-wick { position:absolute; left:20px; bottom:46px; width:2px; height:7px; border-radius:2px; background:#615145; transform:rotate(5deg); }
+.scent-candle-halo {
+  position:absolute;
+  width:96px;
+  height:96px;
+  left:50%;
+  top:-32px;
+  border-radius:50%;
+  pointer-events:none;
+  background:radial-gradient(circle,#ffdda96b 0%,#ffd69c24 33%,transparent 67%);
+  opacity:0;
+  transform:translateX(-50%) scale(.65);
+  transition:opacity .8s ease,transform .8s ease;
+}
+.scent-candle-flame {
+  position:absolute;
+  left:15px;
+  bottom:52px;
+  width:12px;
+  height:22px;
+  opacity:0;
+  transform:translateY(3px) scale(.25);
+  transform-origin:50% 100%;
+  transition:opacity .25s ease,transform .45s cubic-bezier(.22,.75,.25,1);
+}
+.scent-candle-flame>span {
+  display:block;
+  position:relative;
+  width:100%;
+  height:100%;
+  border-radius:60% 40% 48% 52% / 75% 65% 35% 25%;
+  background:linear-gradient(0deg,#ce7b34 0%,#f4b45f 32%,#f9d69b 76%,#fff2d8);
+  box-shadow:0 0 8px #f6c27b55;
+  transform-origin:50% 100%;
+}
+.scent-candle-flame>span::after { content:""; position:absolute; bottom:2px; left:4px; width:4px; height:11px; border-radius:65% 35% 45% 55%; background:#fff7e2; }
+.scent-option.selected .scent-candle-halo { opacity:1; transform:translateX(-50%) scale(1); }
+.scent-option.selected .scent-candle-flame { opacity:1; transform:translateY(0) scale(1); transition-duration:.4s,.6s; }
+.scent-candle-smoke { position:absolute; bottom:47px; left:5px; width:32px; height:48px; pointer-events:none; opacity:0; color:#8d7e71; transform-origin:50% 100%; }
+.scent-candle-smoke path { stroke:currentColor; stroke-width:1.1; stroke-linecap:round; }
+.scent-candle-smoke path+path { stroke-width:1.8; opacity:.2; }
+/* A brief settling flame; it becomes still after ignition, including off screen. */
+@media(prefers-reduced-motion:no-preference) {
+  .scent-option.selected .scent-candle-flame>span { animation:scent-flame-settle 2.8s ease-in-out 2; }
+  .scent-option.just-extinguished .scent-candle-smoke { animation:scent-smoke-release 1.35s ease-out both; }
+  @media(hover:hover) { .scent-option:hover { border-color:#9b857060; background-color:#fbf8f2; }.scent-option.selected:hover { background-color:#fffdf8; } }
+}
+@keyframes scent-smoke-release {
+  0% { opacity:0; transform:translate(0,7px) scale(.65,.45); }
+  18% { opacity:.48; }
+  55% { opacity:.26; transform:translate(-2px,-3px) scale(.9,.8); }
+  100% { opacity:0; transform:translate(5px,-14px) scale(1.15,1.05); }
+}
+@keyframes scent-flame-settle {
+  0%,100% { transform:rotate(0deg) scale(1); }
+  22% { transform:rotate(-5deg) scale(.96,1.04); }
+  48% { transform:rotate(3deg) scale(1.04,.97); }
+  73% { transform:rotate(-2deg) scale(.98,1.02); }
+}
+@media(max-width:1100px) { .scent-options { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:580px) {
+  .scent-options { gap:10px; }
+  .scent-option { flex-direction:column; gap:8px; min-height:178px; padding:17px 12px 19px; border-radius:16px; text-align:center; }
+  .scent-candle { flex-basis:auto; flex-shrink:0; width:42px; height:74px; }
+  .scent-option-text { gap:6px; width:100%; }
+  .scent-option-text strong { font-size:13px; line-height:1.4; }
+  .scent-option-text small { font-size:11px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .scent-option,.scent-option::before,.scent-candle-halo,.scent-candle-flame,.scent-candle-wax::after { transition:none; }
+  .scent-option:active { transform:none; }
+  .scent-candle-flame>span { animation:none; }
+  .scent-candle-smoke { display:none; }
+}
+@media(forced-colors:active) {
+  .scent-option { border-color:ButtonText; }
+  .scent-option.selected { outline:2px solid Highlight; outline-offset:-3px; }
+}
