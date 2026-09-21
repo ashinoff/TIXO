@@ -13,7 +13,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const temp = mkdtempSync(path.join(tmpdir(), 'tixo-domain-'));
 writeFileSync(path.join(temp, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(root, 'node_modules'), path.join(temp, 'node_modules'), 'dir');
-for (const file of ['catalog', 'server/db', 'server/validation', 'server/products', 'server/orders', 'server/uploads']) {
+for (const file of ['atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/orders', 'server/uploads']) {
   const target = path.join(temp, 'lib', `${file}.js`);
   mkdirSync(path.dirname(target), { recursive: true });
   const output = ts.transpileModule(readFileSync(path.join(root, 'lib', `${file}.ts`), 'utf8'), {
@@ -25,11 +25,45 @@ process.on('exit', () => rmSync(temp, { recursive: true, force: true }));
 const require = createRequire(path.join(temp, 'test.cjs'));
 const { parseOrder, parseScent } = require('./lib/server/validation');
 const { cartKey, selectVariant, availableVariants } = require('./lib/catalog');
+const { isRecipe, recipeKey } = require('./lib/atelier');
 const domain = require('./lib/server/db');
 const { saveProduct } = require('./lib/server/products');
 const { createOrder, deleteOrder } = require('./lib/server/orders');
 const customer = { customerName:'Тестовый покупатель', phone:'+79990000000', email:'test@example.com', address:'Тестовый адрес', delivery:'Пункт выдачи', comment:'' };
 const orderBody = items => ({ ...customer, items, requestKey: randomUUID() });
+const recipe = { shape:'sphere', color:'red', top:'lemon', heart:'fig', base:'oud' };
+
+test('custom candle choices are validated, copied and aggregated separately from catalog lines', () => {
+  assert.equal(isRecipe(recipe), true);
+  for (const key of Object.keys(recipe)) {
+    for (const value of ['', 'unknown', '__proto__', 'toString', null, 1, ['sphere']]) {
+      assert.throws(() => parseOrder(orderBody([{ customRecipe:{...recipe,[key]:value}, quantity:1 }])));
+    }
+    const missing = {...recipe}; delete missing[key];
+    assert.throws(() => parseOrder(orderBody([{customRecipe:missing,quantity:1}])));
+  }
+  for (const invalid of [null, [], '', 0, false]) assert.throws(() => parseOrder(orderBody([{customRecipe:invalid,quantity:1}])));
+  for (const quantity of [0,-1,1.5,100,null,'',true,'1e1']) assert.throws(() => parseOrder(orderBody([{customRecipe:recipe,quantity}])));
+  assert.throws(() => parseOrder(orderBody([{customRecipe:recipe,quantity:70},{customRecipe:recipe,quantity:30}])));
+  assert.throws(() => parseOrder(orderBody([{customRecipe:recipe,productId:1,quantity:1}])));
+  assert.throws(() => parseOrder(orderBody([{customRecipe:recipe,variantId:1,quantity:1}])));
+  assert.throws(() => parseOrder(orderBody([{customRecipe:recipe,scentId:1,quantity:1}])));
+  const input = {...recipe,price:1,label:'untrusted'};
+  const other = {...recipe,color:'ivory'};
+  const parsed = parseOrder(orderBody([
+    {customRecipe:input,quantity:1,price:1,quotePending:false},
+    {customRecipe:recipe,quantity:2},
+    {customRecipe:other,quantity:1},
+    {productId:1,scentId:2,quantity:1},
+  ]));
+  assert.deepEqual(parsed.items, [
+    {customRecipe:recipe,quantity:3}, {customRecipe:other,quantity:1},
+    {productId:1,variantId:null,scentId:2,quantity:1},
+  ]);
+  input.color = 'black';
+  assert.equal(parsed.items[0].customRecipe.color,'red');
+  assert.notEqual(recipeKey(recipe),recipeKey(other));
+});
 
 test('invalid quantities and partial malformed carts are rejected, duplicates are aggregated', () => {
   for (const quantity of [0, -1, 1.5, 100, null, '', true, '1e1']) assert.throws(() => parseOrder(orderBody([{ productId:1, quantity }])));
@@ -138,6 +172,52 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await assert.rejects(createOrder(orderBody([{productId:1,scentId:ids[0],quantity:1}])), /аромат/);
     await pool.query('UPDATE scents SET active=TRUE WHERE id=$1',[ids[0]]);
     await pool.query('UPDATE products SET stock=12 WHERE id=1');
+  });
+  await t.test('custom-only orders store a canonical quote request without reserving stock; retries are idempotent', async () => {
+    const beforeProducts = (await pool.query('SELECT * FROM products ORDER BY id')).rows;
+    const beforeVariants = (await pool.query('SELECT * FROM product_variants ORDER BY id')).rows;
+    const inputRecipe = {...recipe};
+    const request = orderBody([{customRecipe:inputRecipe,quantity:2,price:999,quotePending:false,name:'Untrusted name'}]);
+    const [order,retry] = await Promise.all([createOrder(request),createOrder(request)]);
+    assert.equal(order.id,retry.id);
+    assert.equal(order.total,0);
+    assert.equal(order.stockReserved,false);
+    assert.equal(order.items[0].quotePending,true);
+    assert.equal(order.items[0].price,0);
+    assert.equal(order.items[0].productId,0);
+    assert.equal(order.items[0].name,'Авторская свеча · Сфера');
+    assert.equal(order.items[0].scentName,'Лимон / Инжир / Уд');
+    assert.equal(order.items[0].colorName,'Винный');
+    inputRecipe.color = 'black';
+    const stored = domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[order.id])).rows[0]);
+    assert.deepEqual(stored.items[0].customRecipe,recipe);
+    assert.deepEqual((await pool.query('SELECT * FROM products ORDER BY id')).rows,beforeProducts);
+    assert.deepEqual((await pool.query('SELECT * FROM product_variants ORDER BY id')).rows,beforeVariants);
+    await deleteOrder(order.id);
+    assert.equal((await pool.query('SELECT id FROM orders WHERE id=$1',[order.id])).rowCount,0);
+    assert.deepEqual((await pool.query('SELECT * FROM products ORDER BY id')).rows,beforeProducts);
+  });
+  await t.test('mixed catalog and custom orders price and restore only catalog stock', async () => {
+    const scentId = Number((await pool.query('SELECT id FROM scents WHERE active=TRUE ORDER BY id LIMIT 1')).rows[0].id);
+    const beforeStock = (await domain.listProducts(true,1))[0].stock;
+    const order = await createOrder(orderBody([
+      {customRecipe:recipe,quantity:3,price:1},
+      {productId:1,scentId,quantity:2,price:1},
+      {customRecipe:{...recipe,color:'ivory'},quantity:1},
+    ]));
+    assert.equal(order.items.length,3);
+    assert.equal(order.total,3000);
+    assert.equal(order.stockReserved,true);
+    assert.equal(order.items.filter(item=>item.quotePending).length,2);
+    assert.equal((await domain.listProducts(true,1))[0].stock,beforeStock-2);
+    await deleteOrder(order.id);
+    assert.equal((await domain.listProducts(true,1))[0].stock,beforeStock);
+    const countBefore = (await pool.query('SELECT id FROM orders')).rowCount;
+    await assert.rejects(createOrder(orderBody([
+      {customRecipe:recipe,quantity:1}, {productId:1,scentId,quantity:1}, {productId:99999,scentId,quantity:1},
+    ])), error=>error.status===409);
+    assert.equal((await domain.listProducts(true,1))[0].stock,beforeStock);
+    assert.equal((await pool.query('SELECT id FROM orders')).rowCount,countBefore);
   });
   await t.test('global color is unique, preview shapes are validated and variant photos are optional', async () => {
     const insert = async (name, color) => Number((await pool.query("INSERT INTO scents(name,color,color_name,description,notes) VALUES($1,$2,$1,'Композиция',ARRAY['нота']) RETURNING id", [name,color])).rows[0].id);

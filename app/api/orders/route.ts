@@ -17,6 +17,7 @@ export async function GET() {
 export async function POST(request:Request) {
   try {
     const order = await createOrder(await request.json());
-    return NextResponse.json({ orderNumber: order.orderNumber, total: order.total }, { status: 201 });
+    return NextResponse.json({ orderNumber: order.orderNumber, total: order.total,
+      quotePending: order.items.some(item => item.quotePending === true) }, { status: 201 });
   } catch (error) { return apiError(error); }
 }

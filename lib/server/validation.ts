@@ -1,3 +1,5 @@
+import { isRecipe, recipeKey, type Recipe } from "../atelier";
+
 export class InputError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
@@ -30,6 +32,16 @@ export function parseScent(body: Record<string, unknown>) {
   };
 }
 
+type CatalogOrderLine = { productId: number; variantId: number | null; scentId?: number; quantity: number; customRecipe?: never };
+type CustomOrderLine = { customRecipe: Recipe; quantity: number; productId?: never; variantId?: never; scentId?: never };
+export type OrderLine = CatalogOrderLine | CustomOrderLine;
+
+export function parseRecipe(value: unknown): Recipe {
+  if (!isRecipe(value)) throw new InputError("Проверьте форму, цвет и ноты авторской свечи");
+  // Copy only server-recognised choices; never trust client labels, price or extra fields.
+  return { shape: value.shape, color: value.color, top: value.top, heart: value.heart, base: value.base };
+}
+
 export function parseOrder(body: Record<string, unknown>) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные заказа");
   const customerName = textValue(body.customerName, "Имя", 160);
@@ -42,9 +54,18 @@ export function parseOrder(body: Record<string, unknown>) {
   const requestKey = body.requestKey === undefined ? null : textValue(body.requestKey, "Номер запроса", 36);
   if (requestKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) throw new InputError("Некорректный номер запроса");
   if (!Array.isArray(body.items) || !body.items.length || body.items.length > 100) throw new InputError("Проверьте состав заказа");
-  const lines = new Map<string, { productId: number; variantId: number | null; scentId?: number; quantity: number }>();
+  const lines = new Map<string, OrderLine>();
   for (const value of body.items) {
-    if (!value || typeof value !== "object") throw new InputError("Проверьте состав заказа");
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new InputError("Проверьте состав заказа");
+    if (Object.hasOwn(value, "customRecipe")) {
+      if (value.productId != null || value.variantId != null || value.scentId != null) throw new InputError("Авторская свеча не должна содержать вариант из каталога");
+      const customRecipe = parseRecipe(value.customRecipe);
+      const key = recipeKey(customRecipe);
+      const quantity = integer(value.quantity, "Количество", 1, 99) + (lines.get(key)?.quantity ?? 0);
+      if (quantity > 99) throw new InputError("Не более 99 свечей одного рецепта в заказе");
+      lines.set(key, { customRecipe, quantity });
+      continue;
+    }
     const productId = integer(value.productId, "Товар", 1);
     const variantId = value.variantId == null ? null : integer(value.variantId, "Вариант", 1);
     const scentId = value.scentId == null ? undefined : integer(value.scentId, "Аромат", 1);

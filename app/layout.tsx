@@ -3,7 +3,7 @@ import "@fontsource-variable/raleway/wght.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ТИХО — скульптурные свечи и ароматы для дома",
+  title: "ТИХО — пусть мир подождёт",
   description: "ТИХО — скульптурные свечи и авторские ароматы, созданные вручную.",
   icons: {
     icon: "/favicon.svg",

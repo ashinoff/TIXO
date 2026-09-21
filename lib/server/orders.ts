@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { OrderItem } from "../catalog";
 import { productShape, type CandleShape } from "../catalog";
+import { atelierShapes, atelierColors, atelierColorHex, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "../atelier";
 import { ensureSchema, getPool, mapOrder } from "./db";
 import { InputError, parseOrder } from "./validation";
 
@@ -15,7 +16,7 @@ export async function createOrder(body: Record<string, unknown>) {
       const prior = await db.query("SELECT * FROM orders WHERE request_key=$1", [order.requestKey]);
       if (prior.rowCount) { await db.query("COMMIT"); return mapOrder(prior.rows[0]); }
     }
-    const ids = [...new Set(order.items.map(item => item.productId))].sort((a, b) => a - b);
+    const ids = [...new Set(order.items.flatMap(item => item.customRecipe ? [] : [item.productId]))].sort((a, b) => a - b);
     // All writers lock products before variants, in ID order.
     const products = await db.query("SELECT * FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
     const variants = await db.query(`SELECT v.*, s.name AS scent_name, s.color, s.color_name, s.active AS scent_active
@@ -24,6 +25,14 @@ export async function createOrder(body: Record<string, unknown>) {
     const scents = await db.query("SELECT * FROM scents WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.scentId ? [line.scentId] : []))]]);
     const items: OrderItem[] = [];
     for (const line of order.items) {
+      if (line.customRecipe) {
+        const recipe = line.customRecipe;
+        items.push({ productId: 0, name: `Авторская свеча · ${atelierShapes[recipe.shape]}`,
+          scentName: `${atelierTopNotes[recipe.top]} / ${atelierHeartNotes[recipe.heart]} / ${atelierBaseNotes[recipe.base]}`,
+          color: atelierColorHex[recipe.color], colorName: atelierColors[recipe.color],
+          price: 0, quantity: line.quantity, customRecipe: recipe, quotePending: true });
+        continue;
+      }
       const product = products.rows.find(p => Number(p.id) === line.productId);
       if (!product?.published) throw new InputError("Один из товаров больше недоступен. Обновите корзину.", 409);
       const choices = variants.rows.filter(v => Number(v.product_id) === line.productId);
@@ -52,8 +61,8 @@ export async function createOrder(body: Record<string, unknown>) {
     if (!Number.isSafeInteger(total) || total > 2147483647) throw new InputError("Сумма заказа слишком велика");
     const orderNumber = `T-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
     const result = await db.query(`INSERT INTO orders(order_number,customer_name,phone,email,address,delivery,comment,items,total,stock_reserved,request_key)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,TRUE,$10) RETURNING *`,
-    [orderNumber, order.customerName, order.phone, order.email, order.address, order.delivery, order.comment, JSON.stringify(items), total, order.requestKey]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11) RETURNING *`,
+    [orderNumber, order.customerName, order.phone, order.email, order.address, order.delivery, order.comment, JSON.stringify(items), total, ids.length > 0, order.requestKey]);
     await db.query("COMMIT");
     return mapOrder(result.rows[0]);
   } catch (error) { await db.query("ROLLBACK"); throw error; }
@@ -69,10 +78,11 @@ export async function deleteOrder(id: number) {
     if (!result.rowCount) throw new InputError("Заказ не найден", 404);
     const order = mapOrder(result.rows[0]);
     if (order.stockReserved && order.status !== "completed") {
-      const ids = [...new Set(order.items.map(item => item.productId))].sort((a, b) => a - b);
+      const catalogItems = order.items.filter(item => !item.customRecipe);
+      const ids = [...new Set(catalogItems.map(item => item.productId))].sort((a, b) => a - b);
       await db.query("SELECT id FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
       await db.query("SELECT id FROM product_variants WHERE product_id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
-      for (const item of order.items) {
+      for (const item of catalogItems) {
         if (item.variantId) await db.query("UPDATE product_variants SET stock=stock+$1,updated_at=NOW() WHERE id=$2 AND product_id=$3", [item.quantity, item.variantId, item.productId]);
         else {
           // A legacy order cannot be restored into a guessed scent after conversion.

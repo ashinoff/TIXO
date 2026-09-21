@@ -20,3 +20,18 @@
 .admin-header h1,.login-card h1,.product-editor header h2,.scent-admin-body h2,.empty-admin h2 { font-weight:300; }.admin-stats strong,.order-card>header>strong { font-weight:350; font-variant-numeric:lining-nums tabular-nums; }.scent-editor-sample span { font-weight:250;  }
 
 .admin-logo,.scent-editor-sample span { letter-spacing:.14em; }
+
+/* Keep the administration usable independently of the storefront theme. */
+.admin-shell,.admin-login { color:var(--admin-ink); font-family:var(--admin-font,Arial,sans-serif); }
+.admin-shell .modal-backdrop { position:fixed; inset:0; z-index:100; display:flex; justify-content:flex-end; background:#211a1866; backdrop-filter:blur(5px); }
+.admin-shell .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.admin-shell button:focus-visible,.admin-shell a:focus-visible,.admin-shell input:focus-visible,.admin-shell select:focus-visible,.admin-shell textarea:focus-visible,.admin-login input:focus-visible,.admin-login button:focus-visible { outline:2px solid var(--admin-wine); outline-offset:4px; }
+.order-card>header>strong { max-width:55%; text-align:right; font-size:clamp(18px,2vw,27px); }
+.order-quote-note { margin:0; padding:14px 24px; background:#efe8dc; border-bottom:1px solid var(--admin-line); color:#6d594a; font-size:13px; line-height:1.6; }
+.order-recipe { display:grid; gap:4px; margin:10px 0 0; font-size:12px; }
+.order-recipe>div { display:grid; grid-template-columns:65px minmax(0,1fr); gap:8px; }
+.order-recipe dt { color:#7d6c60; }.order-recipe dd { margin:0; }
+.order-line:has(.order-recipe) { align-items:start; }.order-line:has(.order-recipe)>b { color:var(--admin-wine); }
+@keyframes drawer-arrive { from { transform:translateX(100%); } to { transform:translateX(0); } }
+@media(max-width:750px) { .order-quote-note { padding:14px 18px; } }
+@media(prefers-reduced-motion:reduce) { .product-editor { animation:none; }.admin-toast { transition:none; } }

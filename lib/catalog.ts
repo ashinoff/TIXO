@@ -1,3 +1,5 @@
+import type { Recipe } from "./atelier";
+
 export type Scent = {
   id: number;
   name: string;
@@ -54,6 +56,9 @@ export type OrderItem = {
   image?: string | null;
   price: number;
   quantity: number;
+  /** Custom items have no catalog price yet; price contributes 0 to the known subtotal. */
+  customRecipe?: Recipe;
+  quotePending?: boolean;
 };
 
 export type CartLine = { productId: number; variantId: number | null; scentId?: number | null; quantity: number };
