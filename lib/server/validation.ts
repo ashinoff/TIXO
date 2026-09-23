@@ -83,3 +83,23 @@ export function parseOrder(body: Record<string, unknown>) {
   }
   return { customerName, phone, email, address, delivery, comment, requestKey, items: [...lines.values()] };
 }
+
+export function parseForm(body: Record<string, unknown>) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные формы");
+  if (typeof body.active !== "boolean") throw new InputError("Укажите доступность формы");
+  const shape = textValue(body.shape, "Силуэт", 20);
+  if (!["twist", "ribbed", "bubble", "arch", "shell", "knot"].includes(shape)) throw new InputError("Выберите силуэт для предпросмотра");
+  return { name: textValue(body.name, "Название формы", 160), active: body.active, shape };
+}
+
+export function parseAromaProfile(body: Record<string, unknown>) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте главы аромата");
+  const result = {} as import("../catalog").AromaProfile;
+  for (const key of ["top", "heart", "base"] as const) {
+    const stage = body[key];
+    if (!stage || typeof stage !== "object" || Array.isArray(stage)) throw new InputError("Заполните три главы аромата");
+    const value = stage as Record<string, unknown>;
+    result[key] = { notes: textValue(value.notes, "Ноты", 240, false), description: textValue(value.description, "Описание главы", 2000, false) };
+  }
+  return result;
+}

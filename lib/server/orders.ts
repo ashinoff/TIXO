@@ -17,11 +17,8 @@ export async function createOrder(body: Record<string, unknown>) {
       if (prior.rowCount) { await db.query("COMMIT"); return mapOrder(prior.rows[0]); }
     }
     const ids = [...new Set(order.items.flatMap(item => item.customRecipe ? [] : [item.productId]))].sort((a, b) => a - b);
-    // All writers lock products before variants, in ID order.
     const products = await db.query("SELECT * FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
-    const variants = await db.query(`SELECT v.*, s.name AS scent_name, s.active AS scent_active, c.hex AS color, c.name AS color_name, c.active AS color_active
-      FROM product_variants v JOIN scents s ON s.id=v.scent_id JOIN colors c ON c.id=v.color_id
-      WHERE v.product_id=ANY($1::bigint[]) ORDER BY v.id FOR UPDATE OF v FOR SHARE OF s,c`, [ids]);
+    const forms = await db.query("SELECT * FROM candle_forms WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [products.rows.map(p => p.form_id).filter(Boolean)]);
     const scents = await db.query("SELECT * FROM scents WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.scentId ? [line.scentId] : []))]]);
     const colors = await db.query("SELECT * FROM colors WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.colorId ? [line.colorId] : []))]]);
     const items: OrderItem[] = [];
@@ -35,31 +32,22 @@ export async function createOrder(body: Record<string, unknown>) {
         continue;
       }
       const product = products.rows.find(p => Number(p.id) === line.productId);
-      if (!product?.published) throw new InputError("Один из товаров больше недоступен. Обновите корзину.", 409);
-      const choices = variants.rows.filter(v => Number(v.product_id) === line.productId);
-      const variant = line.variantId === null ? null : choices.find(v => Number(v.id) === line.variantId);
-      if ((choices.length && !variant) || (line.variantId !== null && !variant)) throw new InputError(`Выберите доступный аромат для «${product.name}»`, 409);
-      if (variant && (!variant.active || !variant.scent_active || !variant.color_active || (line.scentId && Number(variant.scent_id) !== line.scentId) || (line.colorId && Number(variant.color_id) !== line.colorId))) throw new InputError(`Этот вариант «${product.name}» больше недоступен`, 409);
-      const scent = variant ? { id: variant.scent_id, name: variant.scent_name } : scents.rows.find(s => Number(s.id) === line.scentId && s.active);
+      const form = forms.rows.find(f => Number(f.id) === Number(product?.form_id));
+      if (!product?.published || product.archived || form?.active === false) throw new InputError("Один из товаров больше недоступен. Обновите корзину.", 409);
+      if (line.variantId !== null || (product.scent_id && Number(product.scent_id) !== line.scentId) || (product.color_id && Number(product.color_id) !== line.colorId)) throw new InputError(`Сочетание для «${form?.name || product.name}» изменилось. Выберите свечу заново.`, 409);
+      const scent = scents.rows.find(s => Number(s.id) === line.scentId && s.active);
       if (!scent) throw new InputError(`Выберите доступный аромат для «${product.name}»`, 409);
-      const color = variant ? { id: variant.color_id, name: variant.color_name, hex: variant.color } : colors.rows.find(c => Number(c.id) === line.colorId && c.active);
+      const color = colors.rows.find(c => Number(c.id) === line.colorId && c.active);
       if (!color) throw new InputError(`Выберите доступный цвет для «${product.name}»`, 409);
-      const stock = variant ? variant.stock : product.stock;
+      const stock = product.stock;
       if (line.quantity > stock) throw new InputError(`«${product.name}»: доступно ещё ${stock} шт. для этого заказа.`, 409);
-      items.push({ productId: line.productId, variantId: variant ? Number(variant.id) : null, name: product.name,
+      items.push({ productId: line.productId, variantId: null, name: form?.name || product.name,
         scentId: Number(scent.id), scentName: scent.name, colorId: Number(color.id), color: color.hex, colorName: color.name,
-        shape: productShape({ id: Number(product.id), shape: product.shape as CandleShape | undefined }),
-        image: variant?.image ?? product.image, price: product.price, quantity: line.quantity });
-      if (variant) {
-        await db.query("UPDATE product_variants SET stock=stock-$1,updated_at=NOW() WHERE id=$2", [line.quantity, variant.id]);
-        variant.stock -= line.quantity;
-      } else {
-        await db.query("UPDATE products SET stock=stock-$1,updated_at=NOW() WHERE id=$2", [line.quantity, product.id]);
-        product.stock -= line.quantity;
-      }
+        shape: productShape({ id: Number(product.id), shape: (form?.shape ?? product.shape) as CandleShape | undefined }),
+        image: product.image, price: product.price, quantity: line.quantity });
+      await db.query("UPDATE products SET stock=stock-$1,updated_at=NOW() WHERE id=$2", [line.quantity, product.id]);
+      product.stock -= line.quantity;
     }
-    await db.query(`UPDATE products p SET stock=(SELECT SUM(stock) FROM product_variants WHERE product_id=p.id),updated_at=NOW()
-      WHERE p.id=ANY($1::bigint[]) AND EXISTS(SELECT 1 FROM product_variants WHERE product_id=p.id)`, [ids]);
     const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     if (!Number.isSafeInteger(total) || total > 2147483647) throw new InputError("Сумма заказа слишком велика");
     const orderNumber = `T-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
@@ -82,20 +70,22 @@ export async function deleteOrder(id: number) {
     const order = mapOrder(result.rows[0]);
     if (order.stockReserved && order.status !== "completed") {
       const catalogItems = order.items.filter(item => !item.customRecipe);
-      const ids = [...new Set(catalogItems.map(item => item.productId))].sort((a, b) => a - b);
-      await db.query("SELECT id FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
-      await db.query("SELECT id FROM product_variants WHERE product_id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
-      for (const item of catalogItems) {
-        if (item.variantId) await db.query("UPDATE product_variants SET stock=stock+$1,updated_at=NOW() WHERE id=$2 AND product_id=$3", [item.quantity, item.variantId, item.productId]);
-        else {
-          // A legacy order cannot be restored into a guessed scent after conversion.
-          const converted = await db.query("SELECT 1 FROM product_variants WHERE product_id=$1 LIMIT 1", [item.productId]);
-          if (converted.rowCount) throw new InputError("В заказе исходный вариант, а товар уже разделён по ароматам. Сначала завершите заказ и скорректируйте нужный остаток вручную.", 409);
-          await db.query("UPDATE products SET stock=stock+$1,updated_at=NOW() WHERE id=$2", [item.quantity, item.productId]);
-        }
+      const legacy = await db.query("SELECT id,legacy_variant_id,legacy_parent_id FROM products WHERE legacy_variant_id=ANY($1::bigint[])", [catalogItems.map(item => item.variantId).filter(Boolean)]);
+      const targets = catalogItems.map(item => {
+        if (!item.variantId) return { item, id: item.productId };
+        const mapped = legacy.rows.find(p => Number(p.legacy_variant_id) === item.variantId && Number(p.legacy_parent_id) === item.productId);
+        if (!mapped) throw new InputError("Не удалось найти свечу из старого заказа. Проверьте остаток вручную перед завершением заказа.", 409);
+        return { item, id: Number(mapped.id) };
+      });
+      const ids = [...new Set(targets.map(target => target.id))].sort((a, b) => a - b);
+      const rows = await db.query("SELECT * FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
+      for (const { item, id: targetId } of targets) {
+        const product = rows.rows.find(p => Number(p.id) === targetId);
+        if (!product) throw new InputError("Свеча из заказа удалена. Проверьте остаток вручную перед завершением заказа.", 409);
+        if (!item.variantId && (await db.query("SELECT 1 FROM product_variants WHERE product_id=$1 LIMIT 1", [targetId])).rowCount) throw new InputError("В старом заказе общий остаток, а свечи уже разделены. Проверьте количество вручную перед завершением заказа.", 409);
+        if (!item.variantId && ((product.color_id && Number(product.color_id) !== item.colorId) || (product.scent_id && Number(product.scent_id) !== item.scentId))) throw new InputError("Сочетание свечи изменилось. Проверьте остаток вручную перед завершением заказа.", 409);
+        await db.query("UPDATE products SET stock=stock+$1,updated_at=NOW() WHERE id=$2", [item.quantity, targetId]);
       }
-      await db.query(`UPDATE products p SET stock=(SELECT SUM(stock) FROM product_variants WHERE product_id=p.id),updated_at=NOW()
-        WHERE p.id=ANY($1::bigint[]) AND EXISTS(SELECT 1 FROM product_variants WHERE product_id=p.id)`, [ids]);
     }
     await db.query("DELETE FROM orders WHERE id=$1", [id]);
     await db.query("COMMIT");

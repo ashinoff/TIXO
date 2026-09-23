@@ -23,8 +23,8 @@ export async function DELETE(_request: Request, context: Context) {
   try {
     const id = integer((await context.params).id, "Аромат", 1);
     await ensureSchema();
-    const used = await getPool().query("SELECT 1 FROM product_variants WHERE scent_id=$1 LIMIT 1", [id]);
-    if (used.rowCount) return NextResponse.json({ error: "Аромат связан с формами свечей. Отключите его, чтобы сохранить варианты и остатки." }, { status: 409 });
+    const used = await getPool().query("SELECT 1 FROM products WHERE scent_id=$1 UNION ALL SELECT 1 FROM product_variants WHERE scent_id=$1 LIMIT 1", [id]);
+    if (used.rowCount) return NextResponse.json({ error: "Аромат используется в свечах. Отключите его, чтобы сохранить свечи и остатки." }, { status: 409 });
     const result = await getPool().query("DELETE FROM scents WHERE id=$1", [id]);
     return result.rowCount ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Аромат не найден" }, { status: 404 });
   } catch (error) { return apiError(error); }

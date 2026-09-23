@@ -1,6 +1,6 @@
 import { Pool } from "pg";
-import type { Product, OrderItem, Scent, Variant, CandleColor } from "../catalog";
-import { candleShapes, productShape, type CandleShape } from "../catalog";
+import type { Product, OrderItem, Scent, Variant, CandleColor, CandleForm } from "../catalog";
+import { candleShapes, emptyAromaProfile, productShape, type CandleShape } from "../catalog";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
@@ -126,6 +126,31 @@ export async function ensureSchema() {
     await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE");
     await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT");
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key_unique ON orders (request_key) WHERE request_key IS NOT NULL");
+    await db.query(`CREATE TABLE IF NOT EXISTS candle_forms (
+      id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, shape TEXT NOT NULL DEFAULT 'ribbed', active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS candle_forms_name_unique ON candle_forms(LOWER(name))");
+    await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS profile JSONB NOT NULL DEFAULT '{}'::jsonb");
+    await db.query(`ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS form_id BIGINT REFERENCES candle_forms(id) ON DELETE RESTRICT,
+      ADD COLUMN IF NOT EXISTS color_id BIGINT REFERENCES colors(id) ON DELETE RESTRICT,
+      ADD COLUMN IF NOT EXISTS scent_id BIGINT REFERENCES scents(id) ON DELETE RESTRICT,
+      ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS legacy_variant_id BIGINT UNIQUE,
+      ADD COLUMN IF NOT EXISTS legacy_parent_id BIGINT`);
+    const inventory = await db.query("INSERT INTO app_migrations(key) VALUES('individual-candles-v1') ON CONFLICT DO NOTHING RETURNING key");
+    if (inventory.rowCount) {
+      await db.query(`INSERT INTO candle_forms(name,shape)
+        SELECT DISTINCT ON (LOWER(name)) name, COALESCE(shape,CASE (id-1)%6 WHEN 0 THEN 'twist' WHEN 1 THEN 'ribbed' WHEN 2 THEN 'bubble' WHEN 3 THEN 'arch' WHEN 4 THEN 'shell' ELSE 'knot' END) FROM products ORDER BY LOWER(name),id ON CONFLICT DO NOTHING`);
+      await db.query("UPDATE products p SET form_id=f.id FROM candle_forms f WHERE LOWER(p.name)=LOWER(f.name) AND p.form_id IS NULL");
+      // One physical variant becomes one candle. Preserve a link for cancellation of historical orders.
+      await db.query(`INSERT INTO products(name,category,category_id,notes,price,stock,published,image,shape,form_id,color_id,scent_id,legacy_variant_id,legacy_parent_id)
+        SELECT p.name,p.category,p.category_id,p.notes,p.price,v.stock,p.published AND v.active,COALESCE(v.image,p.image),p.shape,p.form_id,v.color_id,v.scent_id,v.id,p.id
+        FROM product_variants v JOIN products p ON p.id=v.product_id ORDER BY v.id`);
+      await db.query("UPDATE products SET archived=TRUE,published=FALSE,stock=0 WHERE id IN (SELECT product_id FROM product_variants)");
+      await db.query("UPDATE product_variants SET stock=0,active=FALSE");
+    }
     await db.query("COMMIT");
     } catch (error) { await db.query("ROLLBACK"); throw error; }
     finally { db.release(); }
@@ -134,7 +159,9 @@ export async function ensureSchema() {
 }
 
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
-  return { id:Number(row.id), name:String(row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[], shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : productShape({id:Number(row.id)}) };
+  return { formId: row.form_id ? Number(row.form_id) : null, colorId: row.color_id ? Number(row.color_id) : null, scentId: row.scent_id ? Number(row.scent_id) : null,
+    form: row.form ? mapForm(row.form as Record<string, unknown>) : null, color: row.color ? mapColor(row.color as Record<string, unknown>) : null, scent: row.scent ? mapScent(row.scent as Record<string, unknown>) : null,
+    id:Number(row.id), name:String(row.form_name || row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[], shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : productShape({id:Number(row.id)}) };
 }
 export function mapCategory(row:Record<string,unknown>):StoredCategory{return{id:Number(row.id),name:String(row.name),slug:String(row.slug),mood:String(row.mood),description:String(row.description),notes:Array.isArray(row.notes)?row.notes.map(String):[],paper:String(row.paper),ink:String(row.ink),accent:String(row.accent),soft:String(row.soft)}}
 
@@ -144,6 +171,7 @@ export function mapOrder(row: Record<string, unknown>): StoredOrder {
 
 export function mapScent(row: Record<string, unknown>): Scent {
   return { id: Number(row.id), name: String(row.name), description: String(row.description),
+    profile: { ...emptyAromaProfile(), ...(row.profile && typeof row.profile === "object" ? row.profile : {}) },
     notes: Array.isArray(row.notes) ? row.notes.map(String) : [], active: Boolean(row.active) };
 }
 
@@ -157,19 +185,17 @@ export function mapVariant(row: Record<string, unknown>): Variant {
     scent: mapScent(row.scent as Record<string, unknown>) };
 }
 
+export function mapForm(row: Record<string, unknown>): CandleForm {
+  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : "ribbed" };
+}
+
 export async function listProducts(admin = false, id?: number): Promise<Product[]> {
   await ensureSchema();
-  const result = await getPool().query(`SELECT p.*, c.name AS category_name, c.slug AS category_slug,
-    EXISTS(SELECT 1 FROM product_variants v WHERE v.product_id=p.id) AS has_variants
-    FROM products p LEFT JOIN categories c ON c.id=p.category_id
-    WHERE ($1::boolean OR p.published=TRUE) AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
-  const variants = await getPool().query(`SELECT v.*, to_jsonb(s) AS scent, to_jsonb(c) AS color FROM product_variants v
-    JOIN scents s ON s.id=v.scent_id JOIN colors c ON c.id=v.color_id WHERE v.product_id=ANY($1::bigint[])
-    AND ($2::boolean OR (v.active AND s.active AND c.active)) ORDER BY v.id`, [result.rows.map(row => row.id), admin]);
-  return result.rows.map(row => {
-    const product = mapProduct(row);
-    product.variants = variants.rows.filter(variant => Number(variant.product_id) === product.id).map(mapVariant);
-    if (product.hasVariants) product.stock = product.variants.filter(v => admin || (v.active && v.scent.active && v.color.active)).reduce((sum, v) => sum + v.stock, 0);
-    return product;
-  });
+  const result = await getPool().query(`SELECT p.*, c.name AS category_name, c.slug AS category_slug, f.name AS form_name,
+    COALESCE(f.shape,p.shape) AS shape, to_jsonb(f) AS form, to_jsonb(cl) AS color, to_jsonb(s) AS scent
+    FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN candle_forms f ON f.id=p.form_id
+    LEFT JOIN colors cl ON cl.id=p.color_id LEFT JOIN scents s ON s.id=p.scent_id
+    WHERE NOT p.archived AND ($1::boolean OR (p.published AND COALESCE(f.active,TRUE) AND COALESCE(cl.active,TRUE) AND COALESCE(s.active,TRUE)))
+      AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
+  return result.rows.map(mapProduct);
 }
