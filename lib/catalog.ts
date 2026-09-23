@@ -5,10 +5,10 @@ export type Scent = {
   name: string;
   description: string;
   notes: string[];
-  color: string;
-  colorName: string;
   active: boolean;
 };
+
+export type CandleColor = { id: number; name: string; hex: string; active: boolean };
 
 export const candleShapes = {
   twist: "Спираль", ribbed: "Колонна", bubble: "Бабл",
@@ -22,6 +22,8 @@ export function productShape(product: { id: number; shape?: CandleShape }) {
 export type Variant = {
   id: number;
   scentId: number;
+  colorId: number;
+  color: CandleColor;
   stock: number;
   image: string | null;
   active: boolean;
@@ -48,6 +50,7 @@ export type OrderItem = {
   productId: number;
   variantId?: number | null;
   scentId?: number | null;
+  colorId?: number | null;
   shape?: CandleShape;
   name: string;
   scentName?: string;
@@ -61,16 +64,16 @@ export type OrderItem = {
   quotePending?: boolean;
 };
 
-export type CartLine = { productId: number; variantId: number | null; scentId?: number | null; quantity: number };
-export const cartKey = (productId: number, variantId: number | null, scentId?: number | null) => `${productId}:${variantId ?? "original"}${scentId ? `:scent-${scentId}` : ""}`;
+export type CartLine = { productId: number; variantId: number | null; scentId?: number | null; colorId?: number | null; quantity: number };
+export const cartKey = (productId: number, variantId: number | null, scentId?: number | null, colorId?: number | null) => `${productId}:${variantId ?? "original"}${scentId ? `:scent-${scentId}` : ""}${colorId ? `:color-${colorId}` : ""}`;
 export const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
 
 export function availableVariants(product: Product) {
-  return product.variants.filter(variant => variant.active && variant.scent.active);
+  return product.variants.filter(variant => variant.active && variant.scent.active && variant.color.active);
 }
 
-export function selectVariant(product: Product, scentId?: number | null) {
-  const variants = availableVariants(product);
+export function selectVariant(product: Product, scentId?: number | null, colorId?: number | null) {
+  const variants = availableVariants(product).filter(v => colorId == null || v.colorId === colorId);
   if (scentId != null) return variants.find(variant => variant.scentId === scentId);
   return variants.find(variant => variant.stock > 0)
     ?? variants[0];

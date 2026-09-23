@@ -2,17 +2,18 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { money, productShape, type Product, type Scent, type OrderItem } from "@/lib/catalog";
+import { money, productShape, type CandleColor, type Product, type Scent, type OrderItem } from "@/lib/catalog";
 import { atelierShapes, atelierColors, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "@/lib/atelier";
-import { ImagePreview, ProductEditor, ScentEditor } from "./editors";
+import { ImagePreview, ProductEditor, ScentEditor, ColorEditor } from "./editors";
 import { CandlePreview } from "../components/candle-preview";
 import "./admin.css";
 
 type Order = { id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
 type Field = { key:string; label:string; kind:"text"|"image"; fallback:string };
-type Tab = "products" | "scents" | "orders" | "content";
+type Tab = "products" | "scents" | "colors" | "orders" | "content";
 const empty: Product = { id:0, name:"", category:"", categoryId:null, categorySlug:null, notes:"", price:0, stock:0, published:false, image:null, hasVariants:false, variants:[] };
-const emptyScent: Scent = { id:0, name:"", description:"", notes:[], color:"#a84c51", colorName:"", active:true };
+const emptyScent: Scent = { id:0, name:"", description:"", notes:[], active:true };
+const emptyColor: CandleColor = { id:0, name:"", hex:"#e8ddca", active:true };
 const fields: Field[] = [
   { key: "atelier.hero.title", label: "Первый экран — заголовок", kind: "text", fallback: "Пусть мир" },
   { key: "atelier.hero.emphasis", label: "Первый экран — акцент", kind: "text", fallback: "подождёт." },
@@ -55,6 +56,8 @@ export default function Admin() {
   const [tab, setTab] = useState<Tab>("products");
   const [products, setProducts] = useState<Product[]>([]);
   const [scents, setScents] = useState<Scent[]>([]);
+  const [colors, setColors] = useState<CandleColor[]>([]);
+  const [editingColor, setEditingColor] = useState<CandleColor | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [content, setContent] = useState<Record<string, { value:string; kind:string }>>({});
   const [editing, setEditing] = useState<Product | null>(null);
@@ -64,10 +67,11 @@ export default function Admin() {
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     setLoadingData(true);
-    const sections: Tab[] = ["products", "scents", "orders", "content"];
+    const sections: Tab[] = ["products", "scents", "colors", "orders", "content"];
     const results = await Promise.allSettled([
       request<Product[]>("/api/products?admin=1").then(setProducts),
       request<Scent[]>("/api/scents?admin=1").then(setScents),
+      request<CandleColor[]>("/api/colors?admin=1").then(setColors),
       request<Order[]>("/api/orders").then(setOrders),
       request<Record<string, { value:string; kind:string }>>("/api/content").then(setContent),
     ]);
@@ -102,6 +106,11 @@ export default function Admin() {
     setEditingScent(null); await load(); setSaved(true);
   };
   const removeScent = (scent: Scent) => { if (confirm(`Удалить аромат «${scent.name}»?`)) void perform(async () => { await request(`/api/scents/${scent.id}`, { method: "DELETE" }); await load(); setSaved(true); }); };
+  const saveColor = async (color: CandleColor) => {
+    await request(color.id ? `/api/colors/${color.id}` : "/api/colors", { method: color.id ? "PATCH" : "POST", ...json(color) });
+    setEditingColor(null); await load(); setSaved(true);
+  };
+  const removeColor = (color: CandleColor) => { if (confirm(`Удалить цвет «${color.name}»?`)) void perform(async () => { await request(`/api/colors/${color.id}`, { method: "DELETE" }); await load(); setSaved(true); }); };
   const updateStatus = (id: number, status: Order["status"]) => void perform(async () => { await request(`/api/orders/${id}`, { method: "PATCH", ...json({ status }) }); await load(); setSaved(true); });
   const removeOrder = (order: Order) => {
     const restore = order.stockReserved && order.status !== "completed";
@@ -114,16 +123,17 @@ export default function Admin() {
   const filtered = useMemo(() => products.filter(p => `${p.name} ${p.variants.map(v => v.scent.name).join(" ")}`.toLowerCase().includes(query.toLowerCase())), [products, query]);
   const active = orders.filter(order => order.status !== "completed");
   const done = orders.filter(order => order.status === "completed");
-  const labels: Record<Tab, string> = { products: "Формы свечей", scents: "Ароматы", orders: "Заказы", content: "Контент" };
+  const labels: Record<Tab, string> = { products: "Формы свечей", scents: "Ароматы", colors: "Цвета", orders: "Заказы", content: "Контент" };
   if (auth === null) return <main className="admin-login"><div className="login-card"><h1>Мастерская ТИХО</h1>{error ? <><p className="editor-error" role="alert">{error}</p><button className="save" onClick={() => { setError(""); void checkSession(); }}>Повторить подключение</button></> : <p role="status">Проверяем подключение…</p>}</div></main>;
   if (!auth) return <main className="admin-login"><form className="login-card" onSubmit={login}><Link className="admin-logo" href="/">ТИХО</Link><span className="admin-kicker">Мастерская</span><h1>Вход в админку</h1><label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required autoFocus /></label>{error && <p className="editor-error" role="alert">{error}</p>}<button className="save" disabled={busy}>{busy ? "Входим…" : "Войти"}</button></form></main>;
   return <main className="admin-shell">
     <aside className="admin-sidebar"><Link className="admin-logo" href="/">ТИХО</Link><nav aria-label="Управление магазином">{(Object.keys(labels) as Tab[]).map(key => <button key={key} className={tab === key ? "active" : ""} onClick={() => { setError(""); setTab(key); }} aria-current={tab === key ? "page" : undefined}>{labels[key]}{key === "orders" && orders.some(o => o.status === "new") && <i>{orders.filter(o => o.status === "new").length}</i>}</button>)}</nav><button className="admin-logout" disabled={busy} onClick={() => void perform(async () => { await request("/api/admin/logout", { method: "POST" }); setAuth(false); })}>Выйти</button></aside>
-    <section className="admin-workspace"><header className="admin-header"><div><span className="admin-kicker">Управление магазином</span><h1>{labels[tab]}</h1></div><div className="admin-actions"><Link href="/" target="_blank">Открыть сайт ↗</Link>{tab === "products" && <button onClick={() => setEditing({ ...empty })}>Добавить форму</button>}{tab === "scents" && <button onClick={() => setEditingScent({ ...emptyScent })}>Добавить аромат</button>}</div></header>
+    <section className="admin-workspace"><header className="admin-header"><div><span className="admin-kicker">Управление магазином</span><h1>{labels[tab]}</h1></div><div className="admin-actions"><Link href="/" target="_blank">Открыть сайт ↗</Link>{tab === "products" && <button onClick={() => setEditing({ ...empty })}>Добавить форму</button>}{tab === "scents" && <button onClick={() => setEditingScent({ ...emptyScent })}>Добавить аромат</button>}{tab === "colors" && <button onClick={() => setEditingColor({ ...emptyColor })}>Добавить цвет</button>}</div></header>
       {(error || loadErrors[tab]) && <p className="editor-error" role="alert">{error || loadErrors[tab]}<button type="button" className="text-action" disabled={busy || loadingData} onClick={() => void perform(load)}>Обновить данные</button></p>}
       {loadingData && <p className="admin-loading" role="status">Обновляем данные…</p>}
-      {tab === "scents" && <><p className="admin-intro">Название, описание, ноты и цвет аромата используются на витрине. Для форм с общим остатком доступны все включённые ароматы; для форм с вариантами — ароматы этих вариантов.</p>{scents.length === 0 ? <div className="empty-admin"><h2>Начните с первого аромата</h2><p>Укажите его название, ноты и цвет вашей свечи.</p><button className="save" onClick={() => setEditingScent({ ...emptyScent })}>Создать аромат</button></div> : <div className="scent-admin-grid">{scents.map(scent => <article className="scent-admin-card" key={scent.id}><div className="scent-admin-color" style={{ background: scent.color }}><span>{scent.colorName}</span></div><div className="scent-admin-body"><span className="admin-kicker">{scent.active ? "На сайте" : "Отключён"} · {products.filter(p => !p.hasVariants || p.variants.some(v => v.scentId === scent.id && v.active)).length} форм</span><h2>{scent.name}</h2><p>{scent.description}</p><div className="category-notes">{scent.notes.map((note, index) => <span key={`${note}-${index}`}>{note}</span>)}</div><footer><button onClick={() => setEditingScent(scent)}>Редактировать</button><button disabled={busy} onClick={() => removeScent(scent)}>Удалить</button></footer></div></article>)}</div>}</>}
-      {tab === "products" && <><p className="admin-intro">Укажите форму, цену и остаток. Покупатель выбирает доступный аромат в карточке свечи. При необходимости задайте отдельные фотографии и остатки по ароматам.</p><div className="admin-stats"><Stat label="Форм" value={String(products.length)} note={`${products.filter(p => p.published).length} опубликовано`} /><Stat label="В наличии" value={String(products.reduce((sum, p) => sum + p.stock, 0))} note="свечей, без умножения на цвета" /><Stat label="Ароматов" value={String(scents.filter(s => s.active).length)} note="в общем справочнике" /></div><div className="admin-table-card"><div className="table-toolbar"><label><input aria-label="Поиск по формам и ароматам" value={query} onChange={event => setQuery(event.target.value)} placeholder="Форма или аромат" /></label><span>{filtered.length} позиций</span></div><div className="admin-table-wrap"><table><thead><tr><th>Форма</th><th>Цена</th><th>Остаток</th><th>Статус</th><th><span className="sr-only">Действия</span></th></tr></thead><tbody>{filtered.map(product => <tr key={product.id}><td><div className="product-cell"><div className="product-preview">{product.image ? <img src={product.image} alt="" /> : <CandlePreview shape={productShape(product)} color={scents[0]?.color} />}</div><div><strong>{product.name}</strong><div className="table-scents">{product.variants.length ? product.variants.map(variant => <i key={variant.id} className={!variant.active || !variant.scent.active ? "muted" : ""} style={{ background: variant.scent.color }} title={`${variant.scent.name}: ${variant.stock} шт.`} />) : scents.filter(s => s.active).map(scent => <i key={scent.id} style={{ background: scent.color }} title={scent.name} />)}</div></div></div></td><td>{money(product.price)}</td><td>{product.stock} шт.</td><td>{product.published ? "На сайте" : "Черновик"}</td><td><button className="edit-button" aria-label={`Редактировать ${product.name}`} onClick={() => setEditing(product)}>Изменить</button></td></tr>)}</tbody></table>{!filtered.length && <p className="empty-admin">Формы не найдены</p>}</div></div></>}
+      {tab === "scents" && <><p className="admin-intro">Создавайте ароматы и описывайте их ноты. Цвет выбирается отдельно и не меняется при смене аромата.</p>{scents.length === 0 ? <div className="empty-admin"><h2>Начните с первого аромата</h2><p>Укажите название и ноты композиции.</p><button className="save" onClick={() => setEditingScent({ ...emptyScent })}>Создать аромат</button></div> : <div className="scent-admin-grid">{scents.map(scent => <article className="scent-admin-card" key={scent.id}><div className="scent-admin-body"><span className="admin-kicker">{scent.active ? "На сайте" : "Отключён"} · {products.filter(p => !p.hasVariants || p.variants.some(v => v.scentId === scent.id && v.active)).length} форм</span><h2>{scent.name}</h2><p>{scent.description}</p><div className="category-notes">{scent.notes.map((note, index) => <span key={`${note}-${index}`}>{note}</span>)}</div><footer><button onClick={() => setEditingScent(scent)}>Редактировать</button><button disabled={busy} onClick={() => removeScent(scent)}>Удалить</button></footer></div></article>)}</div>}</>}
+      {tab === "colors" && <><p className="admin-intro">Отдельная палитра свечей. Любой цвет можно сочетать с любым ароматом; для готовых свечей доступность задаётся в карточке формы.</p>{!colors.length && <p className="empty-admin">Добавьте первый цвет в палитру.</p>}<div className="scent-admin-grid">{colors.map(color => <article className="scent-admin-card" key={color.id}><div className="scent-admin-color" style={{ background: color.hex }}><span>{color.name}</span></div><div className="scent-admin-body"><span className="admin-kicker">{color.active ? "На сайте" : "Отключён"}</span><h2>{color.name}</h2><p>{color.hex.toUpperCase()}</p><footer><button onClick={() => setEditingColor(color)}>Редактировать</button><button disabled={busy} onClick={() => removeColor(color)}>Удалить</button></footer></div></article>)}</div></>}
+      {tab === "products" && <><p className="admin-intro">Укажите форму, цену и остаток. Покупатель отдельно выбирает цвет и аромат. Для готовых свечей задайте фотографии и остатки конкретных сочетаний.</p><div className="admin-stats"><Stat label="Форм" value={String(products.length)} note={`${products.filter(p => p.published).length} опубликовано`} /><Stat label="В наличии" value={String(products.reduce((sum, p) => sum + p.stock, 0))} note="свечей, без умножения на цвета" /><Stat label="Ароматов" value={String(scents.filter(s => s.active).length)} note="в общем справочнике" /></div><div className="admin-table-card"><div className="table-toolbar"><label><input aria-label="Поиск по формам и ароматам" value={query} onChange={event => setQuery(event.target.value)} placeholder="Форма или аромат" /></label><span>{filtered.length} позиций</span></div><div className="admin-table-wrap"><table><thead><tr><th>Форма</th><th>Цена</th><th>Остаток</th><th>Статус</th><th><span className="sr-only">Действия</span></th></tr></thead><tbody>{filtered.map(product => <tr key={product.id}><td><div className="product-cell"><div className="product-preview">{product.image ? <img src={product.image} alt="" /> : <CandlePreview shape={productShape(product)} color={colors[0]?.hex} />}</div><div><strong>{product.name}</strong><div className="table-scents">{product.variants.length ? product.variants.map(variant => <i key={variant.id} className={!variant.active || !variant.scent.active || !variant.color.active ? "muted" : ""} style={{ background: variant.color.hex }} title={`${variant.color.name} · ${variant.scent.name}: ${variant.stock} шт.`} />) : colors.filter(c => c.active).map(color => <i key={color.id} style={{ background: color.hex }} title={color.name} />)}</div></div></div></td><td>{money(product.price)}</td><td>{product.stock} шт.</td><td>{product.published ? "На сайте" : "Черновик"}</td><td><button className="edit-button" aria-label={`Редактировать ${product.name}`} onClick={() => setEditing(product)}>Изменить</button></td></tr>)}</tbody></table>{!filtered.length && <p className="empty-admin">Формы не найдены</p>}</div></div></>}
       {tab === "orders" && <>
         <div className="admin-stats order-stats">
           <Stat label="Все заказы" value={String(orders.length)} note={`${orders.filter(order => order.status === "new").length} новых`} />
@@ -155,8 +165,9 @@ export default function Admin() {
       </>}
       {tab === "content" && <><p className="admin-intro">Тексты и фотографии новой витрины. Анимация пламени доступна на исходном фото первого экрана; загруженное фото будет показано без искажения.</p><div className="content-grid">{fields.map(field => <Content key={`${field.key}-${content[field.key]?.value ?? ""}`} field={field} value={content[field.key]?.value || field.fallback} save={saveContent} />)}</div></>}
     </section>
-    {editing && <ProductEditor product={editing} scents={scents} onSave={saveProduct} onClose={() => setEditing(null)} />}
+    {editing && <ProductEditor product={editing} scents={scents} colors={colors} onSave={saveProduct} onClose={() => setEditing(null)} />}
     {editingScent && <ScentEditor scent={editingScent} onSave={saveScent} onClose={() => setEditingScent(null)} />}
+    {editingColor && <ColorEditor color={editingColor} onSave={saveColor} onClose={() => setEditingColor(null)} />}
     <div className={saved ? "admin-toast show" : "admin-toast"} role="status">Изменения сохранены</div>
   </main>;
 }

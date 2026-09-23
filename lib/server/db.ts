@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import type { Product, OrderItem, Scent, Variant } from "../catalog";
+import type { Product, OrderItem, Scent, Variant, CandleColor } from "../catalog";
 import { candleShapes, productShape, type CandleShape } from "../catalog";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
@@ -81,7 +81,7 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_name_unique ON scents (LOWER(name))");
-    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_color_unique ON scents (LOWER(color))");
+
     await db.query("CREATE TABLE IF NOT EXISTS app_migrations (key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
     const presets = await db.query("INSERT INTO app_migrations(key) VALUES('global-scents-v1') ON CONFLICT DO NOTHING RETURNING key");
     if (presets.rowCount) {
@@ -102,6 +102,27 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await db.query("CREATE INDEX IF NOT EXISTS product_variants_scent_idx ON product_variants (scent_id)");
+    await db.query(`CREATE TABLE IF NOT EXISTS colors (
+      id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, hex TEXT NOT NULL CHECK (hex ~ '^#[0-9a-f]{6}$'),
+      active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS colors_hex_unique ON colors (LOWER(hex))");
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS colors_name_unique ON colors (LOWER(name))");
+    await db.query("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS color_id BIGINT REFERENCES colors(id) ON DELETE RESTRICT");
+    const independent = await db.query("INSERT INTO app_migrations(key) VALUES('independent-colors-v1') ON CONFLICT DO NOTHING RETURNING key");
+    if (independent.rowCount) {
+      // Copy existing physical colors once; never re-create deleted colors on startup.
+      await db.query(`INSERT INTO colors(name,hex) SELECT DISTINCT ON (LOWER(color)) CASE WHEN COUNT(*) OVER (PARTITION BY LOWER(color_name)) > 1 THEN color_name || ' · ' || LOWER(color) ELSE color_name END,LOWER(color)
+        FROM scents WHERE color IS NOT NULL ORDER BY LOWER(color),id ON CONFLICT DO NOTHING`);
+      // Preserve IDs, photographs and stock of every existing variant and old order.
+      await db.query(`UPDATE product_variants v SET color_id=c.id FROM scents s JOIN colors c ON c.hex=LOWER(s.color)
+        WHERE v.scent_id=s.id AND v.color_id IS NULL`);
+      await db.query("ALTER TABLE product_variants DROP CONSTRAINT IF EXISTS product_variants_product_id_scent_id_key");
+      await db.query("DROP INDEX IF EXISTS scents_color_unique");
+      await db.query("ALTER TABLE scents ALTER COLUMN color DROP NOT NULL, ALTER COLUMN color_name DROP NOT NULL");
+      await db.query("ALTER TABLE product_variants ALTER COLUMN color_id SET NOT NULL");
+    }
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS product_variants_combination_unique ON product_variants(product_id,scent_id,color_id)");
     await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE");
     await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT");
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key_unique ON orders (request_key) WHERE request_key IS NOT NULL");
@@ -123,12 +144,15 @@ export function mapOrder(row: Record<string, unknown>): StoredOrder {
 
 export function mapScent(row: Record<string, unknown>): Scent {
   return { id: Number(row.id), name: String(row.name), description: String(row.description),
-    notes: Array.isArray(row.notes) ? row.notes.map(String) : [], color: String(row.color),
-    colorName: String(row.color_name), active: Boolean(row.active) };
+    notes: Array.isArray(row.notes) ? row.notes.map(String) : [], active: Boolean(row.active) };
+}
+
+export function mapColor(row: Record<string, unknown>): CandleColor {
+  return { id: Number(row.id), name: String(row.name), hex: String(row.hex), active: Boolean(row.active) };
 }
 
 export function mapVariant(row: Record<string, unknown>): Variant {
-  return { id: Number(row.id), scentId: Number(row.scent_id), stock: Number(row.stock),
+  return { id: Number(row.id), scentId: Number(row.scent_id), colorId: Number(row.color_id), color: mapColor(row.color as Record<string, unknown>), stock: Number(row.stock),
     image: row.image ? String(row.image) : null, active: Boolean(row.active),
     scent: mapScent(row.scent as Record<string, unknown>) };
 }
@@ -139,13 +163,13 @@ export async function listProducts(admin = false, id?: number): Promise<Product[
     EXISTS(SELECT 1 FROM product_variants v WHERE v.product_id=p.id) AS has_variants
     FROM products p LEFT JOIN categories c ON c.id=p.category_id
     WHERE ($1::boolean OR p.published=TRUE) AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
-  const variants = await getPool().query(`SELECT v.*, to_jsonb(s) AS scent FROM product_variants v
-    JOIN scents s ON s.id=v.scent_id WHERE v.product_id=ANY($1::bigint[])
-    AND ($2::boolean OR (v.active AND s.active)) ORDER BY v.id`, [result.rows.map(row => row.id), admin]);
+  const variants = await getPool().query(`SELECT v.*, to_jsonb(s) AS scent, to_jsonb(c) AS color FROM product_variants v
+    JOIN scents s ON s.id=v.scent_id JOIN colors c ON c.id=v.color_id WHERE v.product_id=ANY($1::bigint[])
+    AND ($2::boolean OR (v.active AND s.active AND c.active)) ORDER BY v.id`, [result.rows.map(row => row.id), admin]);
   return result.rows.map(row => {
     const product = mapProduct(row);
     product.variants = variants.rows.filter(variant => Number(variant.product_id) === product.id).map(mapVariant);
-    if (product.hasVariants) product.stock = product.variants.filter(v => admin || (v.active && v.scent.active)).reduce((sum, v) => sum + v.stock, 0);
+    if (product.hasVariants) product.stock = product.variants.filter(v => admin || (v.active && v.scent.active && v.color.active)).reduce((sum, v) => sum + v.stock, 0);
     return product;
   });
 }

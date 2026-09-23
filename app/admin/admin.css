@@ -35,3 +35,5 @@
 @keyframes drawer-arrive { from { transform:translateX(100%); } to { transform:translateX(0); } }
 @media(max-width:750px) { .order-quote-note { padding:14px 18px; } }
 @media(prefers-reduced-motion:reduce) { .product-editor { animation:none; }.admin-toast { transition:none; } }
+
+.independent-variant{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end}.independent-variant>button{grid-column:1/-1}.independent-variant label{min-width:0}.independent-variant select{width:100%}

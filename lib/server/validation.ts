@@ -20,20 +20,26 @@ export function textValue(value: unknown, label: string, max: number, required =
 
 export function parseScent(body: Record<string, unknown>) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные аромата");
-  const color = textValue(body.color, "Цвет", 7).toLowerCase();
-  if (!/^#[0-9a-f]{6}$/.test(color)) throw new InputError("Цвет должен быть в формате #AABBCC");
   if (!Array.isArray(body.notes) || body.notes.length > 12) throw new InputError("Укажите до 12 нот аромата");
   if (typeof body.active !== "boolean") throw new InputError("Укажите доступность аромата");
   return {
     name: textValue(body.name, "Название аромата", 120),
     description: textValue(body.description, "Описание", 2000, false),
     notes: body.notes.map(note => textValue(note, "Нота аромата", 80, false)).filter(Boolean),
-    color, colorName: textValue(body.colorName, "Название цвета", 80), active: body.active,
+    active: body.active,
   };
 }
 
-type CatalogOrderLine = { productId: number; variantId: number | null; scentId?: number; quantity: number; customRecipe?: never };
-type CustomOrderLine = { customRecipe: Recipe; quantity: number; productId?: never; variantId?: never; scentId?: never };
+export function parseColor(body: Record<string, unknown>) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные цвета");
+  const hex = textValue(body.hex, "Код цвета", 7).toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(hex)) throw new InputError("Цвет должен быть в формате #AABBCC");
+  if (typeof body.active !== "boolean") throw new InputError("Укажите доступность цвета");
+  return { name: textValue(body.name, "Название цвета", 80), hex, active: body.active };
+}
+
+type CatalogOrderLine = { productId: number; variantId: number | null; scentId?: number; colorId?: number; quantity: number; customRecipe?: never };
+type CustomOrderLine = { customRecipe: Recipe; quantity: number; productId?: never; variantId?: never; scentId?: never; colorId?: never };
 export type OrderLine = CatalogOrderLine | CustomOrderLine;
 
 export function parseRecipe(value: unknown): Recipe {
@@ -58,7 +64,7 @@ export function parseOrder(body: Record<string, unknown>) {
   for (const value of body.items) {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new InputError("Проверьте состав заказа");
     if (Object.hasOwn(value, "customRecipe")) {
-      if (value.productId != null || value.variantId != null || value.scentId != null) throw new InputError("Авторская свеча не должна содержать вариант из каталога");
+      if (value.productId != null || value.variantId != null || value.scentId != null || value.colorId != null) throw new InputError("Авторская свеча не должна содержать вариант из каталога");
       const customRecipe = parseRecipe(value.customRecipe);
       const key = recipeKey(customRecipe);
       const quantity = integer(value.quantity, "Количество", 1, 99) + (lines.get(key)?.quantity ?? 0);
@@ -69,10 +75,11 @@ export function parseOrder(body: Record<string, unknown>) {
     const productId = integer(value.productId, "Товар", 1);
     const variantId = value.variantId == null ? null : integer(value.variantId, "Вариант", 1);
     const scentId = value.scentId == null ? undefined : integer(value.scentId, "Аромат", 1);
-    const key = `${productId}:${variantId}:${scentId ?? ""}`;
+    const colorId = value.colorId == null ? undefined : integer(value.colorId, "Цвет", 1);
+    const key = `${productId}:${variantId}:${scentId ?? ""}:${colorId ?? ""}`;
     const quantity = integer(value.quantity, "Количество", 1, 99) + (lines.get(key)?.quantity ?? 0);
     if (quantity > 99) throw new InputError("Не более 99 свечей одного варианта в заказе");
-    lines.set(key, { productId, variantId, ...(scentId ? { scentId } : {}), quantity });
+    lines.set(key, { productId, variantId, ...(scentId ? { scentId } : {}), ...(colorId ? { colorId } : {}), quantity });
   }
   return { customerName, phone, email, address, delivery, comment, requestKey, items: [...lines.values()] };
 }

@@ -12,8 +12,8 @@ export async function PATCH(request: Request, context: Context) {
     const id = integer((await context.params).id, "Аромат", 1);
     const scent = parseScent(await request.json());
     await ensureSchema();
-    const result = await getPool().query(`UPDATE scents SET name=$1,description=$2,notes=$3,color=$4,color_name=$5,active=$6,updated_at=NOW()
-      WHERE id=$7 RETURNING *`, [scent.name, scent.description, scent.notes, scent.color, scent.colorName, scent.active, id]);
+    const result = await getPool().query(`UPDATE scents SET name=$1,description=$2,notes=$3,active=$4,updated_at=NOW()
+      WHERE id=$5 RETURNING *`, [scent.name, scent.description, scent.notes, scent.active, id]);
     return result.rowCount ? NextResponse.json(mapScent(result.rows[0])) : NextResponse.json({ error: "Аромат не найден" }, { status: 404 });
   } catch (error) { return apiError(error); }
 }

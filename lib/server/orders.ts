@@ -19,10 +19,11 @@ export async function createOrder(body: Record<string, unknown>) {
     const ids = [...new Set(order.items.flatMap(item => item.customRecipe ? [] : [item.productId]))].sort((a, b) => a - b);
     // All writers lock products before variants, in ID order.
     const products = await db.query("SELECT * FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
-    const variants = await db.query(`SELECT v.*, s.name AS scent_name, s.color, s.color_name, s.active AS scent_active
-      FROM product_variants v JOIN scents s ON s.id=v.scent_id
-      WHERE v.product_id=ANY($1::bigint[]) ORDER BY v.id FOR UPDATE OF v FOR SHARE OF s`, [ids]);
+    const variants = await db.query(`SELECT v.*, s.name AS scent_name, s.active AS scent_active, c.hex AS color, c.name AS color_name, c.active AS color_active
+      FROM product_variants v JOIN scents s ON s.id=v.scent_id JOIN colors c ON c.id=v.color_id
+      WHERE v.product_id=ANY($1::bigint[]) ORDER BY v.id FOR UPDATE OF v FOR SHARE OF s,c`, [ids]);
     const scents = await db.query("SELECT * FROM scents WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.scentId ? [line.scentId] : []))]]);
+    const colors = await db.query("SELECT * FROM colors WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.colorId ? [line.colorId] : []))]]);
     const items: OrderItem[] = [];
     for (const line of order.items) {
       if (line.customRecipe) {
@@ -38,13 +39,15 @@ export async function createOrder(body: Record<string, unknown>) {
       const choices = variants.rows.filter(v => Number(v.product_id) === line.productId);
       const variant = line.variantId === null ? null : choices.find(v => Number(v.id) === line.variantId);
       if ((choices.length && !variant) || (line.variantId !== null && !variant)) throw new InputError(`Выберите доступный аромат для «${product.name}»`, 409);
-      if (variant && (!variant.active || !variant.scent_active || (line.scentId && Number(variant.scent_id) !== line.scentId))) throw new InputError(`Этот аромат «${product.name}» больше недоступен`, 409);
-      const scent = variant ? { id: variant.scent_id, name: variant.scent_name, color: variant.color, color_name: variant.color_name } : scents.rows.find(s => Number(s.id) === line.scentId && s.active);
+      if (variant && (!variant.active || !variant.scent_active || !variant.color_active || (line.scentId && Number(variant.scent_id) !== line.scentId) || (line.colorId && Number(variant.color_id) !== line.colorId))) throw new InputError(`Этот вариант «${product.name}» больше недоступен`, 409);
+      const scent = variant ? { id: variant.scent_id, name: variant.scent_name } : scents.rows.find(s => Number(s.id) === line.scentId && s.active);
       if (!scent) throw new InputError(`Выберите доступный аромат для «${product.name}»`, 409);
+      const color = variant ? { id: variant.color_id, name: variant.color_name, hex: variant.color } : colors.rows.find(c => Number(c.id) === line.colorId && c.active);
+      if (!color) throw new InputError(`Выберите доступный цвет для «${product.name}»`, 409);
       const stock = variant ? variant.stock : product.stock;
       if (line.quantity > stock) throw new InputError(`«${product.name}»: доступно ещё ${stock} шт. для этого заказа.`, 409);
       items.push({ productId: line.productId, variantId: variant ? Number(variant.id) : null, name: product.name,
-        scentId: Number(scent.id), scentName: scent.name, color: scent.color, colorName: scent.color_name,
+        scentId: Number(scent.id), scentName: scent.name, colorId: Number(color.id), color: color.hex, colorName: color.name,
         shape: productShape({ id: Number(product.id), shape: product.shape as CandleShape | undefined }),
         image: variant?.image ?? product.image, price: product.price, quantity: line.quantity });
       if (variant) {

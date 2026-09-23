@@ -31,35 +31,60 @@ const Home=require('./app/page.js').default;
 const Admin=require('./app/admin/page.js').default;
 after(()=>{dom.window.close();rmSync(temp,{recursive:true,force:true});});
 const scents=[['Вишня и миндаль','#b82035','Красный'],['Сандал и дым','#222225','Чёрный'],['Белая ваниль','#f7f5ef','Белый'],['Роза и пион','#e7a0b5','Розовый']].map(([name,color,colorName],i)=>({id:i+1,name,color,colorName,notes:['нота'],description:'Описание',active:true}));
+const colors=scents.map(s=>({id:s.id,name:s.colorName,hex:s.color,active:true}));
 const products=['Спираль','Ракушка'].map((name,i)=>({id:i+1,name,shape:i?'shell':'twist',notes:'Форма',price:1500,stock:3,published:true,image:null,hasVariants:false,variants:[]}));
 const response=(data,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}}));
 const button=(name)=>[...document.querySelectorAll('button')].find(node=>node.textContent.includes(name));
 const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const setValue=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});};
 
-test('one scent selection updates every form, cart keeps prior colors and shared stock limits additions',async()=>{
-  window.localStorage.clear();
-  globalThis.fetch=async url=>url==='/api/products'?response(products):url==='/api/scents'?response(scents):response({});
+test('color and aroma filters intersect independently and checkout keeps every combination',async()=>{
+  window.localStorage.clear(); let sent;
+  globalThis.fetch=async(url,init={})=>url==='/api/products'?response(products):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/orders'?(sent=JSON.parse(init.body),response({orderNumber:'T-COLORS',total:4500,quotePending:false},201)):response({});
   const root=createRoot(document.getElementById('root'));
   try {
     await act(async()=>root.render(React.createElement(Home)));
-    assert.equal(document.querySelectorAll('.catalog-scent').length,4);
+    assert.equal(document.querySelectorAll('.color-filter-option').length,4);
+    assert.equal(document.querySelectorAll('.product-card').length,8);
+    await click(document.querySelector('[aria-label="Цвет: Красный"]'));
     assert.equal(document.querySelectorAll('.product-card').length,2);
+    const photo=document.querySelector('.product-image img').getAttribute('src');
+    await click(button('Сандал и дым'));
+    assert.equal(document.querySelector('.product-image img').getAttribute('src'),photo);
+    assert.ok([...document.querySelectorAll('.product-card')].every(node=>node.dataset.colorId==='1' && node.dataset.scentId==='2'));
     await click(document.querySelector('.quick-add'));
-    for(const scent of scents.slice(1)) {
-      await click(button(scent.name));
-      assert.deepEqual([...document.querySelectorAll('.product-card')].map(node=>node.dataset.scentId),[String(scent.id),String(scent.id)]);
-      assert.ok([...document.querySelectorAll('.product-category')].every(node=>node.textContent===scent.name));
-    }
+    await click(document.querySelector('[aria-label="Цвет: Чёрный"]'));
+    assert.equal(document.querySelector('.aroma-filters [aria-pressed="true"]').textContent,'Сандал и дым');
     await click(document.querySelector('.quick-add'));
     await click(button('Белая ваниль'));
     await click(document.querySelector('.quick-add'));
-    await click(button('Сандал и дым'));
-    await click(document.querySelector('.quick-add'));
+    await click(button('Вишня и миндаль'));
+    await click(document.querySelector('.quick-add')); // The same form has only three units, across all combinations.
     await click(document.querySelector('.cart-trigger'));
     assert.equal(document.querySelectorAll('.cart-item').length,3);
-    const cart=document.querySelector('.cart-items').textContent;
-    assert.match(cart,/Вишня и миндаль/);assert.match(cart,/Роза и пион/);assert.match(cart,/Белая ваниль/);assert.doesNotMatch(cart,/Сандал и дым/);
+    assert.match(document.querySelector('.cart-items').textContent,/Красный/);
+    assert.match(document.querySelector('.cart-items').textContent,/Чёрный/);
+    const form=document.querySelector('#checkout-form');
+    for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))form.elements.namedItem(name).value=value;
+    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.deepEqual(sent.items.map(i=>i.colorId),[1,2,2]);
+    assert.deepEqual(sent.items.map(i=>i.scentId),[2,2,3]);
+    assert.match(document.querySelector('.order-success').textContent,/T-COLORS/);
+  } finally {await act(async()=>root.unmount());}
+});
+
+test('unavailable filter combinations show an empty state and can be reset',async()=>{
+  window.localStorage.clear();
+  const product={...products[0],hasVariants:true,variants:[{id:1,scentId:1,colorId:1,stock:2,active:true,image:null,scent:scents[0],color:colors[0]},{id:2,scentId:2,colorId:2,stock:2,active:true,image:null,scent:scents[1],color:colors[1]}]};
+  globalThis.fetch=async url=>url==='/api/products'?response([product]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):response({});
+  const root=createRoot(document.getElementById('root'));
+  try {
+    await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('[aria-label="Цвет: Красный"]'));await click(button('Сандал и дым'));
+    assert.equal(document.querySelectorAll('.product-card').length,0);
+    assert.match(document.querySelector('.catalog-message').textContent,/пока нет/);
+    await click(button('Показать всю коллекцию'));
+    assert.equal(document.querySelectorAll('.product-card').length,2);
   } finally {await act(async()=>root.unmount());}
 });
 
@@ -69,6 +94,7 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
   globalThis.fetch=async(url,init={})=>{
     if(url==='/api/products')return response(products);
     if(url==='/api/scents')return response(scents);
+    if(url==='/api/colors')return response(colors);
     if(url==='/api/orders'){
       sent.push(JSON.parse(init.body));
       return sent.length===1?response({error:'retry'},503):response({orderNumber:'T-TEST',total:0,quotePending:true},201);
@@ -103,12 +129,14 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
 });
 
 test('admin stays authenticated if orders fail; scents still load, edit and save without resetting login',async()=>{
-  let edited; let brokenOrders=true;
+  let edited; let editedColor; let brokenOrders=true;
   globalThis.fetch=async(url,init={})=>{
     if(url==='/api/admin/session') return response({authenticated:true});
     if(url==='/api/products?admin=1') return response(products);
     if(url==='/api/scents?admin=1') return response(edited?[edited,...scents.slice(1)]:scents);
     if(url==='/api/scents/1' && init.method==='PATCH') {edited=JSON.parse(init.body);return response(edited);}
+    if(url==='/api/colors?admin=1') return response(editedColor?[editedColor,...colors.slice(1)]:colors);
+    if(url==='/api/colors/1' && init.method==='PATCH') {editedColor=JSON.parse(init.body);return response(editedColor);}
     if(url==='/api/orders') return brokenOrders?response({error:'Временная ошибка заказов'},500):response([]);
     return response({});
   };
@@ -121,16 +149,22 @@ test('admin stays authenticated if orders fail; scents still load, edit and save
     await click(button('Ароматы'));
     assert.equal(document.querySelectorAll('.scent-admin-card').length,4);
     await click(document.querySelector('.scent-admin-card footer button'));
+    assert.equal(document.querySelector('.scent-editor input[type=color]'),null);
     await setValue(document.querySelector('input[placeholder="Например, Вишня и миндаль"]'),'Моя вишня');
     await act(async()=>document.querySelector('.scent-editor form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.equal(edited.name,'Моя вишня');assert.ok(document.querySelector('.admin-shell'));
     assert.equal(document.querySelector('[role=dialog]'),null);
     assert.match(document.querySelector('.scent-admin-card h2').textContent,/Моя вишня/);
+    await click(button('Цвета'));
+    await click(document.querySelector('.scent-admin-card footer button'));
+    await setValue(document.querySelector('input[placeholder="Например, Слоновая кость"]'),'Гранат');
+    await act(async()=>document.querySelector('.color-editor form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(editedColor.name,'Гранат');assert.equal(edited.name,'Моя вишня');
     brokenOrders=false;
     await click(button('Заказы'));await click(button('Обновить данные'));
     assert.equal(document.querySelector('[role=alert]'),null);
     await click(button('Формы свечей'));await click(button('Добавить форму'));
-    assert.match(document.querySelector('[role=dialog]').textContent,/Все включённые ароматы уже доступны/);
+    assert.match(document.querySelector('[role=dialog]').textContent,/Все включённые цвета и ароматы доступны независимо/);
     assert.equal(document.querySelector('.stock-details').open,false);
   } finally {await act(async()=>root.unmount());}
 });

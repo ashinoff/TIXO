@@ -5,6 +5,7 @@ import { ShoppingProvider, Catalog, Aroma, CartOverlay, CartTrigger } from "./co
 import { Atelier } from "./components/atelier";
 import { LivingFlame } from "./components/living-flame";
 import "./storefront.css";
+import "./components/commerce.css";
 
 type Content = Record<string, {value:string;kind:string}>;
 export default function Home() {

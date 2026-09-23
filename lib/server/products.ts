@@ -3,7 +3,7 @@ import { saveImage, removeImage } from "./uploads";
 import { InputError, integer, textValue } from "./validation";
 import { candleShapes } from "../catalog";
 
-type VariantInput = { scentId: number; stock: number; expectedStock?: number; active: boolean; useMainImage: boolean };
+type VariantInput = { scentId: number; colorId: number; stock: number; expectedStock?: number; active: boolean; useMainImage: boolean };
 
 export async function saveProduct(form: FormData, id?: number) {
   const name = textValue(form.get("name"), "Название формы", 160);
@@ -20,11 +20,11 @@ export async function saveProduct(form: FormData, id?: number) {
     if (!Array.isArray(value) || value.length > 80) throw new InputError("Укажите не более 80 вариантов");
     variants = value.map(item => {
       if (!item || typeof item.active !== "boolean") throw new InputError("Проверьте варианты");
-      return { scentId: integer(item.scentId, "Аромат", 1), stock: integer(item.stock, "Остаток варианта", 0, 1000000),
+      return { scentId: integer(item.scentId, "Аромат", 1), colorId: integer(item.colorId, "Цвет", 1), stock: integer(item.stock, "Остаток варианта", 0, 1000000),
         expectedStock: item.expectedStock == null ? undefined : integer(item.expectedStock, "Исходный остаток", 0, 1000000),
         active: item.active, useMainImage: item.useMainImage === true };
     });
-    if (new Set(variants.map(v => v.scentId)).size !== variants.length) throw new InputError("Аромат не может повторяться в одной форме");
+    if (new Set(variants.map(v => `${v.scentId}:${v.colorId}`)).size !== variants.length) throw new InputError("Сочетание цвета и аромата не может повторяться в одной форме");
   }
   await ensureSchema();
   const db = await getPool().connect();
@@ -41,7 +41,7 @@ export async function saveProduct(form: FormData, id?: number) {
     if (id && !previous?.rowCount) throw new InputError("Товар не найден", 404);
     const old = previous?.rows[0];
     const existing = id ? (await db.query("SELECT * FROM product_variants WHERE product_id=$1 ORDER BY id FOR UPDATE", [id])).rows : [];
-    if (variants && existing.some(v => !variants.some(input => input.scentId === Number(v.scent_id)))) throw new InputError("Состав вариантов изменился. Откройте карточку заново; существующий вариант можно отключить.", 409);
+    if (variants && existing.some(v => !variants.some(input => input.scentId === Number(v.scent_id) && input.colorId === Number(v.color_id)))) throw new InputError("Состав вариантов изменился. Откройте карточку заново; существующий вариант можно отключить.", 409);
     if (!existing.length && old && form.has("expectedStock") && integer(form.get("expectedStock"), "Исходный остаток") !== old.stock) throw new InputError("Остаток изменился после нового заказа. Откройте карточку заново.", 409);
     const image = await upload(form.get("image")) ?? old?.image ?? null;
     if (id) {
@@ -53,13 +53,15 @@ export async function saveProduct(form: FormData, id?: number) {
     for (const variant of variants ?? []) {
       const scent = await db.query("SELECT id FROM scents WHERE id=$1 FOR SHARE", [variant.scentId]);
       if (!scent.rowCount) throw new InputError("Аромат больше не существует", 409);
-      const before = existing.find(v => Number(v.scent_id) === variant.scentId);
+      const color = await db.query("SELECT id FROM colors WHERE id=$1 FOR SHARE", [variant.colorId]);
+      if (!color.rowCount) throw new InputError("Цвет больше не существует", 409);
+      const before = existing.find(v => Number(v.scent_id) === variant.scentId && Number(v.color_id) === variant.colorId);
       if (before && variant.expectedStock === undefined) throw new InputError("Обновите карточку перед сохранением остатков", 409);
       if (before && variant.expectedStock !== before.stock) throw new InputError("Остаток варианта изменился после нового заказа. Откройте карточку заново.", 409);
-      const variantImage = await upload(form.get(`variantImage:${variant.scentId}`)) ?? (variant.useMainImage ? image : before?.image ?? null);
-      await db.query(`INSERT INTO product_variants(product_id,scent_id,stock,image,active) VALUES($1,$2,$3,$4,$5)
-        ON CONFLICT(product_id,scent_id) DO UPDATE SET stock=EXCLUDED.stock,image=EXCLUDED.image,active=EXCLUDED.active,updated_at=NOW()`,
-      [productId, variant.scentId, variant.stock, variantImage, variant.active]);
+      const variantImage = await upload(form.get(`variantImage:${variant.scentId}:${variant.colorId}`)) ?? (variant.useMainImage ? image : before?.image ?? null);
+      await db.query(`INSERT INTO product_variants(product_id,scent_id,color_id,stock,image,active) VALUES($1,$2,$3,$4,$5,$6)
+        ON CONFLICT(product_id,scent_id,color_id) DO UPDATE SET stock=EXCLUDED.stock,image=EXCLUDED.image,active=EXCLUDED.active,updated_at=NOW()`,
+      [productId, variant.scentId, variant.colorId, variant.stock, variantImage, variant.active]);
     }
     if (shape) await db.query("UPDATE products SET shape=$1 WHERE id=$2", [shape, productId]);
     if ((variants?.length ?? existing.length) > 0) {
