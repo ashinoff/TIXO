@@ -2,8 +2,8 @@
 /* eslint-disable @next/next/no-img-element -- catalog and uploaded photographs keep their original URLs */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode, type PointerEvent } from "react";
-import { availableVariants, emptyAromaProfile, candleShapes, cartKey, money, productShape, type Product, type Scent, type Variant, type CandleColor, type CandleShape } from "@/lib/catalog";
-import { atelierColors, atelierShapes, isRecipe as validRecipe, recipeKey, recipeSummary, type Recipe } from "@/lib/atelier";
+import { availableVariants, emptyAromaProfile, candleShapes, cartKey, money, productShape, type Product, type Scent, type Variant, type CandleColor, type CandleShape, type CandleForm } from "@/lib/catalog";
+import { atelierColors, atelierColorHex, recipeFormName, copyRecipe, isRecipe as validRecipe, recipeKey, recipeSummary, type Recipe } from "@/lib/atelier";
 import { Modal } from "./modal";
 import { CandlePreview } from "./candle-preview";
 
@@ -11,13 +11,14 @@ const STORAGE_KEY = "tixo.atelier.cart.v1";
 const REQUEST_KEY = "tixo.atelier.request.v1";
 type CandleVisualData = { silhouette?: string | null; shape?: CandleShape | null; color?: string };
 type StandardLine = CandleVisualData & { key: string; productId: number; variantId: number | null; scentId: number; colorId: number; quantity: number; name: string; scentName: string; colorName: string; image: string | null; price: number };
-type CustomLine = { key: string; customRecipe: Recipe; quantity: number };
+type CustomLine = CandleVisualData & { formName?: string; key: string; customRecipe: Recipe; quantity: number };
 type Line = StandardLine | CustomLine;
-type DisplayLine = CandleVisualData & { key: string; name: string; scentName: string; quantity: number; image: string | null; price: number | null; available: number; customRecipe?: Recipe };
+type DisplayLine = CandleVisualData & { formName?: string; key: string; name: string; scentName: string; quantity: number; image: string | null; price: number | null; available: number; customRecipe?: Recipe };
 type OrderPayload = { requestKey: string; customerName: string; phone: string; email: string; address: string; delivery: string; comment: string; items: ({ productId: number; variantId: number | null; scentId: number; colorId: number; quantity: number } | { customRecipe: Recipe; quantity: number })[] };
 type Receipt = { orderNumber: string; total: number; quotePending: boolean };
 type Selection = { productId: number; scentId?: number; colorId?: number };
 type Shop = {
+  forms: CandleForm[]; formsLoading: boolean; formsError: string; loadForms: () => Promise<void>;
   products: Product[]; scents: Scent[]; colors: CandleColor[]; loading: boolean; catalogError: string; loadCatalog: () => Promise<void>;
   activeScent: number | null; setActiveScent: (id: number | null) => void; selectedScent?: Scent;
   cart: Line[]; items: DisplayLine[]; count: number; total: number; hasCustom: boolean; locked: boolean;
@@ -37,8 +38,12 @@ function restoreCart(value: unknown): Line[] {
   for (const raw of value.slice(0, 100)) {
     if (!raw || typeof raw !== "object" || !positiveInteger(raw.quantity) || raw.quantity > 99) continue;
     if (validRecipe(raw.customRecipe)) {
-      const recipe = { ...raw.customRecipe }; const key = `custom:${recipeKey(recipe)}`;
-      lines.set(key, { key, customRecipe: recipe, quantity: raw.quantity });
+      const recipe = copyRecipe(raw.customRecipe); const key = `custom:${recipeKey(recipe)}`;
+      lines.set(key, { key, customRecipe: recipe, quantity: raw.quantity,
+        formName: typeof raw.formName === "string" ? raw.formName.slice(0,160) : undefined,
+        silhouette: typeof raw.silhouette === "string" ? raw.silhouette : null,
+        shape: typeof raw.shape === "string" && Object.hasOwn(candleShapes, raw.shape) ? raw.shape : null,
+        color: atelierColorHex[recipe.color] });
     } else if (positiveInteger(raw.productId) && positiveInteger(raw.scentId) && (raw.variantId === null || positiveInteger(raw.variantId)) && typeof raw.name === "string" && typeof raw.scentName === "string" && typeof raw.price === "number" && raw.price >= 0 && Number.isFinite(raw.price)) {
       const key = cartKey(raw.productId, raw.variantId, raw.scentId, raw.colorId);
       lines.set(key, { silhouette: typeof raw.silhouette === "string" ? raw.silhouette : null, shape: typeof raw.shape === "string" && Object.hasOwn(candleShapes, raw.shape) ? raw.shape : null, color: typeof raw.color === "string" ? raw.color : undefined, key, productId: raw.productId, variantId: raw.variantId, scentId: raw.scentId, colorId: positiveInteger(raw.colorId) ? raw.colorId : 0, colorName: typeof raw.colorName === "string" ? raw.colorName : "Выберите цвет заново", quantity: raw.quantity, name: raw.name.slice(0, 160), scentName: raw.scentName.slice(0, 120), image: typeof raw.image === "string" ? raw.image : null, price: raw.price });
@@ -83,6 +88,7 @@ const inspection = {
 };
 
 export function ShoppingProvider({ children }: { children: ReactNode }) {
+  const [forms, setForms] = useState<CandleForm[]>([]); const [formsLoading, setFormsLoading] = useState(true); const [formsError, setFormsError] = useState("");
   const [products, setProducts] = useState<Product[]>([]); const [scents, setScents] = useState<Scent[]>([]); const [colors, setColors] = useState<CandleColor[]>([]);
   const [loading, setLoading] = useState(true); const [catalogError, setCatalogError] = useState("");
   const [activeScent, setActiveScent] = useState<number | null>(null); const [cart, setCartState] = useState<Line[]>([]);
@@ -102,6 +108,17 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
     } catch { setCatalogError("Не удалось загрузить коллекцию. Попробуйте ещё раз."); }
     finally { setLoading(false); }
   }, []);
+  const loadForms = useCallback(async () => {
+    setFormsLoading(true);
+    try {
+      const response = await fetch("/api/forms", { cache: "no-store" });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error();
+      setForms(data.filter((form: CandleForm) => form.active)); setFormsError("");
+    } catch { setFormsError("Не удалось загрузить формы мастерской."); }
+    finally { setFormsLoading(false); }
+  }, []);
   const setCart = useCallback((next: Line[]) => { cartRef.current = next; setCartState(next); if (ready.current) storageWrite(STORAGE_KEY, next); }, []);
   const setPending = useCallback((next: OrderPayload | null) => { pendingRef.current = next; setPendingState(next); storageWrite(REQUEST_KEY, next); }, []);
   useEffect(() => {
@@ -109,20 +126,26 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
     // Browser storage is unavailable during server rendering; hydrate it once after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     try { setCart(restoreCart(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]"))); const saved = restoreRequest(JSON.parse(window.localStorage.getItem(REQUEST_KEY) ?? "null")); if (saved) { setPending(saved); setCartOpenState(true); } } catch { /* Ignore stale browser storage. */ }
-    void loadCatalog();
+    void loadCatalog(); void loadForms();
     return () => clearTimeout(toastTimer.current);
-  }, [loadCatalog, setCart, setPending]);
+  }, [loadCatalog, loadForms, setCart, setPending]);
   const notify = (message: string) => { clearTimeout(toastTimer.current); setToast(message); toastTimer.current = setTimeout(() => setToast(""), 4200); };
   const isLocked = () => { if (busy.current || pendingRef.current) { notify("Сначала уточним результат отправки заказа — откройте корзину."); return true; } return false; };
   const items = useMemo<DisplayLine[]>(() => cart.map(line => {
-    if (isCustom(line)) return { key: line.key, name: "Моя свеча ТИХО", scentName: recipeSummary(line.customRecipe), quantity: line.quantity, image: null, price: null, available: 99, customRecipe: line.customRecipe };
+    if (isCustom(line)) {
+      const form = line.customRecipe.formId !== undefined ? forms.find(form => form.id === line.customRecipe.formId) : undefined;
+      const formName = recipeFormName(line.customRecipe, form?.name ?? line.formName);
+      return { key: line.key, name: "Моя свеча ТИХО", formName, silhouette: form ? form.silhouette : line.silhouette, shape: form ? form.shape : line.shape,
+        color: atelierColorHex[line.customRecipe.color], scentName: recipeSummary(line.customRecipe, formName), quantity: line.quantity, image: null, price: null,
+        available: line.customRecipe.formId === undefined || (!formsLoading && !formsError && form?.active) ? 99 : 0, customRecipe: line.customRecipe };
+    }
     const product = products.find(product => product.id === line.productId); const scent = scents.find(scent => scent.id === line.scentId); const color = colors.find(color => color.id === line.colorId);
     const variant = product?.variants.find(variant => variant.id === line.variantId);
     const compatible = product && scent && color && matchesCandle(product, scent.id, color.id) && (product.hasVariants ? variant?.active && variant.scent.active && variant.color.active && variant.scentId === scent.id && variant.colorId === color.id : line.variantId === null);
     const stock = compatible ? product.hasVariants ? variant?.stock ?? 0 : product.stock : 0;
     const otherQuantity = cart.reduce((sum, other) => sum + (!isCustom(other) && other.key !== line.key && other.productId === line.productId && other.variantId === line.variantId ? other.quantity : 0), 0);
     return { ...(product ? visualData(product, color) : { silhouette: line.silhouette, shape: line.shape, color: line.color }), key: line.key, name: product?.name ?? line.name, scentName: `${scent?.name ?? line.scentName} · ${color?.name ?? line.colorName}`, quantity: line.quantity, image: product ? photograph(product, color, scent).src : line.image, price: product?.price ?? line.price, available: Math.max(0, stock - otherQuantity) };
-  }), [cart, products, scents, colors]);
+  }), [cart, products, scents, colors, forms, formsLoading, formsError]);
   const addProduct = (product: Product, scent: Scent, color: CandleColor, quantity = 1) => {
     if (isLocked()) return false;
     const live = products.find(item => item.id === product.id); const active = scents.find(item => item.id === scent.id);
@@ -136,10 +159,12 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
   };
   const addCustom = (recipe: Recipe) => {
     if (isLocked() || !validRecipe(recipe)) return false;
-    const snapshot = { shape: recipe.shape, color: recipe.color, top: recipe.top, heart: recipe.heart, base: recipe.base };
+    const form = recipe.formId !== undefined ? forms.find(form => form.id === recipe.formId) : undefined;
+    if (recipe.formId !== undefined && (formsLoading || formsError || !form?.active)) { notify("Выберите доступную форму в мастерской."); return false; }
+    const snapshot = copyRecipe(recipe);
     const key = `custom:${recipeKey(snapshot)}`; const quantity = (cartRef.current.find(line => line.key === key)?.quantity ?? 0) + 1;
     if (quantity > 99) { notify("В заказе может быть не более 99 свечей одной композиции."); return false; }
-    setCart([...cartRef.current.filter(line => line.key !== key), { key, customRecipe: snapshot, quantity }]); setReceipt(null); setOrderError(""); notify("Ваша авторская свеча — в корзине."); return true;
+    setCart([...cartRef.current.filter(line => line.key !== key), { key, customRecipe: snapshot, quantity, formName: form?.name, silhouette: form?.silhouette, shape: form?.shape, color: atelierColorHex[recipe.color] }]); setReceipt(null); setOrderError(""); notify("Ваша авторская свеча — в корзине."); return true;
   };
   const remove = (key: string) => { if (!isLocked()) { setCart(cartRef.current.filter(line => line.key !== key)); setOrderError(""); } };
   const changeQuantity = (key: string, delta: number) => {
@@ -158,7 +183,7 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
       const response = await fetch("/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
       const data = await response.json();
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) { setPending(null); setOrderError(data.error || "Проверьте данные заказа."); if (response.status === 409) await loadCatalog(); }
+        if (response.status >= 400 && response.status < 500) { setPending(null); setOrderError(data.error || "Проверьте данные заказа."); if (response.status === 409) await Promise.all([loadCatalog(), loadForms()]); }
         else setOrderError("Не удалось получить подтверждение. Повторите отправку: номер запроса сохранён, второй заказ не создастся.");
         return;
       }
@@ -177,7 +202,7 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
     void sendOrder(payload);
   };
   const setCartOpen = (open: boolean) => { if (!open && busy.current) return; setCartOpenState(open); if (open) setDetail(null); };
-  const value: Shop = { products, scents, colors, loading, catalogError, loadCatalog, activeScent, setActiveScent, selectedScent: scents.find(scent => scent.id === activeScent), cart, items, count: cart.reduce((sum, line) => sum + line.quantity, 0), total: items.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0), hasCustom: items.some(item => item.customRecipe), locked: submitting || Boolean(pending), addProduct, addCustom, changeQuantity, remove, cartOpen, setCartOpen, detail, openProduct: (productId, scentId, colorId) => setDetail({ productId, scentId, colorId }), closeProduct: () => setDetail(null), submitOrder, retryOrder: () => { if (pendingRef.current) void sendOrder(pendingRef.current); }, pending, submitting, orderError, receipt, toast, dismissToast: () => setToast("") };
+  const value: Shop = { forms, formsLoading, formsError, loadForms, products, scents, colors, loading, catalogError, loadCatalog, activeScent, setActiveScent, selectedScent: scents.find(scent => scent.id === activeScent), cart, items, count: cart.reduce((sum, line) => sum + line.quantity, 0), total: items.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0), hasCustom: items.some(item => item.customRecipe), locked: submitting || Boolean(pending), addProduct, addCustom, changeQuantity, remove, cartOpen, setCartOpen, detail, openProduct: (productId, scentId, colorId) => setDetail({ productId, scentId, colorId }), closeProduct: () => setDetail(null), submitOrder, retryOrder: () => { if (pendingRef.current) void sendOrder(pendingRef.current); }, pending, submitting, orderError, receipt, toast, dismissToast: () => setToast("") };
   return <ShoppingContext.Provider value={value}>{children}</ShoppingContext.Provider>;
 }
 
@@ -257,20 +282,22 @@ function ProductDetails() {
     <dl className="detail-specs"><div><dt>Ноты</dt><dd>{scent?.notes.join(" · ") || "Выберите аромат"}</dd></div><div><dt>Цвет</dt><dd>{color?.name ?? "Выберите цвет"}</dd></div><div><dt>Форма</dt><dd>{product.form?.name ?? candleShapes[productShape(product)]}</dd></div><div><dt>Доступно</dt><dd>{!scent || !color ? "Выберите цвет и аромат" : available ? `${available} шт.` : "Это сочетание пока недоступно"}</dd></div></dl><div className="detail-footer"><span>{money(product.price)}</span><div className="qty-picker" aria-label="Количество свечей"><button type="button" aria-label="Уменьшить количество" disabled={quantity <= 1} onClick={() => setQuantity(value => value - 1)}>−</button><output aria-live="polite">{quantity}</output><button type="button" aria-label="Увеличить количество" disabled={quantity >= Math.min(99, available)} onClick={() => setQuantity(value => value + 1)}>+</button></div></div><button type="button" className="button button-dark" disabled={!scent || !color || quantity > available || shop.locked} onClick={() => { if (scent && color && shop.addProduct(product, scent, color, quantity)) shop.closeProduct(); }}>Добавить в корзину <span aria-hidden="true">+</span></button>{photo.preview && <p className="detail-notice">Показан силуэт формы в выбранном цвете. Фотографию готовой свечи можно уточнить у мастерской.</p>}<p className="detail-notice">После оформления мастерская подтвердит заказ и согласует доставку.</p></div></Modal>;
 }
 
-function CustomPreview({ recipe }: { recipe: Recipe }) {
+function CustomPreview({ recipe, silhouette, shape, formName }: CandleVisualData & { recipe: Recipe; formName?: string }) {
+  if (recipe.formId !== undefined) return <div className="cart-custom-preview"><CandlePreview silhouette={silhouette} shape={shape} color={atelierColorHex[recipe.color]} label={`${recipeFormName(recipe, formName)}, ${atelierColors[recipe.color]}`} /></div>;
   const positions = { black: "0%", ivory: "33.333333%", red: "66.666667%", rose: "100%" };
-  return <div className="cart-custom-preview"><span className="candle-atlas" role="img" aria-label={`${atelierShapes[recipe.shape]}, ${atelierColors[recipe.color]}`} data-shape={recipe.shape} style={{ "--color-x": positions[recipe.color] } as CSSProperties} /></div>;
+  return <div className="cart-custom-preview"><span className="candle-atlas" role="img" aria-label={`${recipeFormName(recipe)}, ${atelierColors[recipe.color]}`} data-shape={recipe.shape} style={{ "--color-x": positions[recipe.color] } as CSSProperties} /></div>;
 }
 export function CartOverlay() {
   const shop = useShopping(); const [delivery, setDelivery] = useState("pickup");
   const unavailable = shop.items.some(item => item.quantity > item.available);
+  const hasFormRecipes = shop.items.some(item => item.customRecipe?.formId !== undefined);
   return <>{shop.detail && <ProductDetails key={`${shop.detail.productId}:${shop.detail.scentId}:${shop.detail.colorId}`} />}
     {shop.cartOpen && <Modal className="cart-dialog" label="Ваша корзина" onClose={() => shop.setCartOpen(false)}><div className="dialog-inner"><header className="dialog-header"><div><span className="eyebrow">ВАШ ВЕЧЕР НАЧИНАЕТСЯ ЗДЕСЬ</span><h2>Ваша корзина</h2></div><button className="icon-button close-cart" type="button" aria-label="Закрыть корзину" disabled={shop.submitting} onClick={() => shop.setCartOpen(false)}>×</button></header>
       {shop.receipt ? <div className="order-success" role="status"><span className="empty-mark">тихо.</span><h3>Ваш вечер уже ближе.</h3><p>Заказ <strong>{shop.receipt.orderNumber}</strong> передан в мастерскую.</p><p>{shop.receipt.quotePending ? `Стоимость индивидуальных свечей мастер согласует с вами.${shop.receipt.total ? ` Свечи из коллекции: ${money(shop.receipt.total)}.` : ""}` : `Свечи в заказе: ${money(shop.receipt.total)}.`} Доставка рассчитывается отдельно.</p><p>Мы свяжемся с вами по указанным контактам, чтобы подтвердить детали и способ оплаты.</p><button className="button button-dark" onClick={() => shop.setCartOpen(false)}>Продолжить знакомство <span aria-hidden="true">↗</span></button></div> : !shop.items.length && !shop.pending ? <div className="empty-cart"><span className="empty-mark">тихо.</span><p>Здесь пока тихо.</p><span>Выберите аромат, который хочется взять с собой.</span><button type="button" className="button button-dark" onClick={() => { shop.setCartOpen(false); document.getElementById("collection")?.scrollIntoView({ behavior: reducedMotion() ? "instant" : "smooth" }); }}>К коллекции <span aria-hidden="true">↗</span></button></div> : <>
-        <div className="cart-items" id="cart-items">{shop.items.map(item => <article className={`cart-item${item.customRecipe ? " custom" : ""}`} key={item.key}>{item.customRecipe ? <CustomPreview recipe={item.customRecipe} /> : <div className="cart-candle-visual"><CandleVisual src={item.image} silhouette={item.silhouette} shape={item.shape} color={item.color} label={item.name} /></div>}<div><h3>{item.name}</h3><p className="cart-recipe">{item.scentName}</p><span className="cart-item-price">{item.price === null ? "Стоимость по запросу" : money(item.price * item.quantity)}</span><div className="quantity-row"><button type="button" aria-label={`Уменьшить количество ${item.name}`} disabled={shop.locked} onClick={() => shop.changeQuantity(item.key, -1)}>−</button><span aria-label="Количество">{item.quantity}</span><button type="button" aria-label={`Увеличить количество ${item.name}`} disabled={shop.locked || item.quantity >= Math.min(99, item.available)} onClick={() => shop.changeQuantity(item.key, 1)}>+</button><button className="remove-item" type="button" aria-label={`Удалить ${item.name}`} disabled={shop.locked} onClick={() => shop.remove(item.key)}>Удалить</button></div>{!shop.loading && !shop.catalogError && !shop.pending && item.quantity > item.available && <p className="stock-error">{item.available ? `Доступно ${item.available} шт. Уменьшите количество.` : "Вариант больше недоступен. Удалите его из корзины."}</p>}</div></article>)}</div>
+        <div className="cart-items" id="cart-items">{shop.items.map(item => <article className={`cart-item${item.customRecipe ? " custom" : ""}`} key={item.key}>{item.customRecipe ? <CustomPreview recipe={item.customRecipe} formName={item.formName} silhouette={item.silhouette} shape={item.shape} /> : <div className="cart-candle-visual"><CandleVisual src={item.image} silhouette={item.silhouette} shape={item.shape} color={item.color} label={item.name} /></div>}<div><h3>{item.name}</h3><p className="cart-recipe">{item.scentName}</p><span className="cart-item-price">{item.price === null ? "Стоимость по запросу" : money(item.price * item.quantity)}</span><div className="quantity-row"><button type="button" aria-label={`Уменьшить количество ${item.name}`} disabled={shop.locked} onClick={() => shop.changeQuantity(item.key, -1)}>−</button><span aria-label="Количество">{item.quantity}</span><button type="button" aria-label={`Увеличить количество ${item.name}`} disabled={shop.locked || item.quantity >= Math.min(99, item.available)} onClick={() => shop.changeQuantity(item.key, 1)}>+</button><button className="remove-item" type="button" aria-label={`Удалить ${item.name}`} disabled={shop.locked} onClick={() => shop.remove(item.key)}>Удалить</button></div>{!shop.loading && !shop.catalogError && !shop.pending && !(item.customRecipe?.formId !== undefined && (shop.formsLoading || shop.formsError)) && item.quantity > item.available && <p className="stock-error">{item.available ? `Доступно ${item.available} шт. Уменьшите количество.` : item.customRecipe ? "Форма больше недоступна. Удалите эту свечу и выберите другую форму в мастерской." : "Вариант больше недоступен. Удалите его из корзины."}</p>}</div></article>)}</div>
         {!!shop.items.length && <><div className="order-total"><span>{shop.hasCustom ? "Предварительно, без доставки" : "Итого без доставки"}</span><strong>{shop.hasCustom ? shop.total ? `${money(shop.total)} + по запросу` : "По запросу" : money(shop.total)}</strong></div>{shop.hasCustom && <p className="checkout-note">Стоимость индивидуальных свечей не включена в сумму. Мастер согласует состав, возможность изготовления и цену до начала работы.</p>}</>}
         <p className="checkout-note">Доставка и способ оплаты согласуются с мастерской после подтверждения заказа.</p>
-        {shop.pending ? <div className="pending-order"><p>Состав и контакты сохранены для этого запроса. Уточним результат отправки, прежде чем менять заказ.</p><button className="button button-dark" type="button" disabled={shop.submitting} onClick={shop.retryOrder}>{shop.submitting ? "Получаем подтверждение…" : "Повторить отправку"}<span aria-hidden="true">↗</span></button></div> : <form id="checkout-form" className="live-checkout" onSubmit={shop.submitOrder}><h3>Оформить заказ</h3><fieldset disabled={shop.submitting}><label>Ваше имя<input name="name" autoComplete="given-name" placeholder="Имя" required maxLength={160} /></label><div className="field-pair"><label>Телефон<input name="phone" type="tel" autoComplete="tel" placeholder="+7" required minLength={7} maxLength={40} /></label><label>Email<input name="email" type="email" autoComplete="email" placeholder="you@example.com" required maxLength={254} /></label></div><label>Способ доставки<select name="delivery" value={delivery} onChange={event => setDelivery(event.target.value)}><option value="pickup">В пункт выдачи</option><option value="courier">Курьером</option></select></label><label>{delivery === "courier" ? "Город и адрес доставки" : "Город и пункт выдачи"}<input name="address" autoComplete="street-address" placeholder="Город и адрес" required maxLength={1000} /></label><label>Комментарий к заказу<textarea name="comment" rows={3} maxLength={2000} placeholder="Пожелания, упаковка или удобное время для связи" /></label><p className="checkout-note">Отправляя заказ, вы передаёте мастерской указанные контакты для его обработки.</p><button className="button button-dark" type="submit" disabled={shop.loading || !!shop.catalogError || unavailable || !shop.items.length}>Отправить заказ <span aria-hidden="true">↗</span></button>{unavailable && !shop.loading && !shop.catalogError && <p className="stock-error">Проверьте доступность свечей в корзине.</p>}{shop.catalogError && <div role="alert" className="stock-error">{shop.catalogError}<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Обновить коллекцию ↗</button></div>}</fieldset></form>}
+        {shop.pending ? <div className="pending-order"><p>Состав и контакты сохранены для этого запроса. Уточним результат отправки, прежде чем менять заказ.</p><button className="button button-dark" type="button" disabled={shop.submitting} onClick={shop.retryOrder}>{shop.submitting ? "Получаем подтверждение…" : "Повторить отправку"}<span aria-hidden="true">↗</span></button></div> : <form id="checkout-form" className="live-checkout" onSubmit={shop.submitOrder}><h3>Оформить заказ</h3><fieldset disabled={shop.submitting}><label>Ваше имя<input name="name" autoComplete="given-name" placeholder="Имя" required maxLength={160} /></label><div className="field-pair"><label>Телефон<input name="phone" type="tel" autoComplete="tel" placeholder="+7" required minLength={7} maxLength={40} /></label><label>Email<input name="email" type="email" autoComplete="email" placeholder="you@example.com" required maxLength={254} /></label></div><label>Способ доставки<select name="delivery" value={delivery} onChange={event => setDelivery(event.target.value)}><option value="pickup">В пункт выдачи</option><option value="courier">Курьером</option></select></label><label>{delivery === "courier" ? "Город и адрес доставки" : "Город и пункт выдачи"}<input name="address" autoComplete="street-address" placeholder="Город и адрес" required maxLength={1000} /></label><label>Комментарий к заказу<textarea name="comment" rows={3} maxLength={2000} placeholder="Пожелания, упаковка или удобное время для связи" /></label><p className="checkout-note">Отправляя заказ, вы передаёте мастерской указанные контакты для его обработки.</p><button className="button button-dark" type="submit" disabled={shop.loading || !!shop.catalogError || unavailable || !shop.items.length}>Отправить заказ <span aria-hidden="true">↗</span></button>{unavailable && !shop.loading && !shop.catalogError && <p className="stock-error">Проверьте доступность свечей в корзине.</p>}{hasFormRecipes && shop.formsLoading && <p role="status">Проверяем доступность выбранных форм…</p>}{hasFormRecipes && shop.formsError && <div role="alert" className="stock-error">{shop.formsError}<button type="button" className="text-link" onClick={() => void shop.loadForms()}>Обновить формы ↗</button></div>}{shop.catalogError && <div role="alert" className="stock-error">{shop.catalogError}<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Обновить коллекцию ↗</button></div>}</fieldset></form>}
         {shop.orderError && <p className="order-error" role="alert">{shop.orderError}</p>}
       </>}
     </div></Modal>}

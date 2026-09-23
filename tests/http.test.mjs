@@ -108,6 +108,18 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   shapeData.set('silhouette',new File(['<svg/>'],'bad.svg',{type:'image/svg+xml'}));assert.equal((await admin('/api/forms',{method:'POST',body:shapeData})).status,400);
   const spare=await (await admin('/api/forms',{method:'POST',...json({name:'Пустая форма',shape:'arch',active:true})})).json();
   assert.equal((await admin(`/api/forms/${spare.id}`,{method:'DELETE'})).status,200);
+  const publicForms=await (await call('/api/forms')).json();
+  assert.equal(publicForms.find(form=>form.id===shape.id).silhouette,replacement.silhouette);
+  const customRecipe={formId:shape.id,color:'red',top:'lemon',heart:'fig',base:'oud'};
+  const customRequest={...customer,requestKey:randomUUID(),items:[{customRecipe,quantity:1}]};
+  const customResponse=await call('/api/orders',{method:'POST',...json(customRequest)});assert.equal(customResponse.status,201);const receipt=await customResponse.json();assert.equal(receipt.total,0);assert.equal(receipt.quotePending,true);
+  const savedCustom=(await (await admin('/api/orders')).json()).find(order=>order.orderNumber===receipt.orderNumber);
+  assert.equal(savedCustom.items[0].formName,'Изменённый силуэт');assert.equal(savedCustom.items[0].silhouette,replacement.silhouette);assert.deepEqual(savedCustom.items[0].customRecipe,customRecipe);
+  assert.equal((await (await admin('/api/products?admin=1')).json()).find(p=>p.id===product.id).stock,6);
+  assert.equal((await admin(`/api/forms/${shape.id}`,{method:'PATCH',...json({name:'Форма отключена',active:false})})).status,200);
+  assert.equal((await (await call('/api/forms')).json()).some(form=>form.id===shape.id),false);
+  assert.equal((await call('/api/orders',{method:'POST',...json({...customRequest,requestKey:randomUUID()})})).status,409);
+  const retry=await call('/api/orders',{method:'POST',...json(customRequest)});assert.equal(retry.status,201);assert.equal((await retry.json()).orderNumber,receipt.orderNumber);
   const content=new FormData(); content.set('key','hero.title'); content.set('kind','text'); content.set('value','Работает сохранение');
   assert.equal((await admin('/api/content',{method:'PATCH',body:content})).status,200);
   assert.equal((await (await admin('/api/content')).json())['hero.title'].value,'Работает сохранение');

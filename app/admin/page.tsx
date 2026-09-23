@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { money, productShape, type CandleForm, type CandleColor, type Product, type Scent, type OrderItem } from "@/lib/catalog";
-import { atelierShapes, atelierColors, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "@/lib/atelier";
+import { recipeFormName, atelierColors, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "@/lib/atelier";
 import { ImagePreview, ProductEditor, ScentEditor, ColorEditor, FormEditor, StockEditor, AromaProfileEditor } from "./editors";
 import { CandlePreview } from "../components/candle-preview";
 import "./admin.css";
@@ -160,11 +160,11 @@ export default function Admin() {
           <div className="order-grid">
             <div><b>{order.customerName}</b><a href={`tel:${order.phone}`}>{order.phone}</a><a href={`mailto:${order.email}`}>{order.email}</a><p>{order.address}</p><small>{order.delivery}{order.comment ? ` · ${order.comment}` : ""}</small></div>
             <div className="order-items">{order.items.map((item, index) => <div className="order-line" key={`${order.id}-${item.productId}-${item.variantId ?? index}`}>
-              {item.image ? <img src={item.image} alt="" /> : !item.customRecipe && <div className="order-candle-preview"><CandlePreview silhouette={item.silhouette} shape={item.shape} color={item.color} label={item.name} /></div>}
+              {item.image ? <img src={item.image} alt="" /> : (!item.customRecipe || item.customRecipe.formId !== undefined) && <div className="order-candle-preview"><CandlePreview silhouette={item.silhouette} shape={item.shape} color={item.color} label={item.name} /></div>}
               <div>
                 <strong>{item.name} × {item.quantity}</strong>
                 {item.customRecipe ? <dl className="order-recipe">
-                  <div><dt>Форма</dt><dd>{atelierShapes[item.customRecipe.shape]}</dd></div>
+                  <div><dt>Форма</dt><dd>{recipeFormName(item.customRecipe, item.formName)}</dd></div>
                   <div><dt>Цвет</dt><dd>{atelierColors[item.customRecipe.color]}</dd></div>
                   <div><dt>Начало</dt><dd>{atelierTopNotes[item.customRecipe.top]}</dd></div>
                   <div><dt>Сердце</dt><dd>{atelierHeartNotes[item.customRecipe.heart]}</dd></div>

@@ -67,6 +67,16 @@ test('custom candle choices are validated, copied and aggregated separately from
   assert.notEqual(recipeKey(recipe),recipeKey(other));
 });
 
+test('custom recipes accept a form ID, isolate combinations and strip client form labels',()=>{
+  const dynamic={formId:12,color:'red',top:'lemon',heart:'fig',base:'oud'};
+  assert.equal(isRecipe(dynamic),true);
+  for(const formId of [0,-1,1.5,Number.MAX_SAFE_INTEGER+1,'12',null,undefined,true])assert.equal(isRecipe({...dynamic,formId}),false);
+  assert.equal(isRecipe({...dynamic,shape:'ribbed'}),false);
+  const parsed=parseOrder(orderBody([{customRecipe:{...dynamic,formName:'Fake',silhouette:'/fake.png',price:1},quantity:1},{customRecipe:dynamic,quantity:2},{customRecipe:{...dynamic,formId:13},quantity:1}]));
+  assert.deepEqual(parsed.items.map(line=>line.quantity),[3,1]);assert.deepEqual(parsed.items[0].customRecipe,dynamic);
+  assert.notEqual(recipeKey(dynamic),recipeKey({...dynamic,formId:13}));assert.notEqual(recipeKey(dynamic),recipeKey(recipe));
+});
+
 test('invalid quantities and partial malformed carts are rejected, duplicates are aggregated', () => {
   for (const quantity of [0, -1, 1.5, 100, null, '', true, '1e1']) assert.throws(() => parseOrder(orderBody([{ productId:1, quantity }])));
   assert.throws(() => parseOrder(orderBody([{ productId:1, quantity:1 }, { productId:0, quantity:1 }])));
@@ -368,6 +378,29 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await assert.rejects(saveForm(bad),error=>error.status===400);
     renamed.set('removeSilhouette','true');const removed=await saveForm(renamed,form.id);assert.equal(removed.silhouette,null);assert.equal(removed.shape,null);
     const emptyForm=await saveForm({name:'Форма без изображения',active:true});assert.equal(emptyForm.shape,null);assert.equal(emptyForm.silhouette,null);
+  });
+  await t.test('builder forms use server snapshots, reject disabled choices and never consume ready-made stock',async()=>{
+    const data=new FormData();data.set('name','Авторская ракушка');data.set('active','true');
+    data.set('silhouette',new File([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=','base64')],'shell.png',{type:'image/png'}));
+    const form=await saveForm(data);
+    const customRecipe={formId:form.id,color:'red',top:'lemon',heart:'fig',base:'oud'};
+    const request=orderBody([{customRecipe:{...customRecipe,formName:'Forged',silhouette:'/fake.png'},quantity:2}]);
+    const before=(await pool.query('SELECT id,stock FROM products ORDER BY id')).rows;
+    const [placed,retry]=await Promise.all([createOrder(request),createOrder(request)]);
+    assert.equal(placed.id,retry.id);assert.equal(placed.stockReserved,false);assert.equal(placed.total,0);
+    const item=placed.items[0];assert.equal(item.name,'Авторская свеча · Авторская ракушка');assert.equal(item.formName,form.name);assert.equal(item.silhouette,form.silhouette);assert.equal(item.quotePending,true);assert.deepEqual(item.customRecipe,customRecipe);
+    assert.deepEqual((await pool.query('SELECT id,stock FROM products ORDER BY id')).rows,before);
+    await saveForm({name:'Изменённая ракушка',active:false},form.id);
+    await assert.rejects(createOrder(orderBody([{customRecipe,quantity:1}])),error=>error.status===409);
+    await assert.rejects(createOrder(orderBody([{customRecipe:{...customRecipe,formId:999999},quantity:1}])),error=>error.status===409);
+    const stock=(await domain.listProducts(true,1))[0].stock;
+    await assert.rejects(createOrder(orderBody([{productId:1,scentId:1,colorId:defaultColorId,quantity:1},{customRecipe,quantity:1}])),error=>error.status===409);
+    assert.equal((await domain.listProducts(true,1))[0].stock,stock);
+    assert.equal((await createOrder(request)).id,placed.id);
+    const stored=domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[placed.id])).rows[0]);
+    assert.equal(stored.items[0].formName,'Авторская ракушка');assert.equal(stored.items[0].silhouette,form.silhouette);
+    await pool.query('DELETE FROM candle_forms WHERE id=$1',[form.id]);assert.equal((await createOrder(request)).id,placed.id);
+    await deleteOrder(placed.id);assert.deepEqual((await pool.query('SELECT id,stock FROM products ORDER BY id')).rows,before);
   });
   await t.test('aroma profiles preserve three explicitly authored chapters independently of candle and scent notes', async () => {
     const profile={top:{notes:'Цитрус',description:'Первое впечатление'},heart:{notes:'Цветы',description:'Сердце композиции'},base:{notes:'Дерево',description:'Тёплый шлейф'}};

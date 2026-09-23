@@ -58,6 +58,7 @@ export type Product = {
 };
 
 export type OrderItem = {
+  formName?: string;
   silhouette?: string | null;
   productId: number;
   variantId?: number | null;

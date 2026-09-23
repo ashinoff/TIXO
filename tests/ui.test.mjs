@@ -96,6 +96,7 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
     if(url==='/api/products')return response(products);
     if(url==='/api/scents')return response(scents);
     if(url==='/api/colors')return response(colors);
+    if(url==='/api/forms')return response(forms);
     if(url==='/api/orders'){
       sent.push(JSON.parse(init.body));
       return sent.length===1?response({error:'retry'},503):response({orderNumber:'T-TEST',total:0,quotePending:true},201);
@@ -330,4 +331,75 @@ test('form editor uploads the named silhouette and candle photo removal previews
     assert.equal(document.querySelector('.candle-editor-silhouette .wax-uploaded').style.getPropertyValue('--wax'),'#222225');
     await submit(document.querySelector('.product-editor form'));assert.equal(edited.get('removeImage'),'true');
   }finally{await act(async()=>root.unmount());URL.createObjectURL=previousCreate;URL.revokeObjectURL=previousRevoke;}
+});
+
+test('workshop uses active catalog forms and carries their silhouettes through color changes, cart and checkout',async()=>{
+  window.localStorage.clear();let sent;
+  const palette=[{id:21,name:'Наша ракушка',shape:null,silhouette:'/api/uploads/our-shell.png',active:true},{id:22,name:'Наш куб',shape:null,silhouette:'/api/uploads/our-cube.png',active:true},{id:23,name:'Скрытая форма',shape:'twist',active:false}];
+  globalThis.fetch=async(url,init={})=>{
+    if(url==='/api/forms')return response(palette);
+    if(url==='/api/products')return response([]);
+    if(url==='/api/scents')return response(scents);
+    if(url==='/api/colors')return response(colors);
+    if(url==='/api/orders'){sent=JSON.parse(init.body);return response({orderNumber:'T-FORMS',total:0,quotePending:true},201);}
+    return response({});
+  };
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(document.querySelectorAll('input[name="candle-shape"]').length,2);
+    assert.match(document.querySelector('.shape-options').textContent,/Наша ракушка/);assert.doesNotMatch(document.querySelector('.shape-options').textContent,/Скрытая форма|Гладкая колонна/);
+    assert.equal(document.querySelector('#studio-candle').dataset.formId,'21');
+    assert.match(document.querySelector('#studio-candle .wax-uploaded').getAttribute('style'),/our-shell\.png/);
+    await click(document.querySelector('#studio-step-1'));await click(document.querySelector('input[name="candle-color"][value="red"]'));
+    assert.equal(document.querySelector('#studio-candle .wax-uploaded').style.getPropertyValue('--wax'),'#6d2636');
+    await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
+    await click(document.querySelector('#studio-step-0'));await click(document.querySelector('input[name="candle-shape"][value="22"]'));
+    assert.match(document.querySelector('#scene-form').textContent,/Наш куб/);
+    assert.match(document.querySelector('#studio-candle .wax-uploaded').getAttribute('style'),/our-cube\.png/);
+    await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
+    await click(document.querySelector('.cart-trigger'));
+    assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
+    assert.match(document.querySelector('.cart-items').textContent,/Наша ракушка/);assert.match(document.querySelector('.cart-items').textContent,/Наш куб/);
+    const masks=[...document.querySelectorAll('.cart-custom-preview .wax-uploaded')];assert.equal(masks.length,2);assert.match(masks[0].getAttribute('style'),/our-shell\.png/);assert.match(masks[1].getAttribute('style'),/our-cube\.png/);
+    const checkout=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))checkout.elements.namedItem(name).value=value;
+    await submit(checkout);
+    assert.deepEqual(sent.items.map(line=>line.customRecipe.formId),[21,22]);assert.ok(sent.items.every(line=>!Object.hasOwn(line.customRecipe,'shape')));assert.match(document.querySelector('.order-success').textContent,/T-FORMS/);
+  }finally{await act(async()=>root.unmount());}
+});
+
+test('workshop handles failed and empty catalogs and blocks a saved cart form that has been disabled',async()=>{
+  window.localStorage.clear();let mode='error';let orderCalls=0;
+  globalThis.fetch=async(url)=>{
+    if(url==='/api/forms')return mode==='error'?response({error:'offline'},503):response(mode==='empty'?[]:[{id:31,name:'Уже отключена',shape:'ribbed',active:false}]);
+    if(url==='/api/products')return response(products);
+    if(url==='/api/scents')return response(scents);
+    if(url==='/api/colors')return response(colors);
+    if(url==='/api/orders'){orderCalls++;return response({});}
+    return response({});
+  };
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.match(document.querySelector('#studio [role=alert]').textContent,/Не удалось загрузить формы/);assert.equal(document.querySelector('#add-custom').disabled,true);assert.equal(document.querySelectorAll('.product-card').length,8);
+    mode='empty';await click(document.querySelector('#studio .builder-form-message button'));
+    assert.match(document.querySelector('#studio-panel-0').textContent,/готовит новые формы/);assert.equal(document.querySelector('#studio [role=alert]'),null);assert.equal(document.querySelector('#add-custom').disabled,true);
+  }finally{await act(async()=>root.unmount());}
+  window.localStorage.setItem('tixo.atelier.cart.v1',JSON.stringify([{customRecipe:{formId:31,color:'ivory',top:'bergamot',heart:'honey',base:'tonka'},formName:'Моя форма',silhouette:'/api/uploads/old-form.png',quantity:1}]));mode='disabled';root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));await click(document.querySelector('.cart-trigger'));
+    assert.match(document.querySelector('.cart-items').textContent,/Моя форма/);assert.match(document.querySelector('.cart-items').textContent,/Форма больше недоступна/);
+    assert.equal(document.querySelector('#checkout-form button[type=submit]').disabled,true);assert.equal(orderCalls,0);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('admin order uses the saved builder form name and silhouette even when the live form no longer exists',async()=>{
+  const recipe={formId:61,color:'red',top:'lemon',heart:'fig',base:'oud'};
+  globalThis.fetch=async url=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/orders'?response([{id:77,orderNumber:'T-SNAPSHOT',customerName:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес',delivery:'Самовывоз',comment:'',items:[{productId:0,name:'Авторская свеча · Старое название формы',formName:'Старое название формы',silhouette:'/api/uploads/historical-form.png',color:'#6d2636',customRecipe:recipe,price:0,quantity:1,quotePending:true}],total:0,status:'new',createdAt:'2026-09-23T00:00:00.000Z',stockReserved:false}]):url==='/api/content'?response({}):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Admin)));await click(button('Заказы'));
+    assert.match(document.querySelector('.order-recipe').textContent,/Старое название формы/);assert.doesNotMatch(document.querySelector('.order-recipe').textContent,/undefined/);
+    assert.match(document.querySelector('.order-candle-preview .wax-uploaded').getAttribute('style'),/historical-form\.png/);
+  }finally{await act(async()=>root.unmount());}
 });

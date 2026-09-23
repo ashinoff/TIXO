@@ -2,35 +2,23 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import {
-  atelierShapes,
   atelierColors,
+  atelierColorHex,
   atelierTopNotes,
   atelierHeartNotes,
   atelierBaseNotes,
   type Recipe,
+  type FormRecipe,
 } from "@/lib/atelier";
+import { CandlePreview } from "./candle-preview";
 import { useShopping } from "./storefront-commerce";
 
-const initialRecipe: Recipe = {
-  shape: "ribbed",
+const initialRecipe: FormRecipe = {
+  formId: 0,
   color: "ivory",
   top: "bergamot",
   heart: "honey",
   base: "tonka",
-};
-
-const colorPositions: Record<Recipe["color"], string> = {
-  black: "0%",
-  ivory: "33.333333%",
-  red: "66.666667%",
-  rose: "100%",
-};
-
-const pigments: Record<Recipe["color"], string> = {
-  black: "#28251f",
-  ivory: "#e7d9bc",
-  red: "#742930",
-  rose: "#be9596",
 };
 
 const steps = ["Форма", "Цвет", "Аромат", "Результат"];
@@ -84,8 +72,10 @@ function NoteChoices<T extends string>({
 }
 
 export function Atelier() {
-  const { addCustom } = useShopping();
-  const [recipe, setRecipe] = useState<Recipe>(initialRecipe);
+  const { addCustom, forms, formsLoading, formsError, loadForms, locked } = useShopping();
+  const [recipe, setRecipe] = useState<FormRecipe>(initialRecipe);
+  const selectedForm = recipe.formId === 0 ? forms[0] : forms.find(form => form.id === recipe.formId);
+  const formName = selectedForm?.name ?? "Выберите форму";
   const [step, setStep] = useState(0);
   const [status, setStatus] = useState("");
   const candleRef = useRef<HTMLDivElement>(null);
@@ -97,14 +87,14 @@ export function Atelier() {
   useEffect(() => {
     if (!recipeMounted.current) { recipeMounted.current = true; return; }
     return animateReveal(candleRef.current, 650, 6);
-  }, [recipe]);
+  }, [recipe, selectedForm?.id]);
 
   useEffect(() => {
     if (!stepMounted.current) { stepMounted.current = true; return; }
     return animateReveal(panelRefs.current[step], 470, 8);
   }, [step]);
 
-  const updateRecipe = <K extends keyof Recipe>(field: K, value: Recipe[K]) => {
+  const updateRecipe = <K extends keyof FormRecipe>(field: K, value: FormRecipe[K]) => {
     setRecipe(previous => ({ ...previous, [field]: value }));
     setStatus("");
   };
@@ -129,9 +119,10 @@ export function Atelier() {
   };
 
   const addRecipe = () => {
+    if (!selectedForm || formsLoading || formsError || locked) return;
     try {
       // Keep an independent snapshot so later experiments never change the cart.
-      const added = addCustom(Object.freeze({ ...recipe }));
+      const added = addCustom(Object.freeze({ ...recipe, formId: selectedForm.id }));
       setStatus(added
         ? "Ваша композиция добавлена в корзину. Можно продолжить экспериментировать."
         : "Не удалось добавить свечу. Проверьте количество и текущий заказ в корзине.");
@@ -141,7 +132,7 @@ export function Atelier() {
   };
 
   const summary = [
-    ["Форма", atelierShapes[recipe.shape]],
+    ["Форма", formName],
     ["Цвет", atelierColors[recipe.color]],
     ["Начало", atelierTopNotes[recipe.top]],
     ["Сердце", atelierHeartNotes[recipe.heart]],
@@ -156,21 +147,15 @@ export function Atelier() {
       </div>
       <div className="studio-layout">
         <div className="studio-scene">
-          {/* This photograph and the transparent candle atlas are art-directed assets. */}
+          {/* Keep the workbench artwork; the candle comes from the workshop form catalog. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="studio-backdrop" src="/assets/studio-workbench.png" alt="Рабочий стол со свечными формами, красителями и ароматическими ингредиентами" width="1536" height="1024" loading="lazy" />
           <div className="studio-scene-shade" />
           <div className="studio-scene-top"><span className="eyebrow" id="studio-scene-chapter">{chapters[step]}</span><span className="studio-live">Ваша свеча</span></div>
-          <div
-            ref={candleRef}
-            id="studio-candle"
-            className="candle-atlas"
-            data-shape={recipe.shape}
-            style={{ "--color-x": colorPositions[recipe.color] } as CSSProperties}
-            role="img"
-            aria-label={`${atelierShapes[recipe.shape]}, ${atelierColors[recipe.color]}`}
-          />
-          <div className="scene-recipe"><span id="scene-form">{atelierShapes[recipe.shape]}</span><p id="scene-ingredients">{[atelierTopNotes[recipe.top], atelierHeartNotes[recipe.heart], atelierBaseNotes[recipe.base]].join(" · ")}</p></div>
+          <div ref={candleRef} id="studio-candle" className="studio-form-preview" data-form-id={selectedForm?.id}>
+            <CandlePreview silhouette={selectedForm?.silhouette} shape={selectedForm?.shape} color={atelierColorHex[recipe.color]} label={`${formName}, ${atelierColors[recipe.color]}`} />
+          </div>
+          <div className="scene-recipe"><span id="scene-form">{formName}</span><p id="scene-ingredients">{[atelierTopNotes[recipe.top], atelierHeartNotes[recipe.heart], atelierBaseNotes[recipe.base]].join(" · ")}</p></div>
           <span className="scene-disclaimer">Визуализация будущей свечи</span>
         </div>
         <div className="studio-controls">
@@ -192,13 +177,17 @@ export function Atelier() {
           </div>
           <div ref={element => { panelRefs.current[0] = element; }} className="studio-panel" id="studio-panel-0" role="tabpanel" aria-labelledby="studio-step-0" hidden={step !== 0}>
             <p className="eyebrow">НАЧИНАЕМ С ЛИНИЙ</p><h3>Какой будет ваша свеча?</h3><p>Выберите форму — она появится на рабочем столе.</p>
-            <fieldset className="shape-options">
+            {formsLoading && <p role="status" className="builder-form-message">Загружаем формы мастерской…</p>}
+            {formsError && <div role="alert" className="builder-form-message">{formsError}<button type="button" className="text-link" onClick={() => void loadForms()}>Попробовать ещё раз ↗</button></div>}
+            {!formsLoading && !formsError && !forms.length && <p className="builder-form-message">Мастерская готовит новые формы. Загляните немного позже.</p>}
+            {!formsLoading && !formsError && recipe.formId !== 0 && !selectedForm && forms.length > 0 && <p role="status" className="builder-form-message">Эта форма больше недоступна. Выберите другую.</p>}
+            <fieldset className="shape-options workshop-form-options" disabled={formsLoading || !!formsError}>
               <legend className="sr-only">Форма свечи</legend>
-              {(Object.keys(atelierShapes) as Recipe["shape"][]).map(shape => (
-                <label key={shape}>
-                  <input type="radio" name="candle-shape" value={shape} checked={recipe.shape === shape} onChange={() => updateRecipe("shape", shape)} />
-                  <span className="shape-preview candle-atlas" data-shape={shape} aria-hidden="true" />
-                  <span>{atelierShapes[shape]}</span>
+              {forms.map(form => (
+                <label key={form.id}>
+                  <input type="radio" name="candle-shape" value={form.id} checked={selectedForm?.id === form.id} onChange={() => updateRecipe("formId", form.id)} />
+                  <span className="shape-preview workshop-shape-preview" aria-hidden="true"><CandlePreview silhouette={form.silhouette} shape={form.shape} color={atelierColorHex[recipe.color]} /></span>
+                  <span>{form.name}</span>
                 </label>
               ))}
             </fieldset>
@@ -210,7 +199,7 @@ export function Atelier() {
               {(Object.keys(atelierColors) as Recipe["color"][]).map(color => (
                 <label key={color}>
                   <input type="radio" name="candle-color" value={color} checked={recipe.color === color} onChange={() => updateRecipe("color", color)} />
-                  <span className="pigment" style={{ "--pigment": pigments[color] } as CSSProperties} aria-hidden="true" />
+                  <span className="pigment" style={{ "--pigment": atelierColorHex[color] } as CSSProperties} aria-hidden="true" />
                   <span>{atelierColors[color]}</span>
                 </label>
               ))}
@@ -227,13 +216,13 @@ export function Atelier() {
             <dl className="recipe-summary" id="recipe-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
             <div className="custom-price">Индивидуальная свеча <span>Стоимость по запросу</span></div>
             <p className="recipe-note">Перед изготовлением мастер согласует форму, состав, сочетаемость нот и стоимость. Оттенок готовой свечи может отличаться от изображения.</p>
-            <button type="button" className="button button-light" id="add-custom" onClick={addRecipe}>Добавить мою свечу в корзину <span aria-hidden="true">+</span></button>
-            <p className="builder-status" id="builder-status" role="status">{status}</p>
+            <button type="button" className="button button-light" id="add-custom" disabled={!selectedForm || formsLoading || !!formsError || locked} onClick={addRecipe}>Добавить мою свечу в корзину <span aria-hidden="true">+</span></button>
+            <p className="builder-status" id="builder-status" role="status">{formsLoading ? "Загружаем формы мастерской…" : formsError || (!selectedForm ? "Для заказа выберите доступную форму на первом шаге." : status)}</p>
             <p className="recipe-note">Оформите заявку в корзине — мастер свяжется с вами и обсудит вашу композицию.</p>
           </div>
           <div className="studio-navigation">
             <button type="button" id="studio-back" disabled={step === 0} onClick={() => goToStep(step - 1, true)}>← Назад</button>
-            <button type="button" id="studio-next" hidden={step === 3} onClick={() => goToStep(step + 1, true)}>{nextLabels[step]} <span aria-hidden="true">→</span></button>
+            <button type="button" id="studio-next" disabled={step === 0 && (!selectedForm || formsLoading || !!formsError)} hidden={step === 3} onClick={() => goToStep(step + 1, true)}>{nextLabels[step]} <span aria-hidden="true">→</span></button>
           </div>
         </div>
       </div>

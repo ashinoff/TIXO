@@ -1,4 +1,4 @@
-import { isRecipe, recipeKey, type Recipe } from "../atelier";
+import { isRecipe, copyRecipe, recipeKey, type Recipe } from "../atelier";
 
 export class InputError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -45,7 +45,7 @@ export type OrderLine = CatalogOrderLine | CustomOrderLine;
 export function parseRecipe(value: unknown): Recipe {
   if (!isRecipe(value)) throw new InputError("Проверьте форму, цвет и ноты авторской свечи");
   // Copy only server-recognised choices; never trust client labels, price or extra fields.
-  return { shape: value.shape, color: value.color, top: value.top, heart: value.heart, base: value.base };
+  return copyRecipe(value);
 }
 
 export function parseOrder(body: Record<string, unknown>) {
