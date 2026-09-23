@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/server/auth";
-import { ensureSchema, getPool, mapForm } from "@/lib/server/db";
-import { integer, parseForm } from "@/lib/server/validation";
+import { ensureSchema, getPool } from "@/lib/server/db";
+import { integer } from "@/lib/server/validation";
 import { apiError } from "@/lib/server/http";
+import { readFormRequest, saveForm } from "@/lib/server/forms";
 export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
 
@@ -10,11 +11,7 @@ export async function PATCH(request: Request, context: Context) {
   if (!await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   try {
     const id = integer((await context.params).id, "Форма", 1);
-    const form = parseForm(await request.json());
-    await ensureSchema();
-    const result = await getPool().query(`UPDATE candle_forms SET name=$1,shape=$2,active=$3,updated_at=NOW()
-      WHERE id=$4 RETURNING *`, [form.name, form.shape, form.active, id]);
-    return result.rowCount ? NextResponse.json(mapForm(result.rows[0])) : NextResponse.json({ error: "Форма не найдена" }, { status: 404 });
+    return NextResponse.json(await saveForm(await readFormRequest(request), id));
   } catch (error) { return apiError(error); }
 }
 

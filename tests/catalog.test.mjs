@@ -13,7 +13,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const temp = mkdtempSync(path.join(tmpdir(), 'tixo-domain-'));
 writeFileSync(path.join(temp, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(root, 'node_modules'), path.join(temp, 'node_modules'), 'dir');
-for (const file of ['atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/orders', 'server/uploads']) {
+for (const file of ['atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/forms', 'server/orders', 'server/uploads']) {
   const target = path.join(temp, 'lib', `${file}.js`);
   mkdirSync(path.dirname(target), { recursive: true });
   const output = ts.transpileModule(readFileSync(path.join(root, 'lib', `${file}.ts`), 'utf8'), {
@@ -28,6 +28,7 @@ const { cartKey, selectVariant, availableVariants } = require('./lib/catalog');
 const { isRecipe, recipeKey } = require('./lib/atelier');
 const domain = require('./lib/server/db');
 const { saveProduct, updateStock } = require('./lib/server/products');
+const { saveForm } = require('./lib/server/forms');
 const { createOrder, deleteOrder } = require('./lib/server/orders');
 const customer = { customerName:'Тестовый покупатель', phone:'+79990000000', email:'test@example.com', address:'Тестовый адрес', delivery:'Пункт выдачи', comment:'' };
 let defaultColorId;
@@ -344,6 +345,29 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await deleteOrder(pending.id);
     assert.equal((await pool.query('SELECT stock FROM products WHERE id=$1',[product.id])).rows[0].stock,1);
     assert.deepEqual(await domain.listProducts(true,product.id),[]);
+  });
+  await t.test('uploaded silhouettes belong to forms; renaming preserves them and product photos can fall back to the silhouette', async () => {
+    const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=','base64');
+    const data=new FormData();data.set('name','Моя форма');data.set('active','true');data.set('silhouette',new File([png],'silhouette.png',{type:'image/png'}));
+    const form=await saveForm(data);
+    assert.equal(form.name,'Моя форма');assert.equal(form.shape,null);assert.match(form.silhouette,/^\/api\/uploads\/.+\.png$/);
+    const renamed=new FormData();renamed.set('name','Мой силуэт');renamed.set('active','true');
+    const updated=await saveForm(renamed,form.id);assert.equal(updated.silhouette,form.silhouette);assert.equal(updated.name,'Мой силуэт');
+    const values={formId:form.id,colorId:redColor,scentId:red,notes:'Моя свеча',stock:2,price:1000,published:true};
+    const candleData=formFor(values);candleData.set('image',imageFile());
+    const photographed=await saveProduct(candleData);assert.ok(photographed.image);assert.equal(photographed.form.silhouette,form.silhouette);
+    const clear=formFor(photographed);clear.set('removeImage','true');
+    const candle=await saveProduct(clear,photographed.id);assert.equal(candle.image,null);assert.equal(candle.form.silhouette,form.silhouette);assert.equal(candle.name,'Мой силуэт');
+    const placed=await createOrder(orderBody([{productId:candle.id,colorId:redColor,scentId:red,quantity:1}]));
+    assert.equal(placed.items[0].image,null);assert.equal(placed.items[0].silhouette,form.silhouette);assert.equal(placed.items[0].shape,undefined);
+    data.set('name','Новый силуэт');const replaced=await saveForm(data,form.id);assert.notEqual(replaced.silhouette,form.silhouette);
+    assert.deepEqual(readFileSync(path.join(temp,'uploads',path.basename(form.silhouette))),png);
+    const oldOrder=domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[placed.id])).rows[0]);assert.equal(oldOrder.items[0].silhouette,form.silhouette);
+    await deleteOrder(placed.id);
+    const bad=new FormData();bad.set('name','Нельзя');bad.set('active','true');bad.set('silhouette',new File(['<svg/>'],'silhouette.svg',{type:'image/svg+xml'}));
+    await assert.rejects(saveForm(bad),error=>error.status===400);
+    renamed.set('removeSilhouette','true');const removed=await saveForm(renamed,form.id);assert.equal(removed.silhouette,null);assert.equal(removed.shape,null);
+    const emptyForm=await saveForm({name:'Форма без изображения',active:true});assert.equal(emptyForm.shape,null);assert.equal(emptyForm.silhouette,null);
   });
   await t.test('aroma profiles preserve three explicitly authored chapters independently of candle and scent notes', async () => {
     const profile={top:{notes:'Цитрус',description:'Первое впечатление'},heart:{notes:'Цветы',description:'Сердце композиции'},base:{notes:'Дерево',description:'Тёплый шлейф'}};

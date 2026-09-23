@@ -49,9 +49,9 @@ test('color and aroma filters intersect independently and checkout keeps every c
     assert.equal(document.querySelectorAll('.product-card').length,8);
     await click(document.querySelector('[aria-label="Цвет: Красный"]'));
     assert.equal(document.querySelectorAll('.product-card').length,2);
-    const photo=document.querySelector('.product-image img').getAttribute('src');
+    const silhouette=document.querySelector('.product-image .wax-stage').getAttribute('style');
     await click(button('Сандал и дым'));
-    assert.equal(document.querySelector('.product-image img').getAttribute('src'),photo);
+    assert.equal(document.querySelector('.product-image .wax-stage').getAttribute('style'),silhouette);
     assert.ok([...document.querySelectorAll('.product-card')].every(node=>node.dataset.colorId==='1' && node.dataset.scentId==='2'));
     await click(document.querySelector('.quick-add'));
     await click(document.querySelector('[aria-label="Цвет: Чёрный"]'));
@@ -184,7 +184,7 @@ test('inventory uses separate dropdowns for create/edit, quick stock updates and
     if(url==='/api/colors?admin=1')return response(colors);
     if(url==='/api/scents?admin=1')return response(scents);
     if(url==='/api/orders')return response([]);
-    if(url==='/api/forms'&&init.method==='POST'){addedForm={...JSON.parse(init.body),id:3};return response(addedForm,201);}
+    if(url==='/api/forms'&&init.method==='POST'){addedForm={...Object.fromEntries(init.body.entries()),active:init.body.get('active')==='true',shape:null,id:3};return response(addedForm,201);}
     if((url==='/api/products/1'||url==='/api/products')&&['PATCH','POST'].includes(init.method)){saved=init.body;return response(candles[0]);}
     if(url==='/api/products/1/stock'){stockBody=JSON.parse(init.body);candles=[{...candles[0],stock:stockBody.stock}];return response(candles[0]);}
     return response({});
@@ -271,4 +271,63 @@ test('admin edits three chapters separately from basic scent properties',async()
     await submit(document.querySelector('.aroma-profile-editor'));
     assert.deepEqual(Object.keys(sent),['top','heart','base']);assert.equal(sent.heart.notes,'Инжир');
   }finally{await act(async()=>root.unmount());}
+});
+
+test('uploaded form is the colored fallback in gallery, detail and cart; a candle photograph takes priority',async()=>{
+  window.localStorage.clear();
+  const form={id:10,name:'Моя ракушка',shape:null,silhouette:'/api/uploads/shell.png',active:true};
+  const candle={...products[0],formId:10,form,colorId:1,scentId:1,color:colors[0],scent:scents[0]};
+  globalThis.fetch=async url=>url==='/api/products'?response([candle,{...candle,id:20,image:'/api/uploads/candle.webp'}]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):response({});
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    const cards=[...document.querySelectorAll('.product-card')];assert.equal(cards.length,2);
+    assert.equal(cards[0].querySelector('img'),null);
+    assert.match(cards[0].querySelector('.wax-uploaded').getAttribute('style'),/shell\.png/);
+    assert.equal(cards[0].querySelector('.wax-uploaded').style.getPropertyValue('--wax'),'#b82035');
+    assert.equal(cards[1].querySelector('img').getAttribute('src'),'/api/uploads/candle.webp');assert.equal(cards[1].querySelector('.wax-stage'),null);
+    await click(cards[0].querySelector('.product-image'));
+    assert.ok(document.querySelector('.detail-photo .wax-uploaded'));assert.equal(document.querySelector('.detail-photo img'),null);
+    await click(button('Добавить в корзину'));await click(document.querySelector('.cart-trigger'));
+    assert.match(document.querySelector('.cart-item .wax-uploaded').getAttribute('style'),/shell\.png/);
+  }finally{await act(async()=>root.unmount());}
+});
+
+test('form editor uploads the named silhouette and candle photo removal previews the selected form',async()=>{
+  let sent;let edited;
+  const form={id:1,name:'Моя форма',shape:null,silhouette:'/api/uploads/my-form.png',active:true};
+  const candle={...products[0],formId:1,form,colorId:2,scentId:1,color:colors[1],scent:scents[0],image:'/api/uploads/real-photo.webp'};
+  const previousCreate=URL.createObjectURL;const previousRevoke=URL.revokeObjectURL;
+  URL.createObjectURL=()=> 'blob:test-silhouette';URL.revokeObjectURL=()=>{};
+  globalThis.fetch=async(url,init={})=>{
+    if(url==='/api/admin/session')return response({authenticated:true});
+    if(url==='/api/forms?admin=1')return response([form]);
+    if(url==='/api/products?admin=1')return response([candle]);
+    if(url==='/api/scents?admin=1')return response(scents);
+    if(url==='/api/colors?admin=1')return response(colors);
+    if(url==='/api/orders')return response([]);
+    if(url==='/api/forms/1'){sent=init.body;return response(form);}
+    if(url==='/api/products/1'){edited=init.body;return response(candle);}
+    return response({});
+  };
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Admin)));
+    await click(button('Формы'));await click(document.querySelector('.scent-admin-card footer button'));
+    assert.equal(document.querySelector('.form-editor select'),null);
+    await setValue(document.querySelector('input[placeholder="Например, Колонна"]'),'Свой силуэт');
+    const file=new dom.window.File(['png'],'my-form.png',{type:'image/png'});
+    const input=document.querySelector('[aria-label="Загрузить силуэт"]');Object.defineProperty(input,'files',{value:[file]});
+    await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
+    assert.match(document.querySelector('.silhouette-preview .wax-uploaded').getAttribute('style'),/blob:test-silhouette/);
+    await submit(document.querySelector('.form-editor form'));
+    assert.equal(sent.get('name'),'Свой силуэт');assert.equal(sent.get('silhouette').name,'my-form.png');assert.equal(sent.has('shape'),false);
+    await click(button('Остатки'));await click(document.querySelector('[aria-label="Редактировать свечу № 1"]'));
+    assert.equal(document.querySelector('.image-upload img').getAttribute('src'),candle.image);
+    await click(button('Убрать фото'));
+    assert.equal(document.querySelector('.image-upload img'),null);
+    assert.match(document.querySelector('.candle-editor-silhouette .wax-uploaded').getAttribute('style'),/my-form\.png/);
+    assert.equal(document.querySelector('.candle-editor-silhouette .wax-uploaded').style.getPropertyValue('--wax'),'#222225');
+    await submit(document.querySelector('.product-editor form'));assert.equal(edited.get('removeImage'),'true');
+  }finally{await act(async()=>root.unmount());URL.createObjectURL=previousCreate;URL.revokeObjectURL=previousRevoke;}
 });

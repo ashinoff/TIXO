@@ -28,3 +28,5 @@
 .wax-loops b:first-child { left:0; }.wax-loops b:last-child { right:0; transform:rotate(-42deg); }
 @media(hover:hover) and (prefers-reduced-motion:no-preference) { .product-art:hover .wax-object { transform:translateX(-50%) translateY(-6px) rotate(-3deg); } }
 @media(prefers-reduced-motion:reduce) { .wax-stage,.wax-object { transition:none; } }
+
+.wax-uploaded{isolation:isolate}.wax-silhouette{position:absolute;inset:13% 15% 17%;background:linear-gradient(110deg,var(--wax-light),var(--wax) 40%,var(--wax-shade));mask-image:var(--silhouette);-webkit-mask-image:var(--silhouette);mask-mode:alpha;mask-size:contain;-webkit-mask-size:contain;mask-repeat:no-repeat;-webkit-mask-repeat:no-repeat;mask-position:center bottom;-webkit-mask-position:center bottom;transition:background .4s}.wax-missing{display:grid;place-items:center;text-align:center;color:#6b7261;font-size:12px;line-height:1.6;min-height:50px}.wax-missing>span{font:inherit!important;padding:8px}.wax-uploaded .wax-ground{left:20%;width:60%;bottom:14%}

@@ -130,6 +130,8 @@ export async function ensureSchema() {
       id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, shape TEXT NOT NULL DEFAULT 'ribbed', active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await db.query("ALTER TABLE candle_forms ADD COLUMN IF NOT EXISTS silhouette TEXT");
+    await db.query("ALTER TABLE candle_forms ALTER COLUMN shape DROP NOT NULL, ALTER COLUMN shape DROP DEFAULT");
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS candle_forms_name_unique ON candle_forms(LOWER(name))");
     await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS profile JSONB NOT NULL DEFAULT '{}'::jsonb");
     await db.query(`ALTER TABLE products
@@ -186,7 +188,7 @@ export function mapVariant(row: Record<string, unknown>): Variant {
 }
 
 export function mapForm(row: Record<string, unknown>): CandleForm {
-  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : "ribbed" };
+  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : null, silhouette: row.silhouette ? String(row.silhouette) : null };
 }
 
 export async function listProducts(admin = false, id?: number): Promise<Product[]> {

@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { candleShapes, type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile } from "@/lib/catalog";
+import { type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile } from "@/lib/catalog";
 import { Modal } from "../components/modal";
 import { CandlePreview } from "../components/candle-preview";
 
@@ -20,6 +20,7 @@ export function ImagePreview({ file, src, alt = "" }: { file?: File | null; src?
 
 export function ProductEditor({ product, forms, scents, colors, onSave, onClose }: { product: Product; forms: CandleForm[]; scents: Scent[]; colors: CandleColor[]; onSave: (form: FormData) => Promise<void>; onClose: () => void }) {
   const [draft, setDraft] = useState(product); const [image, setImage] = useState<File>();
+  const [removeImage, setRemoveImage] = useState(false);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const save = async (event: FormEvent) => {
     event.preventDefault(); if (saving) return; setSaving(true); setError("");
@@ -27,8 +28,11 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
     for (const key of ["formId", "colorId", "scentId", "notes", "price", "stock", "published"] as const) data.set(key, String(draft[key] ?? ""));
     data.set("expectedStock", String(product.stock));
     if (image) data.set("image", image);
+    data.set("removeImage", String(removeImage));
     try { await onSave(data); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить свечу"); } finally { setSaving(false); }
   };
+  const selectedForm = forms.find(form => form.id === draft.formId);
+  const selectedColor = colors.find(color => color.id === draft.colorId);
   const choices = [
     { key: "formId", label: "Форма", placeholder: "Выберите форму", options: forms },
     { key: "colorId", label: "Цвет", placeholder: "Выберите цвет", options: colors },
@@ -40,7 +44,7 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
       <div className="candle-selects">{choices.map(({ key, label, placeholder, options }) => <label key={key}>{label}<select required value={draft[key] ?? ""} onChange={event => setDraft({ ...draft, [key]: Number(event.target.value) })}><option value="" disabled>{placeholder}</option>{options.filter(option => option.active || option.id === draft[key]).map(option => <option key={option.id} value={option.id}>{option.name}{!option.active ? " · отключён" : ""}</option>)}</select></label>)}</div>
       <p className="editor-hint">Новые варианты добавляются в разделах «Формы», «Цвета» и «Ароматы». Остаток относится только к выбранному сочетанию.</p>
       <label>Описание свечи<textarea maxLength={2000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Размер, вес, особенности — напишите своими словами" /></label>
-      <label className="image-upload"><ImagePreview file={image} src={product.image} /><span>Фотография свечи · JPG, PNG или WebP, до 10 МБ</span><input type="file" aria-label="Фотография свечи" accept="image/jpeg,image/png,image/webp" onChange={event => setImage(event.target.files?.[0])} /></label>
+      <div className="candle-image-field"><label className="image-upload">{image || (!removeImage && product.image) ? <ImagePreview file={image} src={removeImage ? null : product.image} /> : <div className="candle-editor-silhouette"><CandlePreview shape={selectedForm?.shape} silhouette={selectedForm?.silhouette} color={selectedColor?.hex} label={selectedForm?.name ?? "Форма свечи"} /></div>}<span>Фото свечи · необязательно</span><input key={removeImage ? "removed" : "photo"} type="file" aria-label="Фотография свечи" accept="image/jpeg,image/png,image/webp" onChange={event => { setImage(event.target.files?.[0]); setRemoveImage(false); }} /></label>{(image || (!removeImage && product.image)) && <button type="button" className="text-action" onClick={() => { setImage(undefined); setRemoveImage(true); }}>Убрать фото — использовать силуэт</button>}<p className="image-field-hint">Без фото показывается силуэт выбранной формы в цвете свечи. Фото: JPG, PNG или WebP, до 10 МБ.</p></div>
       <div className="editor-row"><label>Цена, ₽<input type="number" min="0" max="10000000" step="1" required value={draft.price} onChange={event => setDraft({ ...draft, price: Number(event.target.value) })} /></label><label>Остаток, шт.<input type="number" min="0" max="1000000" step="1" required value={draft.stock} onChange={event => setDraft({ ...draft, stock: Number(event.target.value) })} /></label></div>
       <label className="inline-check"><input type="checkbox" checked={draft.published} onChange={event => setDraft({ ...draft, published: event.target.checked })} />Показывать свечу на сайте</label>
     </fieldset>{error && <p className="editor-error" role="alert">{error}</p>}<footer><button type="button" className="cancel" disabled={saving} onClick={onClose}>Отмена</button><button className="save" disabled={saving || choices.some(choice => !draft[choice.key])}>{saving ? "Сохраняем…" : "Сохранить свечу"}</button></footer>
@@ -78,11 +82,30 @@ export function ColorEditor({ color, onSave, onClose }: { color: CandleColor; on
   </form></Modal>;
 }
 
-export function FormEditor({ form, onSave, onClose }: { form: CandleForm; onSave: (form: CandleForm) => Promise<void>; onClose: () => void }) {
-  const [draft, setDraft] = useState(form); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
-  return <Modal className="product-editor" label="Редактирование формы" onClose={() => { if (!saving) onClose(); }}><form onSubmit={async event => { event.preventDefault(); if (saving) return; setSaving(true); setError(""); try { await onSave(draft); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить форму"); } finally { setSaving(false); } }}>
-    <header><div><span className="admin-kicker">Справочник форм</span><h2>{form.id ? "Форма" : "Новая форма"}</h2></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
-    <fieldset className="editor-fields" disabled={saving}><label>Название формы<input required maxLength={160} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder="Например, Колонна" /></label><label>Силуэт для предпросмотра<select value={draft.shape} onChange={event => setDraft({ ...draft, shape: event.target.value as CandleShape })}>{Object.entries(candleShapes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><div className="editor-preview"><CandlePreview shape={draft.shape} color="#e8ddca" /></div><p className="editor-hint">Название появится в выпадающем списке свечи. Фотография выбирается отдельно для каждой свечи.</p><label className="inline-check"><input type="checkbox" checked={draft.active} onChange={event => setDraft({ ...draft, active: event.target.checked })} />Форма доступна на сайте</label></fieldset>
+function SilhouettePreview({ file, src, shape }: { file?: File; src?: string | null; shape?: CandleShape | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!file || !ref.current) return;
+    const url = URL.createObjectURL(file);
+    const element = ref.current.querySelector<HTMLElement>(".wax-uploaded");
+    element?.style.setProperty("--silhouette", `url(${JSON.stringify(url)})`);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return <div ref={ref} className="editor-preview silhouette-preview"><CandlePreview silhouette={file ? "about:blank" : src} shape={shape} color="#8a7050" label="Предпросмотр силуэта формы" /></div>;
+}
+
+export function FormEditor({ form, onSave, onClose }: { form: CandleForm; onSave: (data: FormData) => Promise<void>; onClose: () => void }) {
+  const [draft, setDraft] = useState(form); const [file, setFile] = useState<File>(); const [remove, setRemove] = useState(false);
+  const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
+  const save = async (event: FormEvent) => {
+    event.preventDefault(); if (saving) return; setSaving(true); setError("");
+    const data = new FormData(); data.set("name", draft.name); data.set("active", String(draft.active)); data.set("removeSilhouette", String(remove));
+    if (file) data.set("silhouette", file);
+    try { await onSave(data); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить форму"); } finally { setSaving(false); }
+  };
+  return <Modal className="product-editor form-editor" label="Редактирование формы" onClose={() => { if (!saving) onClose(); }}><form onSubmit={save}>
+    <header><div><span className="admin-kicker">Форма / силуэт</span><h2>{form.id ? "Редактировать форму" : "Новая форма"}</h2></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
+    <fieldset className="editor-fields" disabled={saving}><label>Название формы / силуэта<input required maxLength={160} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder="Например, Колонна" /></label><SilhouettePreview file={file} src={remove ? null : form.silhouette} shape={remove ? null : form.shape} /><label className="silhouette-upload">Изображение силуэта<input key={remove ? "removed" : "silhouette"} type="file" accept="image/png,image/webp" aria-label="Загрузить силуэт" onChange={event => { setFile(event.target.files?.[0]); setRemove(false); }} /></label>{(file || (!remove && (form.silhouette || form.shape))) && <button type="button" className="text-action" onClick={() => { setFile(undefined); setRemove(true); }}>Убрать силуэт</button>}<p className="editor-hint">PNG или WebP на прозрачном фоне, до 10 МБ. Силуэт окрашивается в цвет свечи и показывается, если у неё нет фотографии.</p><label className="inline-check"><input type="checkbox" checked={draft.active} onChange={event => setDraft({ ...draft, active: event.target.checked })} />Форма доступна на сайте</label></fieldset>
     {error && <p className="editor-error" role="alert">{error}</p>}<footer><button type="button" className="cancel" disabled={saving} onClick={onClose}>Отмена</button><button className="save" disabled={saving}>{saving ? "Сохраняем…" : "Сохранить форму"}</button></footer>
   </form></Modal>;
 }

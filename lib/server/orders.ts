@@ -43,8 +43,8 @@ export async function createOrder(body: Record<string, unknown>) {
       if (line.quantity > stock) throw new InputError(`«${product.name}»: доступно ещё ${stock} шт. для этого заказа.`, 409);
       items.push({ productId: line.productId, variantId: null, name: form?.name || product.name,
         scentId: Number(scent.id), scentName: scent.name, colorId: Number(color.id), color: color.hex, colorName: color.name,
-        shape: productShape({ id: Number(product.id), shape: (form?.shape ?? product.shape) as CandleShape | undefined }),
-        image: product.image, price: product.price, quantity: line.quantity });
+        shape: form ? form.shape ?? undefined : productShape({ id: Number(product.id), shape: product.shape as CandleShape | undefined }),
+        silhouette: form?.silhouette ?? null, image: product.image, price: product.price, quantity: line.quantity });
       await db.query("UPDATE products SET stock=stock-$1,updated_at=NOW() WHERE id=$2", [line.quantity, product.id]);
       product.stock -= line.quantity;
     }

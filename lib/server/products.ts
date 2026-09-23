@@ -36,7 +36,7 @@ export async function saveProduct(form: FormData, id?: number) {
       if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) throw new InputError("Фото: JPG, PNG или WebP, не более 10 МБ");
       newImage = await saveImage(file);
     }
-    const image = newImage ?? old?.image ?? null;
+    const image = newImage ?? (form.get("removeImage") === "true" ? null : old?.image ?? null);
     const values = [candleForm.name, notes, price, stock, published, image, formId, colorId, scentId, candleForm.shape];
     if (id) await db.query(`UPDATE products SET name=$1,notes=$2,price=$3,stock=$4,published=$5,image=$6,
       form_id=$7,color_id=$8,scent_id=$9,shape=$10,updated_at=NOW() WHERE id=$11`, [...values, id]);

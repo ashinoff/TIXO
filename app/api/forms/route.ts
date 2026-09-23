@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/server/auth";
 import { ensureSchema, getPool, mapForm } from "@/lib/server/db";
-import { parseForm } from "@/lib/server/validation";
+import { readFormRequest, saveForm } from "@/lib/server/forms";
 import { apiError } from "@/lib/server/http";
 export const runtime = "nodejs";
 
@@ -18,10 +18,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   try {
-    const form = parseForm(await request.json());
-    await ensureSchema();
-    const result = await getPool().query(`INSERT INTO candle_forms(name,shape,active)
-      VALUES($1,$2,$3) RETURNING *`, [form.name, form.shape, form.active]);
-    return NextResponse.json(mapForm(result.rows[0]), { status: 201 });
+    return NextResponse.json(await saveForm(await readFormRequest(request)), { status: 201 });
   } catch (error) { return apiError(error); }
 }

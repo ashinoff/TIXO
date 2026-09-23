@@ -87,8 +87,8 @@ export function parseOrder(body: Record<string, unknown>) {
 export function parseForm(body: Record<string, unknown>) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные формы");
   if (typeof body.active !== "boolean") throw new InputError("Укажите доступность формы");
-  const shape = textValue(body.shape, "Силуэт", 20);
-  if (!["twist", "ribbed", "bubble", "arch", "shell", "knot"].includes(shape)) throw new InputError("Выберите силуэт для предпросмотра");
+  const shape = body.shape == null ? null : textValue(body.shape, "Силуэт", 20);
+  if (shape !== null && !["twist", "ribbed", "bubble", "arch", "shell", "knot"].includes(shape)) throw new InputError("Выберите силуэт для предпросмотра");
   return { name: textValue(body.name, "Название формы", 160), active: body.active, shape };
 }
 

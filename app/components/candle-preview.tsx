@@ -2,8 +2,10 @@ import type { CSSProperties } from "react";
 import type { CandleShape } from "@/lib/catalog";
 import "./candle-preview.css";
 
-/** A colour preview built from the store's original wax shapes, never a recoloured product photo. */
-export function CandlePreview({ shape = "twist", color = "#b82035", label }: { shape?: CandleShape; color?: string; label?: string }) {
+/** Uploaded form masks take the selected wax colour; existing built-in forms stay compatible. */
+export function CandlePreview({ shape, silhouette, color = "#e8ddca", label }: { shape?: CandleShape | null; silhouette?: string | null; color?: string; label?: string }) {
+  if (silhouette) return <div className="wax-stage wax-uploaded" style={{ "--wax": color, "--silhouette": `url(${JSON.stringify(silhouette)})` } as CSSProperties} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}><div className="wax-ground" /><div className="wax-silhouette" /></div>;
+  if (!shape) return <div className="wax-stage wax-missing" role="img" aria-label={label ? `${label}. Силуэт ещё не загружен` : "Силуэт ещё не загружен"}><span>Силуэт<br />скоро появится</span></div>;
   return <div className={`wax-stage wax-${shape}`} style={{ "--wax": color } as CSSProperties} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
     <div className="wax-ground" />
     <div className="wax-object">

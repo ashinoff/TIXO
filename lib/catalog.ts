@@ -2,7 +2,7 @@ import type { Recipe } from "./atelier";
 
 export type AromaProfile = Record<"top" | "heart" | "base", { notes: string; description: string }>;
 export const emptyAromaProfile = (): AromaProfile => ({ top: { notes: "", description: "" }, heart: { notes: "", description: "" }, base: { notes: "", description: "" } });
-export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape };
+export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null };
 
 export type Scent = {
   id: number;
@@ -58,6 +58,7 @@ export type Product = {
 };
 
 export type OrderItem = {
+  silhouette?: string | null;
   productId: number;
   variantId?: number | null;
   scentId?: number | null;
