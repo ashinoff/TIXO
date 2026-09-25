@@ -50,7 +50,7 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const admin=(path,options={})=>call(path,{...options,headers:{...options.headers,cookie}});
   assert.deepEqual(await (await admin('/api/admin/session')).json(),{authenticated:true});
   const scents=await (await admin('/api/scents?admin=1')).json();
-  assert.equal(scents.length,4);
+  assert.equal(scents.length,29);assert.equal(scents.filter(scent=>scent.image?.startsWith("/assets/aromas/")).length,25);
   const colors=await (await call('/api/colors')).json();
   assert.equal(colors.length,4);
   assert.equal('color' in scents[0],false);
@@ -137,6 +137,12 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await admin(`/api/products/${product.id}`,{method:'DELETE'})).status,200);
   assert.equal((await (await admin('/api/products?admin=1')).json()).some(p=>p.id===product.id),false);
   assert.equal((await call(multi.images[1])).status,200);
+  for(const portrait of scents.filter(scent=>scent.image?.startsWith('/assets/aromas/'))){const asset=await call(portrait.image);assert.equal(asset.status,200);assert.match(asset.headers.get('content-type'),/image\/webp/);}
+  const portraitData=new FormData();portraitData.set('data',JSON.stringify({name:'HTTP портрет',description:'Сохранённое описание',notes:[],active:true,profile:aromaProfile}));portraitData.set('image',new File([silhouette],'portrait.png',{type:'image/png'}));
+  assert.equal((await call('/api/scents',{method:'POST',body:portraitData})).status,401);
+  const portraitResponse=await admin('/api/scents',{method:'POST',body:portraitData});assert.equal(portraitResponse.status,201);const portrait=await portraitResponse.json();assert.equal((await call(portrait.image)).status,200);assert.deepEqual(portrait.profile,aromaProfile);
+  const libraryImage=await admin(`/api/scents/${portrait.id}`,{method:'PATCH',...json({...portrait,image:'/assets/aromas/pure-jasmine.webp'})});assert.equal(libraryImage.status,200);assert.equal((await libraryImage.json()).image,'/assets/aromas/pure-jasmine.webp');
+  assert.equal((await admin(`/api/scents/${portrait.id}`,{method:'PATCH',...json({...portrait,image:null})})).status,200);assert.equal((await (await call('/api/scents')).json()).find(s=>s.id===portrait.id).image,null);
   const content=new FormData(); content.set('key','hero.title'); content.set('kind','text'); content.set('value','Работает сохранение');
   assert.equal((await admin('/api/content',{method:'PATCH',body:content})).status,200);
   assert.equal((await (await admin('/api/content')).json())['hero.title'].value,'Работает сохранение');

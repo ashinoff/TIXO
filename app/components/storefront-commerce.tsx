@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode, type PointerEvent } from "react";
 import { availableVariants, productImages, emptyAromaProfile, candleShapes, cartKey, money, productShape, type Product, type Scent, type Variant, type CandleColor, type CandleShape, type CandleForm } from "@/lib/catalog";
 import { atelierColors, atelierColorHex, recipeFormName, copyRecipe, isRecipe as validRecipe, recipeKey, recipeSummary, type Recipe } from "@/lib/atelier";
+import { aromaPortraits } from "@/lib/aroma-portraits";
 import { Modal } from "./modal";
 import { CandlePreview } from "./candle-preview";
 
@@ -215,10 +216,55 @@ export function CartTrigger() {
   return <button className="cart-trigger" type="button" aria-haspopup="dialog" aria-label={`Открыть корзину, товаров: ${count}`} onClick={() => setCartOpen(true)}><span>Корзина</span><span className="cart-count">({String(count).padStart(2, "0")})</span><svg aria-hidden="true" viewBox="0 0 24 26" fill="none"><path d="M5 8h14l1 15H4L5 8Z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" /></svg></button>;
 }
 
+function CatalogFilter({ id, label, value, preview, open, onToggle, onClose, children }: { id: string; label: string; value: string; preview?: ReactNode; open: boolean; onToggle: () => void; onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; }, [onClose]);
+  useEffect(() => {
+    if (!open) return;
+    ref.current?.querySelector<HTMLElement>('[data-selected="true"]')?.focus();
+    const outside = (event: globalThis.PointerEvent) => { if (!ref.current?.contains(event.target as Node)) close.current(); };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+  return <div className={`catalog-dropdown ${open ? "is-open" : ""}`} ref={ref} onBlur={event => { if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) onClose(); }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); onClose(); document.getElementById(`filter-${id}`)?.focus(); } }}>
+    <button type="button" id={`filter-${id}`} className="catalog-filter-trigger" aria-expanded={open} aria-controls={`filter-panel-${id}`} onClick={onToggle}><span className="filter-caption">{label}</span><span className="filter-value">{preview}{value}<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor"><path d="m4 6 4 4 4-4" /></svg></span></button>
+    {open && <div id={`filter-panel-${id}`} className={`catalog-filter-panel filter-panel-${id}`} role="region" aria-label={`Выбор: ${label.toLowerCase()}`}>{children}</div>}
+  </div>;
+}
+
+export function ScentDiscovery() {
+  const shop = useShopping();
+  const [previewId, setPreviewId] = useState<number | null>(null);
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+  const choices = useMemo(() => shop.scents.filter(scent => scent.image).sort((a,b) => {
+    const rank = (name: string) => { const index = aromaPortraits.findIndex(portrait => portrait.name === name.toUpperCase()); return index < 0 ? aromaPortraits.length : index; };
+    return rank(a.name) - rank(b.name);
+  }), [shop.scents]);
+  const choice = choices.find(scent => scent.id === (shop.activeScent ?? previewId)) ?? choices[0];
+  const index = choices.findIndex(scent => scent.id === choice?.id);
+  const choose = (scent: Scent) => { setPreviewId(scent.id); shop.setActiveScent(scent.id); };
+  const move = (offset: number) => { const next = choices[(index + offset + choices.length) % choices.length]; if (next) choose(next); };
+  return <section className="scent-discovery pad" id="aromas" aria-labelledby="scent-discovery-title">
+    <div className="scent-discovery-heading"><p className="eyebrow">БИБЛИОТЕКА АРОМАТОВ / ТИХО</p><h2 id="scent-discovery-title">Форма притягивает взгляд.<br /><span>Аромат остаётся в памяти.</span></h2><p>Начните с ощущения. Выберите аромат для своего вечера.</p></div>
+    {shop.loading ? <p role="status" className="scent-discovery-message">Открываем библиотеку ароматов…</p> : shop.catalogError ? <div role="alert" className="scent-discovery-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Попробовать снова ↗</button></div> : !choice ? <p className="scent-discovery-message">Мастерская готовит новую коллекцию ароматов.</p> : <div className="scent-discovery-layout">
+      <div className="scent-portrait"><div className="scent-portrait-frame" key={choice.image}>{choice.image && failedImage !== choice.image ? <img src={choice.image} alt={`Аромат ${choice.name} — образ композиции`} width="1254" height="1254" loading="lazy" onError={() => setFailedImage(choice.image ?? null)} /> : <div className="scent-portrait-missing">Портрет аромата скоро появится</div>}</div><div className="scent-portrait-shade" /><span className="eyebrow scent-portrait-mark">ТИХО / ВАШ АРОМАТ</span><div className="scent-portrait-caption" aria-live="polite"><span>{String(index + 1).padStart(2,"0")} / {String(choices.length).padStart(2,"0")}</span><h3>{choice.name}</h3></div><div className="scent-portrait-navigation"><button type="button" aria-label="Предыдущий аромат" disabled={choices.length < 2} onClick={() => move(-1)}>←</button><button type="button" aria-label="Следующий аромат" disabled={choices.length < 2} onClick={() => move(1)}>→</button></div></div>
+      <div className="scent-library"><div className="scent-library-top"><span className="eyebrow">НАЙДИТЕ СВОЁ ЗВУЧАНИЕ</span><span>{choices.length} ароматов</span></div><div className="scent-name-list" role="group" aria-label="Библиотека ароматов">{choices.map((scent,i) => <button type="button" key={scent.id} aria-pressed={choice.id === scent.id} aria-label={`Познакомиться с ароматом ${scent.name}`} onClick={() => choose(scent)}><span>{String(i + 1).padStart(2,"0")}</span>{scent.name}<i aria-hidden="true">↗</i></button>)}</div><div className="scent-library-selection" aria-live="polite"><span className="eyebrow">ВАШ ВЫБОР</span><h3>{choice.name}</h3>{choice.description && <p>{choice.description}</p>}</div><button type="button" className="button button-light" onClick={() => { choose(choice); document.getElementById("collection")?.scrollIntoView({ behavior: reducedMotion() ? "instant" : "smooth" }); }}>Свечи с этим ароматом <span aria-hidden="true">↗</span></button><a className="scent-chapters-link" href="#ritual">Узнать, как раскрывается аромат ↓</a></div>
+    </div>}
+  </section>;
+}
+
 export function Catalog() {
   const shop = useShopping();
   const [colorId, setColorId] = useState<number | null>(null);
+  const [formId, setFormId] = useState<number | null>(null);
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const palette = shop.colors.find(color => color.id === colorId);
+  const selectedForm = shop.forms.find(form => form.id === formId);
+  const choose = (kind: string, action: () => void) => { action(); setOpenFilter(null); document.getElementById(`filter-${kind}`)?.focus(); };
+  const reset = () => { setColorId(null); setFormId(null); shop.setActiveScent(null); setOpenFilter(null); };
   const cards = shop.products.flatMap(product => shop.colors.flatMap(color => {
+    if (formId !== null && product.formId !== formId) return [];
     if ((colorId !== null && color.id !== colorId) || (product.colorId && product.colorId !== color.id)) return [];
     const candidates = product.hasVariants
       ? availableVariants(product).filter(v => v.colorId === color.id).map(v => v.scent)
@@ -228,11 +274,23 @@ export function Catalog() {
   }));
   return <section className="collection pad" id="collection" aria-labelledby="collection-title">
     <div className="section-heading"><div><p className="eyebrow">01 / КОЛЛЕКЦИЯ</p><h2 id="collection-title">У тишины<br />ваша форма.</h2></div><p className="section-description">Любимый цвет. Любимый аромат.<br />Сочетание выбираете вы.</p></div>
-    <div className="color-filter" role="group" aria-label="Фильтр по цвету"><span className="filter-label">Цвет</span><button type="button" className="all-colors" aria-pressed={colorId === null} onClick={() => setColorId(null)}>Все цвета</button>{shop.colors.map(color => <button type="button" className="color-filter-option" key={color.id} aria-label={`Цвет: ${color.name}`} aria-pressed={colorId === color.id} title={color.name} onClick={() => setColorId(color.id)}><i style={{ background: color.hex }} /><span>{color.name}</span></button>)}</div>
-    <div className="collection-toolbar"><div className="filters aroma-filters" role="group" aria-label="Фильтр по аромату"><button type="button" className={shop.activeScent === null ? "active" : ""} aria-pressed={shop.activeScent === null} onClick={() => shop.setActiveScent(null)}>Все ароматы <sup>{String(shop.scents.length).padStart(2, "0")}</sup></button>{shop.scents.map(scent => <button key={scent.id} type="button" className={shop.activeScent === scent.id ? "active" : ""} aria-pressed={shop.activeScent === scent.id} onClick={() => shop.setActiveScent(scent.id)}>{scent.name}</button>)}</div><span className="catalog-note">{cards.length} вариантов · ручная работа</span></div>
+    <div className="catalog-filter-bar">
+      <div className="catalog-dropdowns">
+        <CatalogFilter id="color" label="Цвет" value={palette?.name ?? "Все цвета"} preview={palette && <i className="filter-selected-color" style={{ background: palette.hex }} />} open={openFilter === "color"} onToggle={() => setOpenFilter(openFilter === "color" ? null : "color")} onClose={() => setOpenFilter(null)}>
+          <div className="filter-color-palette"><button type="button" data-selected={colorId === null} aria-pressed={colorId === null} onClick={() => choose("color", () => setColorId(null))}><i className="all-color-swatch" /><span>Все цвета</span></button>{shop.colors.map(color => <button type="button" key={color.id} aria-label={`Цвет: ${color.name}`} aria-pressed={colorId === color.id} data-selected={colorId === color.id} onClick={() => choose("color", () => setColorId(color.id))}><i style={{ background: color.hex }} /><span>{color.name}</span></button>)}</div>
+        </CatalogFilter>
+        <CatalogFilter id="scent" label="Аромат" value={shop.selectedScent?.name ?? "Все ароматы"} open={openFilter === "scent"} onToggle={() => setOpenFilter(openFilter === "scent" ? null : "scent")} onClose={() => setOpenFilter(null)}>
+          <div className="filter-aroma-list"><button type="button" data-selected={shop.activeScent === null} aria-pressed={shop.activeScent === null} onClick={() => choose("scent", () => shop.setActiveScent(null))}><span>Все ароматы</span><small>{shop.scents.length}</small></button>{shop.scents.map(scent => <button type="button" key={scent.id} data-selected={shop.activeScent === scent.id} aria-pressed={shop.activeScent === scent.id} onClick={() => choose("scent", () => shop.setActiveScent(scent.id))}>{scent.image && <img src={scent.image} alt="" width="40" height="40" loading="lazy" />}<span>{scent.name}</span><small aria-hidden="true">{shop.activeScent === scent.id ? "✓" : ""}</small></button>)}</div>
+        </CatalogFilter>
+        <CatalogFilter id="form" label="Форма" value={selectedForm?.name ?? "Все формы"} open={openFilter === "form"} onToggle={() => setOpenFilter(openFilter === "form" ? null : "form")} onClose={() => setOpenFilter(null)}>
+          {shop.formsLoading ? <p role="status" className="filter-notice">Загружаем формы…</p> : shop.formsError ? <div role="alert" className="filter-notice">{shop.formsError}<button type="button" className="text-link" onClick={() => void shop.loadForms()}>Попробовать снова</button></div> : <div className="filter-form-grid"><button type="button" data-selected={formId === null} aria-pressed={formId === null} onClick={() => choose("form", () => setFormId(null))}><span className="all-forms-mark" aria-hidden="true">∗</span><span>Все формы</span></button>{shop.forms.map(form => <button type="button" key={form.id} aria-label={`Форма: ${form.name}`} data-selected={formId === form.id} aria-pressed={formId === form.id} onClick={() => choose("form", () => setFormId(form.id))}><span className="filter-form-preview" aria-hidden="true"><CandlePreview silhouette={form.silhouette} shape={form.shape} color={palette?.hex ?? "#bbaa8a"} /></span><span>{form.name}</span></button>)}</div>}
+        </CatalogFilter>
+      </div>
+      <div className="catalog-filter-summary"><span className="catalog-note" aria-live="polite">{cards.length} вариантов · ручная работа</span>{(colorId !== null || formId !== null || shop.activeScent !== null) && <button type="button" className="catalog-reset" onClick={reset}>Сбросить фильтры ×</button>}</div>
+    </div>
     {shop.loading && <p className="catalog-message" role="status">Готовим вашу коллекцию…</p>}
     {shop.catalogError && <div className="catalog-message" role="alert">{shop.catalogError}<button className="text-link" onClick={() => void shop.loadCatalog()}>Попробовать ещё раз ↗</button></div>}
-    {!shop.loading && !shop.catalogError && !cards.length && <div className="catalog-message" role="status"><p>В этом сочетании свечей пока нет.</p><button className="text-link" onClick={() => { setColorId(null); shop.setActiveScent(null); }}>Показать всю коллекцию ↗</button></div>}
+    {!shop.loading && !shop.catalogError && !cards.length && <div className="catalog-message" role="status"><p>В этом сочетании свечей пока нет.</p><button className="text-link" onClick={reset}>Показать всю коллекцию ↗</button></div>}
     <div className="product-grid" id="product-grid">{cards.map(({ product, color, scent, photo }, index) => {
       const stock = stockFor(product, scent, color);
       return <article className="product-card" key={`${product.id}:${color.id}`} data-product-id={product.id} data-color-id={color.id} data-scent-id={shop.activeScent ?? undefined}>
@@ -240,14 +298,14 @@ export function Catalog() {
         <div className="product-category">{color.name}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id)}>{product.name}</button><span>{money(product.price)}</span></div><p>{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
         <button className="quick-add" type="button" disabled={shop.locked || ((shop.activeScent !== null || !!product.scentId) && !stock)} aria-label={`Выбрать ${product.name}, ${color.name}`} onClick={() => shop.activeScent === null ? shop.openProduct(product.id, product.scentId ?? undefined, color.id) : shop.addProduct(product, scent, color)}>+</button>{(shop.activeScent !== null || !!product.scentId) && !stock && <span className="product-unavailable">Нет в наличии</span>}
       </article>;
-    })}</div><div className="collection-end"><span>Форма притягивает взгляд. Аромат остаётся в памяти.</span><a href="#ritual">Познакомиться ближе <span aria-hidden="true">↓</span></a></div>
+    })}</div>
   </section>;
 }
 
 export function Aroma() {
   const shop = useShopping(); const [choiceKey, setChoiceKey] = useState(""); const [note, setNote] = useState(0);
   const choices = useMemo(() => shop.scents.map(scent => ({ key: String(scent.id), scent })), [shop.scents]);
-  const choice = choices.find(item => item.key === choiceKey) ?? choices[0];
+  const choice = choices.find(item => item.key === String(shop.activeScent ?? choiceKey)) ?? choices[0];
   const panelRef = useRef<HTMLDivElement>(null); const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const [shown, setShown] = useState({ key: "", note: 0 }); const [fading, setFading] = useState(false);
   useEffect(() => {
@@ -263,7 +321,7 @@ export function Aroma() {
   const selectNote = (index: number, focus = false) => { setNote(index); if (focus) tabs.current[index]?.focus(); };
   return <section className="ritual" id="ritual" aria-labelledby="ritual-title">
     <div className="ritual-visual zoom-surface" {...inspection}><img src="/assets/hero.png" alt="Свет свечи ТИХО" width="1254" height="1254" loading="lazy" /><div className="ritual-overlay" /><span className="ritual-word">{choice?.scent.name.toLowerCase() ?? "почувствуйте"}.</span><span className="eyebrow visual-caption">ТИХО / ИСКУССТВО АРОМАТА</span><span className="ritual-photo-hint">Наведите, чтобы рассмотреть</span></div>
-    <div className="ritual-content"><p className="eyebrow">02 / ИСКУССТВО АРОМАТА</p><h2 id="ritual-title">У каждого вечера —<br /><span>свой шлейф.</span></h2><label className="aroma-picker-label" htmlFor="ritual-aroma">Какой аромат раскроем?</label><div className="aroma-select-wrap"><select id="ritual-aroma" value={choice?.key ?? ""} disabled={!choices.length} onChange={event => { setChoiceKey(event.target.value); setNote(0); }}>{!choices.length && <option value="">{shop.loading ? "Загружаем ароматы…" : "Коллекция готовится"}</option>}{choices.map(item => <option key={item.key} value={item.key}>{item.scent.name}</option>)}</select><span aria-hidden="true">⌄</span></div><p className="ritual-intro">{choice?.scent.description || "Узнайте аромат чуть ближе. Выберите аромат и неспешно пройдите его три главы."}</p><p className="note-instruction">Выберите главу, чтобы исследовать аромат</p>
+    <div className="ritual-content"><p className="eyebrow">02 / ИСКУССТВО АРОМАТА</p><h2 id="ritual-title">У каждого вечера —<br /><span>свой шлейф.</span></h2><label className="aroma-picker-label" htmlFor="ritual-aroma">Какой аромат раскроем?</label><div className="aroma-select-wrap"><select id="ritual-aroma" value={choice?.key ?? ""} disabled={!choices.length} onChange={event => { setChoiceKey(event.target.value); shop.setActiveScent(Number(event.target.value)); setNote(0); }}>{!choices.length && <option value="">{shop.loading ? "Загружаем ароматы…" : "Коллекция готовится"}</option>}{choices.map(item => <option key={item.key} value={item.key}>{item.scent.name}</option>)}</select><span aria-hidden="true">⌄</span></div><p className="ritual-intro">{choice?.scent.description || "Узнайте аромат чуть ближе. Выберите аромат и неспешно пройдите его три главы."}</p><p className="note-instruction">Выберите главу, чтобы исследовать аромат</p>
       <div className="note-tabs" role="tablist" aria-label="Главы аромата">{["Начало", "Сердце", "Шлейф"].map((label, index) => <button ref={element => { tabs.current[index] = element; }} key={label} type="button" role="tab" aria-selected={note === index} aria-controls="note-panel" id={`note-tab-${index}`} tabIndex={note === index ? 0 : -1} onClick={() => selectNote(index)} onKeyDown={event => { const next = event.key === "ArrowRight" ? (index + 1) % 3 : event.key === "ArrowLeft" ? (index + 2) % 3 : event.key === "Home" ? 0 : event.key === "End" ? 2 : null; if (next !== null) { event.preventDefault(); selectNote(next, true); } }}><span>0{index + 1}</span><strong>{label}</strong></button>)}</div>
       <div ref={panelRef} className={`note-panel${fading ? " is-changing" : ""}`} id="note-panel" role="tabpanel" aria-labelledby={`note-tab-${note}`} tabIndex={0}><span className="eyebrow">{titles[shown.note]}</span><h3>{stage.notes || ["Начало", "Сердце", "Шлейф"][shown.note]}</h3><p>{stage.description || "Мастерская скоро добавит описание этой главы аромата."}</p></div>
       <button type="button" className="text-link" disabled={!choice} onClick={() => { if (choice) { shop.setActiveScent(choice.scent.id); document.getElementById("collection")?.scrollIntoView({ behavior: reducedMotion() ? "instant" : "smooth" }); } }}>Свечи с этим ароматом <span aria-hidden="true">↗</span></button>

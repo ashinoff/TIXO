@@ -5,6 +5,7 @@ export const emptyAromaProfile = (): AromaProfile => ({ top: { notes: "", descri
 export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null };
 
 export type Scent = {
+  image?: string | null;
   id: number;
   name: string;
   description: string;

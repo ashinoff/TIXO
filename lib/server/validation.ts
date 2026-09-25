@@ -1,4 +1,5 @@
 import { isRecipe, copyRecipe, recipeKey, type Recipe } from "../atelier";
+import { aromaPortraits } from "../aroma-portraits";
 
 export class InputError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -22,11 +23,13 @@ export function parseScent(body: Record<string, unknown>) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные аромата");
   if (!Array.isArray(body.notes) || body.notes.length > 12) throw new InputError("Укажите до 12 нот аромата");
   if (typeof body.active !== "boolean") throw new InputError("Укажите доступность аромата");
+  if (body.image !== undefined && body.image !== null && (typeof body.image !== "string" || (!aromaPortraits.some(portrait => portrait.image === body.image) && !/^\/api\/uploads\/[\da-f-]{36}\.(png|jpg|webp)$/.test(body.image)))) throw new InputError("Выберите изображение из библиотеки или загрузите фото аромата");
   return {
     name: textValue(body.name, "Название аромата", 120),
     description: textValue(body.description, "Описание", 2000, false),
     notes: body.notes.map(note => textValue(note, "Нота аромата", 80, false)).filter(Boolean),
     active: body.active,
+    ...(body.image !== undefined ? { image: body.image as string | null } : {}),
     ...(body.profile !== undefined ? { profile: parseAromaProfile(body.profile as Record<string, unknown>) } : {}),
   };
 }

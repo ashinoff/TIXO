@@ -13,7 +13,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const temp = mkdtempSync(path.join(tmpdir(), 'tixo-domain-'));
 writeFileSync(path.join(temp, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(root, 'node_modules'), path.join(temp, 'node_modules'), 'dir');
-for (const file of ['atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/forms', 'server/orders', 'server/uploads']) {
+for (const file of ['aroma-portraits', 'atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/forms', 'server/scents', 'server/orders', 'server/uploads']) {
   const target = path.join(temp, 'lib', `${file}.js`);
   mkdirSync(path.dirname(target), { recursive: true });
   const output = ts.transpileModule(readFileSync(path.join(root, 'lib', `${file}.ts`), 'utf8'), {
@@ -29,6 +29,8 @@ const { isRecipe, recipeKey } = require('./lib/atelier');
 const domain = require('./lib/server/db');
 const { saveProduct, updateStock } = require('./lib/server/products');
 const { saveForm } = require('./lib/server/forms');
+const { saveScent } = require('./lib/server/scents');
+const { aromaPortraits } = require('./lib/aroma-portraits');
 const { createOrder, deleteOrder } = require('./lib/server/orders');
 const customer = { customerName:'Тестовый покупатель', phone:'+79990000000', email:'test@example.com', address:'Тестовый адрес', delivery:'Пункт выдачи', comment:'' };
 let defaultColorId;
@@ -188,7 +190,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     const migratedRows=(await pool.query('SELECT * FROM products ORDER BY id')).rows;
     await pool.query("UPDATE scents SET name='Мой красный аромат', active=FALSE WHERE color_name='Красный'");
     globalThis.tihoSchemaReady = undefined; await domain.ensureSchema();
-    assert.equal((await pool.query('SELECT * FROM scents')).rows.length, 4);
+    assert.equal((await pool.query('SELECT * FROM scents')).rows.length, 29);
     assert.equal((await pool.query("SELECT active FROM scents WHERE name='Мой красный аромат'")).rows[0].active, false);
     assert.deepEqual((await pool.query('SELECT * FROM products ORDER BY id')).rows,migratedRows);
     await pool.query("UPDATE scents SET active=TRUE WHERE color_name='Красный'");
@@ -202,7 +204,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await assert.rejects(createOrder(orderBody([{productId:2,variantId:1,scentId:1,quantity:1}])),error=>error.status===409);
   });
   await t.test('all four scents work with existing forms without photos or setup; stock stays shared', async () => {
-    const defaults = (await pool.query('SELECT id FROM scents ORDER BY id')).rows.map(row => Number(row.id));
+    const defaults = (await pool.query('SELECT id FROM scents ORDER BY id LIMIT 4')).rows.map(row => Number(row.id));
     const order = await createOrder(orderBody(defaults.map(scentId => ({ productId:1, scentId, quantity:1 }))));
     assert.equal(order.items.length, 4);
     assert.deepEqual(order.items.map(item => item.colorName), ['Красный','Красный','Красный','Красный']);
@@ -449,6 +451,26 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     assert.equal((await createOrder(request)).id,placed.id);
     const saved=domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[placed.id])).rows[0]);assert.equal(saved.items[0].scentName,'Авторский чай');assert.deepEqual(saved.items[0].aromaProfile,profile);
     await deleteOrder(placed.id);
+  });
+
+  await t.test('portrait migration preserves matching aromas and never recreates deleted collection entries',async()=>{
+    const entries=(await pool.query("SELECT * FROM scents WHERE image LIKE '/assets/aromas/%' ORDER BY id")).rows;assert.equal(entries.length,25);assert.deepEqual(entries.map(s=>s.name).sort(),aromaPortraits.map(s=>s.name).sort());
+    const cherry=entries.find(s=>s.name==='CHERRY');const profile={top:{notes:'Наше начало',description:'Текст'},heart:{notes:'Наше сердце',description:'Текст'},base:{notes:'Наш шлейф',description:'Текст'}};
+    await pool.query("UPDATE scents SET name='Cherry',description='Описание мастерской',profile=$1::jsonb,active=FALSE,image='/api/uploads/old.webp' WHERE id=$2",[JSON.stringify(profile),cherry.id]);
+    await pool.query("DELETE FROM app_migrations WHERE key='aroma-portraits-v1'");globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();
+    const saved=(await pool.query('SELECT * FROM scents WHERE id=$1',[cherry.id])).rows[0];assert.equal(saved.name,'Cherry');assert.equal(saved.description,'Описание мастерской');assert.deepEqual(saved.profile,profile);assert.equal(saved.active,false);assert.equal(saved.image,'/api/uploads/old.webp');assert.equal((await pool.query("SELECT count(*)::int AS n FROM scents WHERE LOWER(name)='cherry'")).rows[0].n,1);
+    const wine=entries.find(s=>s.name==='WINE');await pool.query('DELETE FROM scents WHERE id=$1',[wine.id]);globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();assert.equal((await pool.query("SELECT * FROM scents WHERE name='WINE'")).rowCount,0);
+  });
+
+  await t.test('aroma photos support library selection, multipart upload, rename and explicit removal',async()=>{
+    const body={name:'Наша фотокомпозиция',description:'Авторское описание',notes:['нота'],active:true,image:'/assets/aromas/cherry.webp'};
+    const jsonRequest=data=>new Request('http://test/api/scents',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+    let scent=await saveScent(jsonRequest(body));assert.equal(scent.image,body.image);
+    const data=new FormData();data.set('data',JSON.stringify({...body,name:'Наш новый портрет'}));data.set('image',imageFile());scent=await saveScent(new Request('http://test/api/scents',{method:'PATCH',body:data}),scent.id);assert.match(scent.image,/^\/api\/uploads\/.+\.webp$/);const uploaded=scent.image;
+    const {image,...withoutImage}=body;scent=await saveScent(jsonRequest({...withoutImage,name:'Переименованный аромат'}),scent.id);assert.equal(scent.image,uploaded);
+    data.set('image',new File(['svg'],'bad.svg',{type:'image/svg+xml'}));await assert.rejects(saveScent(new Request('http://test/api/scents',{method:'PATCH',body:data}),scent.id),error=>error.status===400);
+    await assert.rejects(saveScent(jsonRequest({...body,image:'https://untrusted.example/picture.png'}),scent.id),error=>error.status===400);
+    scent=await saveScent(jsonRequest({...body,image:null}),scent.id);assert.equal(scent.image,null);assert.ok(readFileSync(path.join(temp,'uploads',path.basename(uploaded))).length);
   });
 
   await t.test('aroma profiles preserve three explicitly authored chapters independently of candle and scent notes', async () => {

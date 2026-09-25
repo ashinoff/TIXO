@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/server/auth";
 import { ensureSchema, getPool, mapScent } from "@/lib/server/db";
-import { parseScent } from "@/lib/server/validation";
+import { saveScent } from "@/lib/server/scents";
 import { apiError } from "@/lib/server/http";
 export const runtime = "nodejs";
 
@@ -18,10 +18,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   try {
-    const scent = parseScent(await request.json());
-    await ensureSchema();
-    const result = await getPool().query(`INSERT INTO scents(name,description,notes,active,profile)
-      VALUES($1,$2,$3,$4,$5::jsonb) RETURNING *`, [scent.name, scent.description, scent.notes, scent.active, JSON.stringify(scent.profile ?? {})]);
-    return NextResponse.json(mapScent(result.rows[0]), { status: 201 });
+    return NextResponse.json(await saveScent(request), { status: 201 });
   } catch (error) { return apiError(error); }
 }

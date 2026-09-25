@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { aromaPortraits } from "../aroma-portraits";
 import type { Product, OrderItem, Scent, Variant, CandleColor, CandleForm } from "../catalog";
 import { candleShapes, emptyAromaProfile, productShape, type CandleShape } from "../catalog";
 
@@ -155,6 +156,15 @@ export async function ensureSchema() {
     }
     // Null marks legacy single-photo rows; an explicit empty list means silhouette only.
     await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB");
+    await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS image TEXT");
+    const portraits = await db.query("INSERT INTO app_migrations(key) VALUES('aroma-portraits-v1') ON CONFLICT DO NOTHING RETURNING key");
+    if (portraits.rowCount) {
+      for (const portrait of aromaPortraits) {
+        // Keep live IDs, descriptions, chapters and availability; attach only a missing portrait.
+        await db.query(`INSERT INTO scents(name,image) VALUES($1,$2)
+          ON CONFLICT (LOWER(name)) DO UPDATE SET image=COALESCE(scents.image,EXCLUDED.image)`, [portrait.name, portrait.image]);
+      }
+    }
     await db.query("COMMIT");
     } catch (error) { await db.query("ROLLBACK"); throw error; }
     finally { db.release(); }
@@ -177,6 +187,7 @@ export function mapOrder(row: Record<string, unknown>): StoredOrder {
 
 export function mapScent(row: Record<string, unknown>): Scent {
   return { id: Number(row.id), name: String(row.name), description: String(row.description),
+    image: row.image ? String(row.image) : null,
     profile: { ...emptyAromaProfile(), ...(row.profile && typeof row.profile === "object" ? row.profile : {}) },
     notes: Array.isArray(row.notes) ? row.notes.map(String) : [], active: Boolean(row.active) };
 }

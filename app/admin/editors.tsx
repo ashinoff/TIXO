@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile, productImages, MAX_PRODUCT_IMAGES } from "@/lib/catalog";
+import { aromaPortraits } from "@/lib/aroma-portraits";
 import { Modal } from "../components/modal";
 import { CandlePreview } from "../components/candle-preview";
 
@@ -61,17 +62,19 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
   </form></Modal>;
 }
 
-export function ScentEditor({ scent, onSave, onClose }: { scent: Scent; onSave: (scent: Scent) => Promise<void>; onClose: () => void }) {
+export function ScentEditor({ scent, onSave, onClose }: { scent: Scent; onSave: (scent: Scent, file?: File) => Promise<void>; onClose: () => void }) {
   const [draft, setDraft] = useState({ ...scent, profile: scent.profile ?? emptyAromaProfile() });
+  const [imageFile, setImageFile] = useState<File>();
   const [notes, setNotes] = useState(scent.notes.join(", "));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const save = async (event: FormEvent) => { event.preventDefault(); if (saving) return; setSaving(true); setError(""); try { await onSave({ ...draft, notes: notes.split(",").map(n => n.trim()).filter(Boolean) }); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить аромат"); } finally { setSaving(false); } };
+  const save = async (event: FormEvent) => { event.preventDefault(); if (saving) return; setSaving(true); setError(""); try { await onSave({ ...draft, notes: notes.split(",").map(n => n.trim()).filter(Boolean) }, imageFile); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить аромат"); } finally { setSaving(false); } };
   return <Modal className="product-editor scent-editor" label="Редактирование аромата" onClose={() => { if (!saving) onClose(); }}><form onSubmit={save}>
     <header><div><span className="admin-kicker">Общий справочник</span><h2>{scent.id ? "Аромат" : "Новый аромат"}</h2></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
     <fieldset className="editor-fields" disabled={saving}>
 
       <label>Название аромата<input required maxLength={120} value={draft.name} placeholder="Например, Вишня и миндаль" onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
+      <div className="scent-portrait-editor"><div className="scent-editor-photo"><ImagePreview file={imageFile} src={draft.image} alt={`Изображение аромата ${draft.name}`} /></div><label>Изображение из библиотеки<select value={imageFile ? "" : draft.image ?? ""} onChange={event => { setDraft({ ...draft, image: event.target.value || null }); setImageFile(undefined); }}><option value="">{imageFile ? "Будет загружено новое фото" : "Без изображения"}</option>{draft.image && !aromaPortraits.some(portrait => portrait.image === draft.image) && <option value={draft.image}>Загруженное изображение</option>}{aromaPortraits.map(portrait => <option key={portrait.slug} value={portrait.image}>{portrait.name}</option>)}</select></label><label>Загрузить своё изображение<input key={draft.image ?? "empty"} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Фото аромата" onChange={event => { const file = event.target.files?.[0]; if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024)) { setError("Фото: JPG, PNG или WebP, до 10 МБ"); event.target.value = ""; return; } setError(""); setImageFile(file); }} /></label>{(imageFile || draft.image) && <button type="button" className="text-action" onClick={() => { setImageFile(undefined); setDraft({ ...draft, image: null }); }}>Убрать изображение аромата</button>}<p className="editor-hint">Изображение появляется в интерактивной библиотеке после первого экрана. Выберите готовый образ или загрузите JPG, PNG, WebP до 10 МБ. Главы аромата ниже описывают вашу композицию.</p></div>
       <label>Описание<textarea maxLength={2000} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label>
       <label>Ноты через запятую<input value={notes} onChange={e => setNotes(e.target.value)} placeholder="вишня, миндаль, ваниль" /></label>
       <p className="editor-hint">Этот аромат можно выбрать для готовой и авторской свечи. Главы ниже используются в блоках «Искусство аромата» и «Побыть мастером».</p><AromaProfileFields profile={draft.profile} onChange={profile => setDraft({ ...draft, profile })} />

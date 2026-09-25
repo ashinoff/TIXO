@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/server/auth";
-import { ensureSchema, getPool, mapScent } from "@/lib/server/db";
-import { integer, parseScent } from "@/lib/server/validation";
+import { ensureSchema, getPool } from "@/lib/server/db";
+import { integer } from "@/lib/server/validation";
+import { saveScent } from "@/lib/server/scents";
 import { apiError } from "@/lib/server/http";
 export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
@@ -10,11 +11,7 @@ export async function PATCH(request: Request, context: Context) {
   if (!await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   try {
     const id = integer((await context.params).id, "Аромат", 1);
-    const scent = parseScent(await request.json());
-    await ensureSchema();
-    const result = await getPool().query(`UPDATE scents SET name=$1,description=$2,notes=$3,active=$4,profile=COALESCE($6::jsonb,profile),updated_at=NOW()
-      WHERE id=$5 RETURNING *`, [scent.name, scent.description, scent.notes, scent.active, id, scent.profile ? JSON.stringify(scent.profile) : null]);
-    return result.rowCount ? NextResponse.json(mapScent(result.rows[0])) : NextResponse.json({ error: "Аромат не найден" }, { status: 404 });
+    return NextResponse.json(await saveScent(request, id));
   } catch (error) { return apiError(error); }
 }
 
