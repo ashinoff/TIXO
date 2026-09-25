@@ -50,7 +50,7 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const admin=(path,options={})=>call(path,{...options,headers:{...options.headers,cookie}});
   assert.deepEqual(await (await admin('/api/admin/session')).json(),{authenticated:true});
   const scents=await (await admin('/api/scents?admin=1')).json();
-  assert.equal(scents.length,29);assert.equal(scents.filter(scent=>scent.image?.startsWith("/assets/aromas/")).length,25);
+  assert.equal(scents.length,30);assert.equal(scents.filter(scent=>scent.image?.startsWith("/assets/aromas/")).length,26);
   const colors=await (await call('/api/colors')).json();
   assert.equal(colors.length,4);
   assert.equal('color' in scents[0],false);

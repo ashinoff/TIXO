@@ -512,7 +512,7 @@ test('portrait library follows the hero, changes images and synchronizes the thr
   try{
     await act(async()=>root.render(React.createElement(Home)));
     assert.equal(document.querySelector('#home').nextElementSibling.id,'aromas');assert.equal(document.querySelector('#aromas').nextElementSibling.id,'collection');
-    assert.equal(document.querySelectorAll('.scent-name-list button').length,25);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
+    assert.equal(document.querySelectorAll('.scent-name-list button').length,26);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/cherry.webp');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'02 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
@@ -520,7 +520,7 @@ test('portrait library follows the hero, changes images and synchronizes the thr
     assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.product-card').dataset.productId,'3');assert.equal(document.activeElement.id,'filter-form');
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Красный"]'));assert.equal(document.querySelectorAll('.product-card').length,0);
     await click(document.querySelector('.catalog-reset'));assert.equal(document.querySelectorAll('.product-card').length,3);
-    await click(document.querySelector('#filter-scent'));assert.equal(document.querySelectorAll('.filter-aroma-list button').length,26);
+    await click(document.querySelector('#filter-scent'));assert.equal(document.querySelectorAll('.filter-aroma-list button').length,27);
     await click([...document.querySelectorAll('.filter-aroma-list button')].find(node=>node.textContent.includes('CHERRY')));assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'CHERRY');
     await click(document.querySelector('[aria-label="Следующий аромат"]'));assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');await click(document.querySelector('.scent-library>.button'));assert.match(document.querySelector('#filter-scent').textContent,/WINE/);
     await click(document.querySelector('#filter-color'));assert.equal(document.querySelectorAll('.catalog-filter-panel').length,1);

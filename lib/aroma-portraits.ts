@@ -124,6 +124,10 @@ export const aromaPortraits = [
     "name": "PURE JASMINE",
     "slug": "pure-jasmine",
     "image": "/assets/aromas/pure-jasmine.webp"
+  },
+  {
+    "name": "CHERRY WINE",
+    "slug": "cherry-wine",
+    "image": "/assets/aromas/cherry-wine.webp"
   }
 ] as const;
-

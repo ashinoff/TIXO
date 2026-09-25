@@ -190,7 +190,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     const migratedRows=(await pool.query('SELECT * FROM products ORDER BY id')).rows;
     await pool.query("UPDATE scents SET name='Мой красный аромат', active=FALSE WHERE color_name='Красный'");
     globalThis.tihoSchemaReady = undefined; await domain.ensureSchema();
-    assert.equal((await pool.query('SELECT * FROM scents')).rows.length, 29);
+    assert.equal((await pool.query('SELECT * FROM scents')).rows.length, 30);
     assert.equal((await pool.query("SELECT active FROM scents WHERE name='Мой красный аромат'")).rows[0].active, false);
     assert.deepEqual((await pool.query('SELECT * FROM products ORDER BY id')).rows,migratedRows);
     await pool.query("UPDATE scents SET active=TRUE WHERE color_name='Красный'");
@@ -454,11 +454,17 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
   });
 
   await t.test('portrait migration preserves matching aromas and never recreates deleted collection entries',async()=>{
-    const entries=(await pool.query("SELECT * FROM scents WHERE image LIKE '/assets/aromas/%' ORDER BY id")).rows;assert.equal(entries.length,25);assert.deepEqual(entries.map(s=>s.name).sort(),aromaPortraits.map(s=>s.name).sort());
+    const entries=(await pool.query("SELECT * FROM scents WHERE image LIKE '/assets/aromas/%' ORDER BY id")).rows;assert.equal(entries.length,26);assert.deepEqual(entries.map(s=>s.name).sort(),aromaPortraits.map(s=>s.name).sort());
     const cherry=entries.find(s=>s.name==='CHERRY');const profile={top:{notes:'Наше начало',description:'Текст'},heart:{notes:'Наше сердце',description:'Текст'},base:{notes:'Наш шлейф',description:'Текст'}};
     await pool.query("UPDATE scents SET name='Cherry',description='Описание мастерской',profile=$1::jsonb,active=FALSE,image='/api/uploads/old.webp' WHERE id=$2",[JSON.stringify(profile),cherry.id]);
     await pool.query("DELETE FROM app_migrations WHERE key='aroma-portraits-v1'");globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();
     const saved=(await pool.query('SELECT * FROM scents WHERE id=$1',[cherry.id])).rows[0];assert.equal(saved.name,'Cherry');assert.equal(saved.description,'Описание мастерской');assert.deepEqual(saved.profile,profile);assert.equal(saved.active,false);assert.equal(saved.image,'/api/uploads/old.webp');assert.equal((await pool.query("SELECT count(*)::int AS n FROM scents WHERE LOWER(name)='cherry'")).rows[0].n,1);
+    const cherryWine=entries.find(s=>s.name==='CHERRY WINE');
+    await pool.query("UPDATE scents SET name='Cherry Wine',description='Наше вишнёвое вино',profile=$1::jsonb,active=FALSE,image='/assets/aromas/cherry.webp' WHERE id=$2",[JSON.stringify(profile),cherryWine.id]);
+    await pool.query("DELETE FROM app_migrations WHERE key='cherry-wine-portrait-v1'");globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();
+    const attached=(await pool.query('SELECT * FROM scents WHERE id=$1',[cherryWine.id])).rows[0];assert.equal(attached.name,'Cherry Wine');assert.equal(attached.description,'Наше вишнёвое вино');assert.deepEqual(attached.profile,profile);assert.equal(attached.active,false);assert.equal(attached.image,'/assets/aromas/cherry-wine.webp');
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM scents WHERE LOWER(name)='cherry wine'")).rows[0].n,1);
+    await pool.query("UPDATE scents SET image='/api/uploads/later.webp' WHERE id=$1",[cherryWine.id]);globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();assert.equal((await pool.query('SELECT image FROM scents WHERE id=$1',[cherryWine.id])).rows[0].image,'/api/uploads/later.webp');
     const wine=entries.find(s=>s.name==='WINE');await pool.query('DELETE FROM scents WHERE id=$1',[wine.id]);globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();assert.equal((await pool.query("SELECT * FROM scents WHERE name='WINE'")).rowCount,0);
   });
 

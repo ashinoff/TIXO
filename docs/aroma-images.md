@@ -2,9 +2,15 @@
 
 Generated with the built-in image_gen tool for TIXO on 2026-09-25. These are editorial visual associations, not ingredient specifications. The workshop's descriptions and top/heart/base chapters remain independently editable.
 
-Final website assets: `public/assets/aromas/*.webp` (25 individual square images). Names and paths: `lib/aroma-portraits.ts`.
+Final website assets: `public/assets/aromas/*.webp` (26 individual square images). Names and paths: `lib/aroma-portraits.ts`.
 
 ## Prompts
+
+### cherry-wine
+
+Final website asset: `public/assets/aromas/cherry-wine.webp`. Generated with the built-in `image_gen` tool (new image, opaque background) on 2026-09-25; optimized to 1024 × 1024 WebP for the website.
+
+Use case: ads-marketing. Asset type: square photographic aroma portrait for the premium TIXO candle website. Create one photorealistic editorial still-life for the aroma CHERRY WINE: a delicate clear stemmed glass holding deep ruby cherry wine, accompanied by ripe dark burgundy cherries with elegant stems, one halved cherry revealing its juicy flesh. A few cherries rest naturally on a low rough black stone plinth. No grapes. Sophisticated niche-perfume campaign aesthetic, nearly black softly textured background, restrained burgundy, garnet and warm brown palette, soft warm directional side light, deep luxurious shadows, tactile fruit skins and realistic subtle glass reflections. Compose the glass slightly right of center and the cherries across the lower half. Keep the upper-left area calm, dark and mostly empty for the website's title and description overlay; do not render any overlay text yourself. Generous breathing room, believable premium still-life photography, square 1024x1024 composition. No people, candles, bottles, packaging, labels, letters, logos, borders, collage or watermark. One distinct scene.
 
 ### cherry
 
@@ -105,4 +111,3 @@ Use case: ads-marketing. Asset type: square photographic aroma portrait for the 
 ### pure-jasmine
 
 Use case: ads-marketing. Asset type: square photographic aroma portrait for the premium TIXO candle website. One photorealistic editorial still-life for the aroma PURE JASMINE. Subject: A delicate jasmine branch bearing a few small ivory star-shaped blossoms and dark green leaves, soft velvety petals and dew, ivory and forest green tones. Center the composition with generous breathing room, objects about 55% of frame, on a low dark stone plinth against a nearly black softly textured background. Warm soft side light from upper left, deep luxurious shadows, tactile detail, restrained cinematic color, real macro photography, sophisticated niche-perfume campaign aesthetic. Square 1024x1024 framing. No people, candles, packaging, text, letters, logos, borders, collage or watermark. One distinct scene.
-

@@ -165,6 +165,13 @@ export async function ensureSchema() {
           ON CONFLICT (LOWER(name)) DO UPDATE SET image=COALESCE(scents.image,EXCLUDED.image)`, [portrait.name, portrait.image]);
       }
     }
+    const cherryWine = aromaPortraits.find(portrait => portrait.slug === "cherry-wine");
+    if (cherryWine && (await db.query("INSERT INTO app_migrations(key) VALUES('cherry-wine-portrait-v1') ON CONFLICT DO NOTHING RETURNING key")).rowCount) {
+      // Attach the requested photo to the existing aroma; keep its ID and authored content.
+      // Run only once so later photo edits in the workshop remain authoritative.
+      await db.query(`INSERT INTO scents(name,image) VALUES($1,$2)
+        ON CONFLICT (LOWER(name)) DO UPDATE SET image=EXCLUDED.image,updated_at=NOW()`, [cherryWine.name, cherryWine.image]);
+    }
     await db.query("COMMIT");
     } catch (error) { await db.query("ROLLBACK"); throw error; }
     finally { db.release(); }
