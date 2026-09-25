@@ -14,13 +14,15 @@ for(const key of ['window','document','HTMLElement','HTMLInputElement','Event','
 globalThis.self=dom.window;
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
+// Decode downloaded portrait replacements before React starts their transition.
+window.Image=class { set src(value){this.url=value;queueMicrotask(()=>this.onload?.());} decode(){return Promise.resolve();} };
 window.HTMLCanvasElement.prototype.getContext=()=>null;
 const {createRoot}=await import('react-dom/client');
 const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/living-flame.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/living-flame.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -35,7 +37,7 @@ const colors=scents.map(s=>({id:s.id,name:s.colorName,hex:s.color,active:true}))
 const forms=[{id:1,name:'Спираль',shape:'twist',active:true},{id:2,name:'Ракушка',shape:'shell',active:true}];
 const products=['Спираль','Ракушка'].map((name,i)=>({id:i+1,name,shape:i?'shell':'twist',notes:'Форма',price:1500,stock:3,published:true,image:null,hasVariants:false,variants:[]}));
 const response=(data,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}}));
-const button=(name)=>[...document.querySelectorAll('button')].find(node=>node.textContent.includes(name));
+const button=(name)=>[...document.querySelectorAll('.catalog-filter-panel button'),...document.querySelectorAll('button')].find(node=>node.textContent.includes(name));
 const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const setValue=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});};
 
@@ -218,7 +220,7 @@ test('inventory uses separate dropdowns for create/edit, quick stock updates and
   }finally{await act(async()=>root.unmount());}
 });
 
-test('configured candles show one real combination, while aroma chapters use authored text and the original photograph',async()=>{
+test('configured candles show one real combination and the merged aroma block uses authored chapters even without a photo',async()=>{
   window.localStorage.clear();
   const profile={top:{notes:'Лимон',description:'Яркое начало'},heart:{notes:'Инжир',description:'Мягкое сердце'},base:{notes:'Сандал',description:'Тёплый шлейф'}};
   const profiles=scents.map(scent=>({...scent,profile}));
@@ -234,10 +236,9 @@ test('configured candles show one real combination, while aroma chapters use aut
     assert.equal(document.querySelectorAll('.detail-colors button').length,1);
     assert.equal(document.querySelectorAll('#detail-scent option').length,2);
     await click(document.querySelector('[aria-label="Закрыть карточку свечи"]'));
-    const photo=document.querySelector('.ritual-visual img').getAttribute('src');
-    assert.equal(photo,'/assets/hero.png');
-    assert.equal(document.querySelector('#ritual-aroma').options.length,4);
-    await selectValue(document.querySelector('#ritual-aroma'),2);
+    assert.equal(document.querySelector('#ritual'),null);
+    assert.equal(document.querySelectorAll('.scent-name-list button').length,4);
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом Сандал и дым"]'));
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
     assert.match(document.querySelector('#note-panel').textContent,/Яркое начало/);
     await click(document.querySelector('#note-tab-1'));
@@ -246,7 +247,12 @@ test('configured candles show one real combination, while aroma chapters use aut
     await click(document.querySelector('#note-tab-2'));
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
     assert.match(document.querySelector('#note-panel').textContent,/Тёплый шлейф/);
-    assert.equal(document.querySelector('.ritual-visual img').getAttribute('src'),photo);
+    assert.ok(document.querySelector('#aromas #note-panel'));
+    assert.match(document.querySelector('.scent-portrait-missing').textContent,/Портрет аромата/);
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом Вишня и миндаль"]'));
+    assert.equal(document.querySelector('#note-tab-0').getAttribute('aria-selected'),'true');
+    assert.doesNotMatch(document.querySelector('#note-panel').textContent,/Тёплый шлейф/);
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом Сандал и дым"]'));
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Чёрный"]'));
     assert.equal(document.querySelectorAll('.product-card').length,0);
   }finally{await act(async()=>root.unmount());}
@@ -507,7 +513,7 @@ test('portrait library follows the hero, changes images and synchronizes the thr
     assert.equal(document.querySelectorAll('.scent-name-list button').length,25);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/cherry.webp');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
-    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);assert.equal(document.querySelector('#ritual-aroma').value,'11');
+    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'02 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
     await click(document.querySelector('#filter-form'));assert.ok(document.querySelector('.filter-form-preview .wax-stage'));await click(document.querySelector('[aria-label="Форма: Спираль"]'));
     assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.product-card').dataset.productId,'3');assert.equal(document.activeElement.id,'filter-form');
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Красный"]'));assert.equal(document.querySelectorAll('.product-card').length,0);
@@ -543,4 +549,39 @@ test('aroma settings select generated portraits and upload a replacement with it
     await click(document.querySelector('.scent-admin-card footer button'));const input=document.querySelector('[aria-label="Фото аромата"]');Object.defineProperty(input,'files',{value:[new dom.window.File(['photo'],'aroma.png',{type:'image/png'})]});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
     assert.equal(document.querySelector('.scent-editor-photo img').getAttribute('src'),'blob:aroma');await setValue(document.querySelector('.aroma-chapter input'),'Своя нота');await submit(document.querySelector('.scent-editor form'));assert.equal(saved.get('image').name,'aroma.png');assert.equal(JSON.parse(saved.get('data')).profile.top.notes,'Своя нота');
   }finally{await act(async()=>root.unmount());URL.createObjectURL=previousCreate;URL.revokeObjectURL=previousRevoke;}
+});
+
+test('aroma portraits retain the decoded frame, discard stale loads and support mouse inspection',async()=>{
+  window.localStorage.clear();
+  const originalImage=window.Image, originalMedia=window.matchMedia;
+  const requested=[];
+  window.Image=class { constructor(){requested.push(this);} set src(value){this.url=value;} decode(){return Promise.resolve();} };
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+  const aromas=['CHERRY','WINE','YUZU'].map((name,i)=>({...scents[i],name,image:`/${name}.webp`}));
+  globalThis.fetch=async url=>url==='/api/scents'?response(aromas):url==='/api/products'?response([]):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  const root=createRoot(document.getElementById('root'));
+  const pointer=async(type,pointerType='mouse',x=160,y=40)=>{
+    const event=new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,relatedTarget:document.body});Object.defineProperty(event,'pointerType',{value:pointerType});
+    await act(async()=>document.querySelector('.scent-portrait').dispatchEvent(event));
+  };
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    const surface=document.querySelector('.scent-portrait');surface.getBoundingClientRect=()=>({left:0,top:0,width:200,height:200});
+    await pointer('pointerover');await pointer('pointermove');assert.equal(surface.style.getPropertyValue('--zoom-scale'),'1.18');assert.equal(surface.style.getPropertyValue('--zoom-x'),'80%');assert.equal(surface.style.getPropertyValue('--zoom-y'),'20%');
+    await pointer('pointerout');assert.equal(surface.style.getPropertyValue('--zoom-scale'),'1');assert.equal(surface.style.getPropertyValue('--zoom-x'),'50%');
+    await pointer('pointerover','touch');assert.equal(surface.style.getPropertyValue('--zoom-scale'),'1');
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
+    const stale=requested.at(-1).onload;
+    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/CHERRY.webp');assert.equal(document.querySelector('.scent-portrait-images').getAttribute('aria-busy'),'true');
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом YUZU"]'));
+    await act(async()=>stale());assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/CHERRY.webp');
+    await act(async()=>requested.at(-1).onload());
+    const layers=document.querySelectorAll('.scent-portrait-frame');assert.equal(layers.length,2);assert.equal(layers[0].getAttribute('aria-hidden'),'true');assert.equal(layers[1].querySelector('img').getAttribute('src'),'/YUZU.webp');assert.ok(layers[1].classList.contains('is-revealing'));
+    await act(async()=>layers[1].dispatchEvent(new Event('animationend',{bubbles:true})));assert.equal(document.querySelectorAll('.scent-portrait-frame').length,1);assert.equal(document.querySelector('.scent-portrait-images').getAttribute('aria-busy'),'false');
+    await act(async()=>document.querySelector('#note-tab-0').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true})));assert.equal(document.activeElement.id,'note-tab-1');assert.equal(document.querySelector('#note-panel').getAttribute('aria-labelledby'),'note-tab-1');
+    await act(async()=>document.activeElement.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'End',bubbles:true,cancelable:true})));assert.equal(document.activeElement.id,'note-tab-2');
+    window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
+    await pointer('pointerover');assert.equal(surface.style.getPropertyValue('--zoom-scale'),'1');
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));await act(async()=>requested.at(-1).onload());assert.equal(document.querySelectorAll('.scent-portrait-frame').length,1);assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/WINE.webp');
+  }finally{await act(async()=>root.unmount());window.Image=originalImage;window.matchMedia=originalMedia;window.localStorage.clear();}
 });
