@@ -234,22 +234,32 @@ function CatalogFilter({ id, label, value, preview, open, onToggle, onClose, chi
   </div>;
 }
 
+const scentChapters = [
+  { key: "top", label: "Начало", title: "ПЕРВОЕ ВПЕЧАТЛЕНИЕ" },
+  { key: "heart", label: "Сердце", title: "ХАРАКТЕР КОМПОЗИЦИИ" },
+  { key: "base", label: "Шлейф", title: "ПОСЛЕВКУСИЕ" },
+] as const;
+
 export function ScentDiscovery() {
   const shop = useShopping();
   const [previewId, setPreviewId] = useState<number | null>(null);
+  const [chapterSelection, setChapterSelection] = useState({ scentId: 0, note: 0 });
   const choices = useMemo(() => [...shop.scents].sort((a,b) => {
     const rank = (name: string) => { const index = aromaPortraits.findIndex(portrait => portrait.name === name.toUpperCase()); return index < 0 ? aromaPortraits.length : index; };
     return rank(a.name) - rank(b.name);
   }), [shop.scents]);
   const choice = choices.find(scent => scent.id === (shop.activeScent ?? previewId)) ?? choices[0];
   const index = choices.findIndex(scent => scent.id === choice?.id);
+  const note = chapterSelection.scentId === choice?.id ? chapterSelection.note : 0;
+  const chapter = scentChapters[note];
+  const stage = (choice?.profile ?? emptyAromaProfile())[chapter.key];
   const choose = (scent: Scent) => { setPreviewId(scent.id); shop.setActiveScent(scent.id); };
   const move = (offset: number) => { const next = choices[(index + offset + choices.length) % choices.length]; if (next) choose(next); };
   return <section className="scent-discovery pad" id="aromas" aria-labelledby="scent-discovery-title">
     <div className="scent-discovery-heading"><p className="eyebrow">02 / ИСКУССТВО АРОМАТА</p><h2 id="scent-discovery-title">Форма притягивает взгляд.<br /><span>Аромат остаётся в памяти.</span></h2><p>Начните с ощущения. Выберите аромат для своего вечера.</p></div>
     {shop.loading ? <p role="status" className="scent-discovery-message">Открываем библиотеку ароматов…</p> : shop.catalogError ? <div role="alert" className="scent-discovery-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Попробовать снова ↗</button></div> : !choice ? <p className="scent-discovery-message">Мастерская готовит новую коллекцию ароматов.</p> : <div className="scent-discovery-layout">
-      <div className="scent-portrait" {...inspection}><ScentPortrait src={choice.image} name={choice.name} /><div className="scent-portrait-shade" /><span className="eyebrow scent-portrait-mark">ТИХО / ВАШ АРОМАТ</span><div className="scent-portrait-caption" aria-live="polite"><span>{String(index + 1).padStart(2,"0")} / {String(choices.length).padStart(2,"0")}</span><h3>{choice.name}</h3></div><div className="scent-portrait-navigation"><button type="button" aria-label="Предыдущий аромат" disabled={choices.length < 2} onClick={() => move(-1)}>←</button><button type="button" aria-label="Следующий аромат" disabled={choices.length < 2} onClick={() => move(1)}>→</button></div></div>
-      <div className="scent-library"><div className="scent-library-top"><span className="eyebrow">НАЙДИТЕ СВОЁ ЗВУЧАНИЕ</span><span>{choices.length} ароматов</span></div><div className="scent-name-list" role="group" aria-label="Библиотека ароматов">{choices.map((scent,i) => <button type="button" key={scent.id} aria-pressed={choice.id === scent.id} aria-label={`Познакомиться с ароматом ${scent.name}`} onClick={() => choose(scent)}><span>{String(i + 1).padStart(2,"0")}</span>{scent.name}<i aria-hidden="true">↗</i></button>)}</div><div className="scent-library-selection" aria-live="polite"><span className="eyebrow">ВАШ ВЫБОР</span><h3>{choice.name}</h3>{choice.description && <p>{choice.description}</p>}</div><ScentChapters key={choice.id} scent={choice} /><button type="button" className="button button-light" onClick={() => { choose(choice); document.getElementById("collection")?.scrollIntoView({ behavior: reducedMotion() ? "instant" : "smooth" }); }}>Свечи с этим ароматом <span aria-hidden="true">↗</span></button></div>
+      <div className="scent-portrait" {...inspection}><ScentPortrait src={choice.image} name={choice.name} counter={`${String(index + 1).padStart(2,"0")} / ${String(choices.length).padStart(2,"0")}`} description={choice.description} chapterLabel={`0${note + 1} / ${chapter.label}`} chapterDescription={stage.description} /><div className="scent-portrait-navigation"><button type="button" aria-label="Предыдущий аромат" disabled={choices.length < 2} onClick={() => move(-1)}>←</button><button type="button" aria-label="Следующий аромат" disabled={choices.length < 2} onClick={() => move(1)}>→</button></div></div>
+      <div className="scent-library"><div className="scent-library-top"><span className="eyebrow">НАЙДИТЕ СВОЁ ЗВУЧАНИЕ</span><span>{choices.length} ароматов</span></div><div className="scent-name-list" role="group" aria-label="Библиотека ароматов">{choices.map((scent,i) => <button type="button" key={scent.id} aria-pressed={choice.id === scent.id} aria-label={`Познакомиться с ароматом ${scent.name}`} onClick={() => choose(scent)}><span>{String(i + 1).padStart(2,"0")}</span>{scent.name}<i aria-hidden="true">↗</i></button>)}</div><ScentChapters key={choice.id} scent={choice} note={note} onSelect={note => setChapterSelection({ scentId: choice.id, note })} /><button type="button" className="button button-light" onClick={() => { choose(choice); document.getElementById("collection")?.scrollIntoView({ behavior: reducedMotion() ? "instant" : "smooth" }); }}>Свечи с этим ароматом <span aria-hidden="true">↗</span></button></div>
     </div>}
   </section>;
 }
@@ -302,24 +312,21 @@ export function Catalog() {
   </section>;
 }
 
-function ScentChapters({ scent }: { scent: Scent }) {
-  const [note, setNote] = useState(0);
+function ScentChapters({ scent, note, onSelect }: { scent: Scent; note: number; onSelect: (note: number) => void }) {
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
-  const chapterKeys = ["top", "heart", "base"] as const;
-  const labels = ["Начало", "Сердце", "Шлейф"];
-  const titles = ["ПЕРВОЕ ВПЕЧАТЛЕНИЕ", "ХАРАКТЕР КОМПОЗИЦИИ", "ПОСЛЕВКУСИЕ"];
-  const stage = (scent.profile ?? emptyAromaProfile())[chapterKeys[note]];
-  const selectNote = (index: number, focus = false) => { setNote(index); if (focus) tabs.current[index]?.focus(); };
+  const chapter = scentChapters[note];
+  const stage = (scent.profile ?? emptyAromaProfile())[chapter.key];
+  const selectNote = (index: number, focus = false) => { onSelect(index); if (focus) tabs.current[index]?.focus(); };
   return <div className="scent-chapters">
     <p className="note-instruction">Выберите главу, чтобы исследовать аромат</p>
     <div className="note-tabs" role="tablist" aria-label={`Главы аромата ${scent.name}`}>
-      {labels.map((label, index) => <button ref={element => { tabs.current[index] = element; }} key={label} type="button" role="tab" aria-selected={note === index} aria-controls="note-panel" id={`note-tab-${index}`} tabIndex={note === index ? 0 : -1} onClick={() => selectNote(index)} onKeyDown={event => {
+      {scentChapters.map(({ label }, index) => <button ref={element => { tabs.current[index] = element; }} key={label} type="button" role="tab" aria-selected={note === index} aria-controls="note-panel" id={`note-tab-${index}`} tabIndex={note === index ? 0 : -1} onClick={() => selectNote(index)} onKeyDown={event => {
         const next = event.key === "ArrowRight" ? (index + 1) % 3 : event.key === "ArrowLeft" ? (index + 2) % 3 : event.key === "Home" ? 0 : event.key === "End" ? 2 : null;
         if (next !== null) { event.preventDefault(); selectNote(next, true); }
       }}><span>0{index + 1}</span><strong>{label}</strong></button>)}
     </div>
     <div className="note-panel" key={note} id="note-panel" role="tabpanel" aria-labelledby={`note-tab-${note}`} tabIndex={0}>
-      <span className="eyebrow">{titles[note]}</span><h3>{stage.notes || labels[note]}</h3><p>{stage.description || "Мастерская скоро добавит описание этой главы аромата."}</p>
+      <span className="eyebrow">{chapter.title}</span><h3>{stage.notes || chapter.label}</h3>
     </div>
   </div>;
 }
