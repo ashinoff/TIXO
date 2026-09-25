@@ -4,13 +4,46 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Portrait = { src?: string | null; name: string; counter: string; description: string; chapterLabel: string; chapterDescription: string };
-type Frame = Omit<Portrait, "src"> & { src: string | null; key: string; failed: boolean };
+type Frame = Omit<Portrait, "src" | "chapterLabel" | "chapterDescription"> & { src: string | null; key: string; failed: boolean };
+const AROMA_FADE_MS = 2200;
+const CHAPTER_FADE_MS = 1800;
+
+function ChapterCopy({ label, description, overview, active }: { label: string; description: string; overview: string; active: boolean }) {
+  const text = description && description !== overview ? description : overview ? "" : "Мастерская скоро добавит описание этой главы аромата.";
+  const next = useMemo(() => ({ key: JSON.stringify([label, text]), label, text }), [label, text]);
+  const [copies, setCopies] = useState<{ shown: typeof next; previous: typeof next | null }>({ shown: next, previous: null });
+  const shownKey = copies.shown.key;
+  useEffect(() => {
+    if (!active || next.key === shownKey) return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) setCopies(last => ({ shown: next, previous: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? null : last.shown }));
+    });
+    return () => { cancelled = true; };
+  }, [active, next, shownKey]);
+  useEffect(() => {
+    if (!copies.previous) return;
+    const timer = setTimeout(() => setCopies(last => ({ ...last, previous: null })), CHAPTER_FADE_MS + 100);
+    return () => clearTimeout(timer);
+  }, [copies.previous]);
+  if (!copies.shown.text && !copies.previous?.text) return null;
+  return <div className="scent-portrait-chapter" aria-live={active ? "polite" : "off"}>
+    {[copies.previous, copies.shown].filter((copy): copy is typeof next => copy !== null).map((copy, index, layers) => {
+      const current = index === layers.length - 1;
+      return <div key={copy.key} className={`scent-chapter-copy${!current ? " is-leaving" : copies.previous ? " is-revealing" : ""}`} aria-hidden={!current || undefined}
+        onAnimationEnd={event => { if (current && event.target === event.currentTarget) setCopies(last => ({ ...last, previous: null })); }}>
+        {copy.text && <><span>{copy.label}</span><p>{copy.text}</p></>}
+      </div>;
+    })}
+  </div>;
+}
 
 /** A photo and its caption share a snapshot so slow downloads cannot mismatch them. */
 export function ScentPortrait({ src, name, counter, description, chapterLabel, chapterDescription }: Portrait) {
-  const next = useMemo(() => ({ src: src ?? null, name, counter, description, chapterLabel, chapterDescription,
-    key: JSON.stringify([src ?? null, name, counter, description, chapterLabel, chapterDescription]),
-  }), [src, name, counter, description, chapterLabel, chapterDescription]);
+  // Only a different aroma/photo can replace this snapshot. Chapters own their animation.
+  const next = useMemo(() => ({ src: src ?? null, name, counter, description,
+    key: JSON.stringify([src ?? null, name, counter, description]),
+  }), [src, name, counter, description]);
   const [frames, setFrames] = useState<{ current: Frame; previous: Frame | null }>(() => ({
     current: { ...next, failed: !src }, previous: null,
   }));
@@ -35,7 +68,7 @@ export function ScentPortrait({ src, name, counter, description, chapterLabel, c
       show(false);
     };
     image.onerror = () => show(true);
-    // A chapter change only crossfades text; keep the photo and its slow movement.
+    // Renaming an aroma does not reload its photograph.
     if (next.src === currentSrc) void Promise.resolve().then(() => show(currentFailed));
     else if (next.src) image.src = next.src;
     else void Promise.resolve().then(() => show(true));
@@ -45,7 +78,7 @@ export function ScentPortrait({ src, name, counter, description, chapterLabel, c
   useEffect(() => {
     if (!frames.previous) return;
     // Also release the old image when animation events are skipped by a browser.
-    const timer = setTimeout(() => setFrames(last => ({ ...last, previous: null })), 950);
+    const timer = setTimeout(() => setFrames(last => ({ ...last, previous: null })), AROMA_FADE_MS + 100);
     return () => clearTimeout(timer);
   }, [frames.previous]);
 
@@ -69,8 +102,7 @@ export function ScentPortrait({ src, name, counter, description, chapterLabel, c
           onAnimationEnd={event => { if (current && event.target === event.currentTarget) setFrames(last => ({ ...last, previous: null })); }}>
           <span>{frame.counter}</span><h3>{frame.name}</h3>
           {frame.description && <p className="scent-portrait-description">{frame.description}</p>}
-          {frame.chapterDescription && frame.chapterDescription !== frame.description && <div className="scent-portrait-chapter"><span>{frame.chapterLabel}</span><p>{frame.chapterDescription}</p></div>}
-          {!frame.description && !frame.chapterDescription && <p className="scent-portrait-description">Мастерская скоро добавит описание этой главы аромата.</p>}
+          <ChapterCopy label={chapterLabel} description={chapterDescription} overview={frame.description} active={current && frame.key === next.key} />
         </div>;
       })}
     </div>

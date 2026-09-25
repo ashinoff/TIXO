@@ -559,7 +559,7 @@ test('aroma portraits retain the decoded frame, discard stale loads and support 
   const requested=[];
   window.Image=class { constructor(){requested.push(this);} set src(value){this.url=value;} decode(){return Promise.resolve();} };
   window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
-  const aromas=['CHERRY','WINE','YUZU'].map((name,i)=>({...scents[i],name,image:`/${name}.webp`}));
+  const aromas=['CHERRY','WINE','YUZU'].map((name,i)=>({...scents[i],name,image:`/${name}.webp`,description:`Образ аромата ${name}`,profile:{top:{notes:'Цитрус',description:'Лёгкое начало.'},heart:{notes:'Цветы',description:'Цветочное сердце композиции с длинным описанием.'},base:{notes:'Древесина',description:'Мягкий древесный шлейф.'}}}));
   globalThis.fetch=async url=>url==='/api/scents'?response(aromas):url==='/api/products'?response([]):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
   const root=createRoot(document.getElementById('root'));
   const pointer=async(type,pointerType='mouse',x=160,y=40)=>{
@@ -582,8 +582,18 @@ test('aroma portraits retain the decoded frame, discard stale loads and support 
     const layers=document.querySelectorAll('.scent-portrait-frame');assert.equal(layers.length,2);assert.equal(layers[0].getAttribute('aria-hidden'),'true');assert.equal(layers[1].querySelector('img').getAttribute('src'),'/YUZU.webp');assert.ok(layers[1].classList.contains('is-revealing'));
     assert.equal(document.querySelector('.scent-portrait-caption:not([aria-hidden]) h3').textContent,'YUZU');
     await act(async()=>layers[1].dispatchEvent(new Event('animationend',{bubbles:true})));assert.equal(document.querySelectorAll('.scent-portrait-frame').length,1);assert.equal(document.querySelector('.scent-portrait-images').getAttribute('aria-busy'),'false');
+    const caption=document.querySelector('.scent-portrait-caption'),title=caption.querySelector('h3'),overview=caption.querySelector('.scent-portrait-description'),photo=document.querySelector('.scent-portrait img'),drift=document.querySelector('.scent-portrait-drift'),loads=requested.length;
+    const assertStableIdentity=()=>{
+      assert.equal(document.querySelector('.scent-portrait-caption'),caption);assert.equal(caption.querySelector('h3'),title);assert.equal(caption.querySelector('.scent-portrait-description'),overview);
+      assert.equal(document.querySelector('.scent-portrait img'),photo);assert.equal(document.querySelector('.scent-portrait-drift'),drift);assert.equal(requested.length,loads);
+      assert.ok(!caption.classList.contains('is-revealing'));assert.equal(document.querySelectorAll('.scent-portrait-caption').length,1);
+    };
     await act(async()=>document.querySelector('#note-tab-0').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true})));assert.equal(document.activeElement.id,'note-tab-1');assert.equal(document.querySelector('#note-panel').getAttribute('aria-labelledby'),'note-tab-1');
+    assertStableIdentity();assert.match(caption.querySelector('.scent-chapter-copy.is-revealing').textContent,/Цветочное сердце/);assert.equal(caption.querySelector('.scent-chapter-copy.is-leaving').getAttribute('aria-hidden'),'true');
     await act(async()=>document.activeElement.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'End',bubbles:true,cancelable:true})));assert.equal(document.activeElement.id,'note-tab-2');
+    assertStableIdentity();assert.match(caption.querySelector('.scent-chapter-copy.is-revealing').textContent,/Мягкий древесный/);
+    await act(async()=>caption.querySelector('.scent-chapter-copy.is-revealing').dispatchEvent(new Event('animationend',{bubbles:true})));
+    assertStableIdentity();assert.equal(caption.querySelectorAll('.scent-chapter-copy').length,1);
     window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
     await pointer('pointerover');assert.equal(surface.style.getPropertyValue('--zoom-scale'),'1');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));await act(async()=>requested.at(-1).onload());assert.equal(document.querySelectorAll('.scent-portrait-frame').length,1);assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/WINE.webp');
