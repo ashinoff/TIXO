@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { OrderItem } from "../catalog";
 import { productShape, type CandleShape } from "../catalog";
 import { recipeFormName, atelierColors, atelierColorHex, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "../atelier";
-import { ensureSchema, getPool, mapOrder } from "./db";
+import { ensureSchema, getPool, mapOrder, mapScent } from "./db";
 import { InputError, parseOrder } from "./validation";
 
 export async function createOrder(body: Record<string, unknown>) {
@@ -20,7 +20,7 @@ export async function createOrder(body: Record<string, unknown>) {
     const products = await db.query("SELECT * FROM products WHERE id=ANY($1::bigint[]) ORDER BY id FOR UPDATE", [ids]);
     const formIds = [...new Set([...products.rows.map(p => Number(p.form_id)).filter(Boolean), ...order.items.flatMap(line => line.customRecipe?.formId ? [line.customRecipe.formId] : [])])].sort((a,b) => a-b);
     const forms = await db.query("SELECT * FROM candle_forms WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [formIds]);
-    const scents = await db.query("SELECT * FROM scents WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.scentId ? [line.scentId] : []))]]);
+    const scents = await db.query("SELECT * FROM scents WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => { const id = line.customRecipe?.scentId ?? line.scentId; return id ? [id] : []; }))].sort((a,b) => a-b)]);
     const colors = await db.query("SELECT * FROM colors WHERE id=ANY($1::bigint[]) ORDER BY id FOR SHARE", [[...new Set(order.items.flatMap(line => line.colorId ? [line.colorId] : []))]]);
     const items: OrderItem[] = [];
     for (const line of order.items) {
@@ -29,9 +29,12 @@ export async function createOrder(body: Record<string, unknown>) {
         const customForm = recipe.formId !== undefined ? forms.rows.find(form => Number(form.id) === recipe.formId) : undefined;
         if (recipe.formId !== undefined && !customForm?.active) throw new InputError("Выбранная форма авторской свечи больше недоступна. Выберите другую форму в мастерской.", 409);
         const formName = recipeFormName(recipe, customForm?.name);
+        const customScent = recipe.scentId !== undefined ? scents.rows.find(scent => Number(scent.id) === recipe.scentId) : undefined;
+        if (recipe.scentId !== undefined && !customScent?.active) throw new InputError("Выбранный аромат авторской свечи больше недоступен. Выберите другой аромат в мастерской.", 409);
         items.push({ productId: 0, name: `Авторская свеча · ${formName}`,
           ...(customForm ? { formName, silhouette: customForm.silhouette ?? null, shape: customForm.shape ?? undefined } : {}),
-          scentName: `${atelierTopNotes[recipe.top]} / ${atelierHeartNotes[recipe.heart]} / ${atelierBaseNotes[recipe.base]}`,
+          ...(recipe.scentId !== undefined ? { scentId: recipe.scentId, scentName: customScent!.name, aromaProfile: mapScent(customScent!).profile }
+            : { scentName: `${atelierTopNotes[recipe.top]} / ${atelierHeartNotes[recipe.heart]} / ${atelierBaseNotes[recipe.base]}` }),
           color: atelierColorHex[recipe.color], colorName: atelierColors[recipe.color],
           price: 0, quantity: line.quantity, customRecipe: recipe, quotePending: true });
         continue;

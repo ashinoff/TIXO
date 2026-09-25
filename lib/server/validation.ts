@@ -27,6 +27,7 @@ export function parseScent(body: Record<string, unknown>) {
     description: textValue(body.description, "Описание", 2000, false),
     notes: body.notes.map(note => textValue(note, "Нота аромата", 80, false)).filter(Boolean),
     active: body.active,
+    ...(body.profile !== undefined ? { profile: parseAromaProfile(body.profile as Record<string, unknown>) } : {}),
   };
 }
 
@@ -43,7 +44,7 @@ type CustomOrderLine = { customRecipe: Recipe; quantity: number; productId?: nev
 export type OrderLine = CatalogOrderLine | CustomOrderLine;
 
 export function parseRecipe(value: unknown): Recipe {
-  if (!isRecipe(value)) throw new InputError("Проверьте форму, цвет и ноты авторской свечи");
+  if (!isRecipe(value)) throw new InputError("Проверьте форму, цвет и аромат авторской свечи");
   // Copy only server-recognised choices; never trust client labels, price or extra fields.
   return copyRecipe(value);
 }

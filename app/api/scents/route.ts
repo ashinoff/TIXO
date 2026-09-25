@@ -20,8 +20,8 @@ export async function POST(request: Request) {
   try {
     const scent = parseScent(await request.json());
     await ensureSchema();
-    const result = await getPool().query(`INSERT INTO scents(name,description,notes,active)
-      VALUES($1,$2,$3,$4) RETURNING *`, [scent.name, scent.description, scent.notes, scent.active]);
+    const result = await getPool().query(`INSERT INTO scents(name,description,notes,active,profile)
+      VALUES($1,$2,$3,$4,$5::jsonb) RETURNING *`, [scent.name, scent.description, scent.notes, scent.active, JSON.stringify(scent.profile ?? {})]);
     return NextResponse.json(mapScent(result.rows[0]), { status: 201 });
   } catch (error) { return apiError(error); }
 }

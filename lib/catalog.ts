@@ -53,11 +53,13 @@ export type Product = {
   published: boolean;
   image: string | null;
   hasVariants: boolean;
+  images?: string[];
   variants: Variant[];
   shape?: CandleShape;
 };
 
 export type OrderItem = {
+  aromaProfile?: AromaProfile;
   formName?: string;
   silhouette?: string | null;
   productId: number;
@@ -80,6 +82,11 @@ export type OrderItem = {
 export type CartLine = { productId: number; variantId: number | null; scentId?: number | null; colorId?: number | null; quantity: number };
 export const cartKey = (productId: number, variantId: number | null, scentId?: number | null, colorId?: number | null) => `${productId}:${variantId ?? "original"}${scentId ? `:scent-${scentId}` : ""}${colorId ? `:color-${colorId}` : ""}`;
 export const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
+
+export const MAX_PRODUCT_IMAGES = 10;
+export function productImages(product: { images?: string[] | null; image?: string | null }): string[] {
+  return Array.isArray(product.images) ? product.images : product.image ? [product.image] : [];
+}
 
 export function availableVariants(product: Product) {
   return product.variants.filter(variant => variant.active && variant.scent.active && variant.color.active);

@@ -12,12 +12,14 @@ export type RecipeIngredients = {
   heart: keyof typeof atelierHeartNotes;
   base: keyof typeof atelierBaseNotes;
 };
-export type LegacyRecipe = RecipeIngredients & { shape: keyof typeof atelierShapes; formId?: never };
-export type FormRecipe = RecipeIngredients & { formId: number; shape?: never };
-export type Recipe = LegacyRecipe | FormRecipe;
+export type LegacyRecipe = RecipeIngredients & { shape: keyof typeof atelierShapes; formId?: never; scentId?: never };
+export type FormRecipe = RecipeIngredients & { formId: number; shape?: never; scentId?: never };
+export type ScentRecipe = { formId: number; color: keyof typeof atelierColors; scentId: number; shape?: never; top?: never; heart?: never; base?: never };
+export type Recipe = LegacyRecipe | FormRecipe | ScentRecipe;
 export type CustomRecipe = Recipe;
 
 export function copyRecipe(recipe: Recipe): Recipe {
+  if (recipe.scentId !== undefined) return { formId: recipe.formId, color: recipe.color, scentId: recipe.scentId };
   const ingredients = { color: recipe.color, top: recipe.top, heart: recipe.heart, base: recipe.base };
   return recipe.formId !== undefined ? { formId: recipe.formId, ...ingredients } : { shape: recipe.shape, ...ingredients };
 }
@@ -27,10 +29,12 @@ export function recipeFormName(recipe: Recipe, formName?: string) {
 }
 
 export function recipeKey(recipe: Recipe) {
+  if (recipe.scentId !== undefined) return `custom:form-${recipe.formId}:${recipe.color}:scent-${recipe.scentId}`;
   return `custom:${recipe.formId !== undefined ? `form-${recipe.formId}` : recipe.shape}:${recipe.color}:${recipe.top}:${recipe.heart}:${recipe.base}`;
 }
 
-export function recipeSummary(recipe: Recipe, formName?: string) {
+export function recipeSummary(recipe: Recipe, formName?: string, scentName?: string) {
+  if (recipe.scentId !== undefined) return `${recipeFormName(recipe, formName)} · ${atelierColors[recipe.color]} · ${scentName || `Аромат № ${recipe.scentId}`}`;
   return `${recipeFormName(recipe, formName)} · ${atelierColors[recipe.color]} · ${atelierTopNotes[recipe.top]} / ${atelierHeartNotes[recipe.heart]} / ${atelierBaseNotes[recipe.base]}`;
 }
 
@@ -38,6 +42,10 @@ export function recipeSummary(recipe: Recipe, formName?: string) {
 export function isRecipe(value: unknown): value is Recipe {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const recipe = value as Record<string, unknown>;
+  if (Object.hasOwn(recipe, "scentId")) return typeof recipe.scentId === "number" && Number.isSafeInteger(recipe.scentId) && recipe.scentId > 0
+    && typeof recipe.formId === "number" && Number.isSafeInteger(recipe.formId) && recipe.formId > 0
+    && typeof recipe.color === "string" && Object.hasOwn(atelierColors, recipe.color)
+    && !["shape", "top", "heart", "base"].some(key => Object.hasOwn(recipe, key));
   const form = Object.hasOwn(recipe, "formId")
     ? typeof recipe.formId === "number" && Number.isSafeInteger(recipe.formId) && recipe.formId > 0 && !Object.hasOwn(recipe, "shape")
     : typeof recipe.shape === "string" && Object.hasOwn(atelierShapes, recipe.shape);

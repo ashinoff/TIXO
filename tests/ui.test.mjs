@@ -324,12 +324,12 @@ test('form editor uploads the named silhouette and candle photo removal previews
     await submit(document.querySelector('.form-editor form'));
     assert.equal(sent.get('name'),'Свой силуэт');assert.equal(sent.get('silhouette').name,'my-form.png');assert.equal(sent.has('shape'),false);
     await click(button('Остатки'));await click(document.querySelector('[aria-label="Редактировать свечу № 1"]'));
-    assert.equal(document.querySelector('.image-upload img').getAttribute('src'),candle.image);
+    assert.equal(document.querySelector('.editor-photo img').getAttribute('src'),candle.image);
     await click(button('Убрать фото'));
-    assert.equal(document.querySelector('.image-upload img'),null);
+    assert.equal(document.querySelector('.editor-photo img'),null);
     assert.match(document.querySelector('.candle-editor-silhouette .wax-uploaded').getAttribute('style'),/my-form\.png/);
     assert.equal(document.querySelector('.candle-editor-silhouette .wax-uploaded').style.getPropertyValue('--wax'),'#222225');
-    await submit(document.querySelector('.product-editor form'));assert.equal(edited.get('removeImage'),'true');
+    await submit(document.querySelector('.product-editor form'));assert.equal(edited.get('photos'),'[]');
   }finally{await act(async()=>root.unmount());URL.createObjectURL=previousCreate;URL.revokeObjectURL=previousRevoke;}
 });
 
@@ -402,4 +402,94 @@ test('admin order uses the saved builder form name and silhouette even when the 
     assert.match(document.querySelector('.order-recipe').textContent,/Старое название формы/);assert.doesNotMatch(document.querySelector('.order-recipe').textContent,/undefined/);
     assert.match(document.querySelector('.order-candle-preview .wax-uploaded').getAttribute('style'),/historical-form\.png/);
   }finally{await act(async()=>root.unmount());}
+});
+
+test('builder chooses catalog aromas and displays their authored chapters without mixing individual notes',async()=>{
+  window.localStorage.clear();let sent;
+  const profile={top:{notes:'Цедра',description:'Свежий старт'},heart:{notes:'Тёмный чай',description:'Глубокое сердце'},base:{notes:'Кедр',description:'Древесное послевкусие'}};
+  const aromas=[{...scents[0],profile},{...scents[1],profile:{...profile,heart:{notes:'Сандал',description:'Тёплое дерево'}}},{...scents[2],active:false}];
+  globalThis.fetch=async(url,init={})=>url==='/api/forms'?response(forms):url==='/api/products'?response([]):url==='/api/scents'?response(aromas):url==='/api/colors'?response(colors):url==='/api/orders'?(sent=JSON.parse(init.body),response({orderNumber:'T-AROMAS',total:0,quotePending:true},201)):response({});
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('#studio-step-2'));
+    assert.equal(document.querySelectorAll('input[name="recipe-scent"]').length,2);assert.equal(document.querySelector('input[name="recipe-top"]'),null);
+    assert.match(document.querySelector('.builder-aroma').textContent,/Цедра/);assert.match(document.querySelector('.builder-aroma').textContent,/Древесное послевкусие/);
+    await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
+    await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="recipe-scent"][value="2"]'));
+    assert.match(document.querySelector('.builder-aroma').textContent,/Тёплое дерево/);assert.doesNotMatch(document.querySelector('.builder-aroma').textContent,/Глубокое сердце/);
+    await click(document.querySelector('#studio-step-3'));assert.match(document.querySelector('#recipe-summary').textContent,/Сандал и дым/);await click(document.querySelector('#add-custom'));
+    await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
+    assert.match(document.querySelector('.cart-items').textContent,/Вишня и миндаль/);assert.match(document.querySelector('.cart-items').textContent,/Сандал и дым/);
+    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))form.elements.namedItem(name).value=value;
+    await submit(form);assert.deepEqual(sent.items.map(item=>item.customRecipe),[{formId:1,color:'ivory',scentId:1},{formId:1,color:'ivory',scentId:2}]);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('disabled saved aroma blocks checkout and empty aroma catalog blocks the builder',async()=>{
+  window.localStorage.clear();window.localStorage.setItem('tixo.atelier.cart.v1',JSON.stringify([{customRecipe:{formId:1,color:'ivory',scentId:1},formName:'Спираль',scentName:'Старый аромат',quantity:1}]));
+  globalThis.fetch=async url=>url==='/api/forms'?response(forms):url==='/api/scents'?response([{...scents[0],active:false}]):url==='/api/colors'?response(colors):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('#add-custom').disabled,true);assert.match(document.querySelector('#studio-panel-2').textContent,/готовит новые ароматы/);
+    await click(document.querySelector('.cart-trigger'));assert.match(document.querySelector('.cart-items').textContent,/Старый аромат/);assert.match(document.querySelector('.stock-error').textContent,/аромат больше недоступны/);assert.equal(document.querySelector('#checkout-form button[type=submit]').disabled,true);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('aroma editor saves three chapters in the same settings as the scent name',async()=>{
+  let saved;
+  globalThis.fetch=async(url,init={})=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/scents?admin=1'?response(scents):url==='/api/scents/1'?(saved=JSON.parse(init.body),response(saved)):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Admin)));await click(button('Ароматы'));await click(document.querySelector('.scent-admin-card footer button'));
+    const chapters=[...document.querySelectorAll('.scent-editor .aroma-chapter')];assert.equal(chapters.length,3);
+    for(const [index,chapter] of chapters.entries()){
+      await setValue(chapter.querySelector('input'),['Цедра','Чай','Дерево'][index]);
+      const textarea=chapter.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value').set.call(textarea,['Первое','Второе','Третье'][index]);textarea.dispatchEvent(new Event('input',{bubbles:true}));});
+    }
+    await submit(document.querySelector('.scent-editor form'));assert.equal(saved.profile.heart.notes,'Чай');assert.equal(saved.profile.base.description,'Третье');assert.equal(saved.name,scents[0].name);
+  }finally{await act(async()=>root.unmount());}
+});
+
+test('admin appends photos, selects a new cover and removes individual photos while preserving upload order',async()=>{
+  let saved;const candle={...products[0],formId:1,colorId:1,scentId:1,form:forms[0],color:colors[0],scent:scents[0],image:'/old.png',images:['/old.png']};
+  const previousCreate=URL.createObjectURL;const previousRevoke=URL.revokeObjectURL;URL.createObjectURL=file=>`blob:${file.name}`;URL.revokeObjectURL=()=>{};
+  globalThis.fetch=async(url,init={})=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/products?admin=1'?response([candle]):url==='/api/forms?admin=1'?response(forms):url==='/api/scents?admin=1'?response(scents):url==='/api/colors?admin=1'?response(colors):url==='/api/products/1'?(saved=init.body,response(candle)):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Admin)));await click(document.querySelector('[aria-label="Редактировать свечу № 1"]'));
+    const input=document.querySelector('[aria-label="Фотографии свечи"]');assert.equal(input.multiple,true);Object.defineProperty(input,'files',{value:[new dom.window.File(['a'],'a.png',{type:'image/png'}),new dom.window.File(['b'],'b.png',{type:'image/png'})]});
+    await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));assert.equal(document.querySelectorAll('.editor-photo').length,3);
+    await click(document.querySelectorAll('.editor-photo')[2].querySelector('button'));
+    assert.equal(document.querySelector('.editor-photo img').getAttribute('src'),'blob:b.png');await click(document.querySelector('[aria-label="Удалить фото 2"]'));
+    await submit(document.querySelector('.product-editor form'));
+    assert.deepEqual(JSON.parse(saved.get('photos')),[{upload:0},{upload:1}]);assert.deepEqual(saved.getAll('images').map(file=>file.name),['b.png','a.png']);assert.equal(saved.get('expectedImages'),'["/old.png"]');
+  }finally{await act(async()=>root.unmount());URL.createObjectURL=previousCreate;URL.revokeObjectURL=previousRevoke;}
+});
+
+test('candle gallery switches photos by thumbnails, buttons and keyboard while keeping cover in cart',async()=>{
+  window.localStorage.clear();const candle={...products[0],formId:1,colorId:1,scentId:1,form:forms[0],color:colors[0],scent:scents[0],image:'/one.png',images:['/one.png','/two.png','/three.png']};
+  globalThis.fetch=async url=>url==='/api/products'?response([candle]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('.product-image img').getAttribute('src'),'/one.png');await click(document.querySelector('.product-image'));
+    const src=()=>document.querySelector('.detail-photo img').getAttribute('src');assert.equal(src(),'/one.png');assert.equal(document.querySelectorAll('.photo-thumbnails button').length,3);
+    await click(document.querySelector('[aria-label="Фото 3"]'));assert.equal(src(),'/three.png');await click(document.querySelector('[aria-label="Следующее фото"]'));assert.equal(src(),'/one.png');
+    await act(async()=>document.querySelector('[aria-label="Фото 1"]').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true})));assert.equal(src(),'/three.png');
+    await click(button('Добавить в корзину'));await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelector('.cart-candle-visual img').getAttribute('src'),'/one.png');
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('inventory groups exact form-color-scent combinations and exposes SVG edit/delete actions next to stock',async()=>{
+  const snake={...forms[0],name:'Змея'};let removed;
+  let candles=[{...products[0],id:41,name:'Змея',formId:1,form:snake,colorId:1,color:colors[0],scentId:1,scent:scents[0],stock:2},{...products[0],id:42,name:'Змея',formId:1,form:snake,colorId:2,color:colors[1],scentId:1,scent:scents[0],stock:7},{...products[0],id:43,name:'Змея',formId:1,form:snake,colorId:1,color:colors[0],scentId:1,scent:scents[0],stock:3}];
+  const previousConfirm=globalThis.confirm;globalThis.confirm=()=>true;
+  globalThis.fetch=async(url,init={})=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/products?admin=1'?response(candles):url==='/api/forms?admin=1'?response([snake]):url==='/api/scents?admin=1'?response(scents):url==='/api/colors?admin=1'?response(colors):init.method==='DELETE'?(removed=url,candles=candles.filter(p=>p.id!==42),response({ok:true})):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Admin)));const groups=[...document.querySelectorAll('.inventory-group')];assert.equal(groups.length,2);assert.equal(groups[0].querySelectorAll('.inventory-entry').length,2);assert.match(groups[0].querySelector('.inventory-group-total').textContent,/5 шт/);assert.match(groups[1].querySelector('.inventory-group-total').textContent,/7 шт/);
+    assert.equal(document.querySelector('.inventory-groups .admin-table-wrap'),null);assert.equal(document.querySelectorAll('.inventory-entry-actions svg').length,6);
+    await click(document.querySelector('[aria-label="Редактировать свечу № 42"]'));assert.equal(document.querySelectorAll('.candle-selects select')[1].value,'2');await click(document.querySelector('[aria-label="Закрыть редактор"]'));
+    await click(document.querySelector('[aria-label="Удалить свечу № 42"]'));assert.equal(removed,'/api/products/42');assert.equal(document.querySelectorAll('.inventory-group').length,1);assert.equal(document.querySelectorAll('.inventory-entry').length,2);
+  }finally{await act(async()=>root.unmount());globalThis.confirm=previousConfirm;}
 });

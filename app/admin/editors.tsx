@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile } from "@/lib/catalog";
+import { type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile, productImages, MAX_PRODUCT_IMAGES } from "@/lib/catalog";
 import { Modal } from "../components/modal";
 import { CandlePreview } from "../components/candle-preview";
 
@@ -19,16 +19,17 @@ export function ImagePreview({ file, src, alt = "" }: { file?: File | null; src?
 }
 
 export function ProductEditor({ product, forms, scents, colors, onSave, onClose }: { product: Product; forms: CandleForm[]; scents: Scent[]; colors: CandleColor[]; onSave: (form: FormData) => Promise<void>; onClose: () => void }) {
-  const [draft, setDraft] = useState(product); const [image, setImage] = useState<File>();
-  const [removeImage, setRemoveImage] = useState(false);
+  const [draft, setDraft] = useState(product);
+  const [photos, setPhotos] = useState<{ src?: string; file?: File }[]>(() => productImages(product).map(src => ({ src })));
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const save = async (event: FormEvent) => {
     event.preventDefault(); if (saving) return; setSaving(true); setError("");
     const data = new FormData();
     for (const key of ["formId", "colorId", "scentId", "notes", "price", "stock", "published"] as const) data.set(key, String(draft[key] ?? ""));
     data.set("expectedStock", String(product.stock));
-    if (image) data.set("image", image);
-    data.set("removeImage", String(removeImage));
+    let upload = 0;
+    data.set("photos", JSON.stringify(photos.map(photo => { if (photo.file) { data.append("images", photo.file); return { upload: upload++ }; } return { url: photo.src }; })));
+    data.set("expectedImages", JSON.stringify(productImages(product)));
     try { await onSave(data); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить свечу"); } finally { setSaving(false); }
   };
   const selectedForm = forms.find(form => form.id === draft.formId);
@@ -44,7 +45,16 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
       <div className="candle-selects">{choices.map(({ key, label, placeholder, options }) => <label key={key}>{label}<select required value={draft[key] ?? ""} onChange={event => setDraft({ ...draft, [key]: Number(event.target.value) })}><option value="" disabled>{placeholder}</option>{options.filter(option => option.active || option.id === draft[key]).map(option => <option key={option.id} value={option.id}>{option.name}{!option.active ? " · отключён" : ""}</option>)}</select></label>)}</div>
       <p className="editor-hint">Новые варианты добавляются в разделах «Формы», «Цвета» и «Ароматы». Остаток относится только к выбранному сочетанию.</p>
       <label>Описание свечи<textarea maxLength={2000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Размер, вес, особенности — напишите своими словами" /></label>
-      <div className="candle-image-field"><label className="image-upload">{image || (!removeImage && product.image) ? <ImagePreview file={image} src={removeImage ? null : product.image} /> : <div className="candle-editor-silhouette"><CandlePreview shape={selectedForm?.shape} silhouette={selectedForm?.silhouette} color={selectedColor?.hex} label={selectedForm?.name ?? "Форма свечи"} /></div>}<span>Фото свечи · необязательно</span><input key={removeImage ? "removed" : "photo"} type="file" aria-label="Фотография свечи" accept="image/jpeg,image/png,image/webp" onChange={event => { setImage(event.target.files?.[0]); setRemoveImage(false); }} /></label>{(image || (!removeImage && product.image)) && <button type="button" className="text-action" onClick={() => { setImage(undefined); setRemoveImage(true); }}>Убрать фото — использовать силуэт</button>}<p className="image-field-hint">Без фото показывается силуэт выбранной формы в цвете свечи. Фото: JPG, PNG или WebP, до 10 МБ.</p></div>
+      <div className="candle-image-field"><h3>Фотографии свечи <small>{photos.length} / {MAX_PRODUCT_IMAGES}</small></h3>
+        {!!photos.length && <div className="editor-photo-grid">{photos.map((photo, index) => <div className="editor-photo" key={photo.src ?? `${photo.file?.name}-${index}`}><ImagePreview file={photo.file} src={photo.src} alt={`Фото свечи ${index + 1}`} /><span className="photo-role">{index === 0 ? "Главное фото" : `Фото ${index + 1}`}</span><div className="editor-photo-actions"><button type="button" disabled={index === 0} onClick={() => setPhotos([photo, ...photos.filter((_, i) => i !== index)])}>{index === 0 ? "Главное" : "Сделать главным"}</button><button type="button" aria-label={`Удалить фото ${index + 1}`} onClick={() => setPhotos(photos.filter((_, i) => i !== index))}>Убрать фото</button></div></div>)}</div>}
+        {!photos.length && <div className="candle-editor-silhouette"><CandlePreview shape={selectedForm?.shape} silhouette={selectedForm?.silhouette} color={selectedColor?.hex} label={selectedForm?.name ?? "Форма свечи"} /></div>}
+        <label className="photo-upload-label">Добавить фотографии<input type="file" multiple aria-label="Фотографии свечи" accept="image/jpeg,image/png,image/webp" disabled={photos.length >= MAX_PRODUCT_IMAGES} onChange={event => {
+          const files = Array.from(event.target.files ?? []); event.target.value = "";
+          if (photos.length + files.length > MAX_PRODUCT_IMAGES) { setError(`Можно добавить до ${MAX_PRODUCT_IMAGES} фотографий.`); return; }
+          if (files.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024 || !file.size)) { setError("Фото: JPG, PNG или WebP, до 10 МБ каждое."); return; }
+          setError(""); setPhotos([...photos, ...files.map(file => ({ file }))]);
+        }} /></label><p className="image-field-hint">Главное фото показывается в галерее и корзине, остальные — в карточке свечи. До {MAX_PRODUCT_IMAGES} фото, JPG, PNG или WebP, до 10 МБ каждое. Без фотографий показывается силуэт формы в цвете свечи.</p>
+      </div>
       <div className="editor-row"><label>Цена, ₽<input type="number" min="0" max="10000000" step="1" required value={draft.price} onChange={event => setDraft({ ...draft, price: Number(event.target.value) })} /></label><label>Остаток, шт.<input type="number" min="0" max="1000000" step="1" required value={draft.stock} onChange={event => setDraft({ ...draft, stock: Number(event.target.value) })} /></label></div>
       <label className="inline-check"><input type="checkbox" checked={draft.published} onChange={event => setDraft({ ...draft, published: event.target.checked })} />Показывать свечу на сайте</label>
     </fieldset>{error && <p className="editor-error" role="alert">{error}</p>}<footer><button type="button" className="cancel" disabled={saving} onClick={onClose}>Отмена</button><button className="save" disabled={saving || choices.some(choice => !draft[choice.key])}>{saving ? "Сохраняем…" : "Сохранить свечу"}</button></footer>
@@ -52,7 +62,7 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
 }
 
 export function ScentEditor({ scent, onSave, onClose }: { scent: Scent; onSave: (scent: Scent) => Promise<void>; onClose: () => void }) {
-  const [draft, setDraft] = useState(scent);
+  const [draft, setDraft] = useState({ ...scent, profile: scent.profile ?? emptyAromaProfile() });
   const [notes, setNotes] = useState(scent.notes.join(", "));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -64,7 +74,7 @@ export function ScentEditor({ scent, onSave, onClose }: { scent: Scent; onSave: 
       <label>Название аромата<input required maxLength={120} value={draft.name} placeholder="Например, Вишня и миндаль" onChange={e => setDraft({ ...draft, name: e.target.value })} /></label>
       <label>Описание<textarea maxLength={2000} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label>
       <label>Ноты через запятую<input value={notes} onChange={e => setNotes(e.target.value)} placeholder="вишня, миндаль, ваниль" /></label>
-      <p className="editor-hint">Аромат появится в списке при создании свечи. Главы «Начало», «Сердце» и «Шлейф» заполняются отдельно в разделе «Искусство аромата».</p>
+      <p className="editor-hint">Этот аромат можно выбрать для готовой и авторской свечи. Главы ниже используются в блоках «Искусство аромата» и «Побыть мастером».</p><AromaProfileFields profile={draft.profile} onChange={profile => setDraft({ ...draft, profile })} />
       <label className="inline-check"><input type="checkbox" checked={draft.active} onChange={e => setDraft({ ...draft, active: e.target.checked })} />Аромат доступен на сайте</label>
     </fieldset>
     {error && <p className="editor-error" role="alert">{error}</p>}
@@ -122,7 +132,11 @@ export function StockEditor({ product, onSave, onClose }: { product: Product; on
 export function AromaProfileEditor({ scent, onSave }: { scent: Scent; onSave: (profile: AromaProfile) => Promise<void> }) {
   const [profile, setProfile] = useState<AromaProfile>(scent.profile ?? emptyAromaProfile()); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   return <form className="aroma-profile-editor" onSubmit={async event => { event.preventDefault(); if (saving) return; setSaving(true); setError(""); try { await onSave(profile); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить главы аромата"); } finally { setSaving(false); } }}>
-    <fieldset className="aroma-chapters" disabled={saving}>{([{ key: "top", title: "Начало", hint: "Первое впечатление" }, { key: "heart", title: "Сердце", hint: "Характер композиции" }, { key: "base", title: "Шлейф", hint: "Послевкусие" }] as const).map((chapter, index) => <section key={chapter.key} className="aroma-chapter"><header><span>0{index + 1}</span><h3>{chapter.title}</h3></header><p>{chapter.hint}</p><label>Ноты · {chapter.title.toLowerCase()}<input maxLength={240} value={profile[chapter.key].notes} onChange={event => setProfile({ ...profile, [chapter.key]: { ...profile[chapter.key], notes: event.target.value } })} placeholder="Например, бергамот · лимон" /></label><label>Описание · {chapter.title.toLowerCase()}<textarea maxLength={2000} rows={5} value={profile[chapter.key].description} onChange={event => setProfile({ ...profile, [chapter.key]: { ...profile[chapter.key], description: event.target.value } })} placeholder="Как раскрывается аромат на этом этапе" /></label></section>)}</fieldset>
-    {error && <p className="editor-error" role="alert">{error}</p>}<footer><p>Изменения появятся в блоке «02 / Искусство аромата».</p><button className="save" disabled={saving}>{saving ? "Сохраняем…" : "Сохранить разбор аромата"}</button></footer>
+    <fieldset disabled={saving} className="aroma-profile-fields"><AromaProfileFields profile={profile} onChange={setProfile} /></fieldset>
+    {error && <p className="editor-error" role="alert">{error}</p>}<footer><p>Изменения появятся в блоках «Искусство аромата» и «Побыть мастером».</p><button className="save" disabled={saving}>{saving ? "Сохраняем…" : "Сохранить разбор аромата"}</button></footer>
   </form>;
+}
+
+function AromaProfileFields({ profile, onChange }: { profile: AromaProfile; onChange: (profile: AromaProfile) => void }) {
+  return (<fieldset className="aroma-chapters" >{([{ key: "top", title: "Начало", hint: "Первое впечатление" }, { key: "heart", title: "Сердце", hint: "Характер композиции" }, { key: "base", title: "Шлейф", hint: "Послевкусие" }] as const).map((chapter, index) => <section key={chapter.key} className="aroma-chapter"><header><span>0{index + 1}</span><h3>{chapter.title}</h3></header><p>{chapter.hint}</p><label>Ноты · {chapter.title.toLowerCase()}<input maxLength={240} value={profile[chapter.key].notes} onChange={event => onChange({ ...profile, [chapter.key]: { ...profile[chapter.key], notes: event.target.value } })} placeholder="Например, бергамот · лимон" /></label><label>Описание · {chapter.title.toLowerCase()}<textarea maxLength={2000} rows={5} value={profile[chapter.key].description} onChange={event => onChange({ ...profile, [chapter.key]: { ...profile[chapter.key], description: event.target.value } })} placeholder="Как раскрывается аромат на этом этапе" /></label></section>)}</fieldset>);
 }

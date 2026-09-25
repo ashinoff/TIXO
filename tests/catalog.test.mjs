@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ts from 'typescript';
@@ -75,6 +75,15 @@ test('custom recipes accept a form ID, isolate combinations and strip client for
   const parsed=parseOrder(orderBody([{customRecipe:{...dynamic,formName:'Fake',silhouette:'/fake.png',price:1},quantity:1},{customRecipe:dynamic,quantity:2},{customRecipe:{...dynamic,formId:13},quantity:1}]));
   assert.deepEqual(parsed.items.map(line=>line.quantity),[3,1]);assert.deepEqual(parsed.items[0].customRecipe,dynamic);
   assert.notEqual(recipeKey(dynamic),recipeKey({...dynamic,formId:13}));assert.notEqual(recipeKey(dynamic),recipeKey(recipe));
+});
+
+test('catalog aroma recipes reject mixed note payloads and keep aroma IDs distinct',()=>{
+  const value={formId:12,color:'red',scentId:7};assert.equal(isRecipe(value),true);
+  for(const scentId of [0,-1,1.5,'7',null,undefined,Number.MAX_SAFE_INTEGER+1])assert.equal(isRecipe({...value,scentId}),false);
+  for(const extra of [{top:'lemon'},{heart:'fig'},{base:'oud'},{shape:'sphere'}])assert.equal(isRecipe({...value,...extra}),false);
+  const parsed=parseOrder(orderBody([{customRecipe:{...value,scentName:'Fake',aromaProfile:{},price:1},quantity:1},{customRecipe:value,quantity:2},{customRecipe:{...value,scentId:8},quantity:1}]));
+  assert.deepEqual(parsed.items,[{customRecipe:value,quantity:3},{customRecipe:{...value,scentId:8},quantity:1}]);
+  assert.notEqual(recipeKey(value),recipeKey({...value,scentId:8}));
 });
 
 test('invalid quantities and partial malformed carts are rejected, duplicates are aggregated', () => {
@@ -158,7 +167,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
   await t.test('one-time migration moves each physical variant without duplicating stock or losing photos and history', async () => {
     await Promise.all([domain.ensureSchema(), domain.ensureSchema()]);
     const legacy = (await domain.listProducts(true,1))[0];
-    assert.equal(legacy.stock,12); assert.equal(legacy.image,before[0].image);
+    assert.equal(legacy.stock,12); assert.equal(legacy.image,before[0].image);assert.deepEqual(legacy.images,[before[0].image]);
     assert.equal(legacy.colorId,null); assert.equal(legacy.scentId,null); assert.ok(legacy.formId);
     assert.equal((await pool.query("SELECT value FROM site_content WHERE key='hero.title'")).rows[0].value, 'Сохранённый заголовок');
     originalOrder = domain.mapOrder((await pool.query("SELECT * FROM orders WHERE order_number='OLD-01'")).rows[0]);
@@ -402,6 +411,46 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await pool.query('DELETE FROM candle_forms WHERE id=$1',[form.id]);assert.equal((await createOrder(request)).id,placed.id);
     await deleteOrder(placed.id);assert.deepEqual((await pool.query('SELECT id,stock FROM products ORDER BY id')).rows,before);
   });
+  await t.test('multiple photographs preserve order, cover and legacy photos, reject foreign URLs and stale galleries',async()=>{
+    const form=await saveForm({name:'Форма для галереи',active:true});
+    const values={formId:form.id,colorId:redColor,scentId:red,notes:'Галерея',price:2000,stock:3,published:true};
+    const data=formFor(values);data.set('photos',JSON.stringify([{upload:0},{upload:1}]));data.append('images',imageFile());data.append('images',imageFile());
+    const candle=await saveProduct(data);assert.equal(candle.images.length,2);assert.equal(candle.image,candle.images[0]);assert.notEqual(candle.images[0],candle.images[1]);
+    const beforeUploads=readdirSync(path.join(temp,'uploads')).length;
+    const invalid=formFor(values);invalid.set('photos',JSON.stringify([{url:'/api/uploads/foreign.webp'}]));await assert.rejects(saveProduct(invalid,candle.id),error=>error.status===400);
+    invalid.set('photos',JSON.stringify([{upload:0},{upload:0}]));invalid.append('images',imageFile());await assert.rejects(saveProduct(invalid,candle.id),error=>error.status===400);
+    invalid.set('photos',JSON.stringify(Array.from({length:11},()=>({upload:0}))));await assert.rejects(saveProduct(invalid,candle.id),error=>error.status===400);
+    const badFile=formFor(values);badFile.set('photos','[{"upload":0},{"upload":1}]');badFile.append('images',imageFile());badFile.append('images',new File(['bad'],'bad.svg',{type:'image/svg+xml'}));await assert.rejects(saveProduct(badFile,candle.id),error=>error.status===400);
+    assert.equal(readdirSync(path.join(temp,'uploads')).length,beforeUploads);
+    const reorder=formFor(values);reorder.set('expectedImages',JSON.stringify(candle.images));reorder.set('photos',JSON.stringify([{url:candle.images[1]},{upload:0},{url:candle.images[0]}]));reorder.append('images',imageFile());
+    const reordered=await saveProduct(reorder,candle.id);assert.equal(reordered.images.length,3);assert.equal(reordered.image,candle.images[1]);assert.equal(reordered.images[2],candle.images[0]);
+    await assert.rejects(saveProduct(reorder,candle.id),error=>error.status===409);
+    const placed=await createOrder(orderBody([{productId:candle.id,scentId:red,colorId:redColor,quantity:1}]));assert.equal(placed.items[0].image,reordered.image);
+    const clear=formFor({...values,stock:2});clear.set('expectedImages',JSON.stringify(reordered.images));clear.set('photos','[]');const cleared=await saveProduct(clear,candle.id);assert.equal(cleared.image,null);assert.deepEqual(cleared.images,[]);
+    for(const url of reordered.images)assert.ok(readFileSync(path.join(temp,'uploads',path.basename(url))).length);
+    globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();assert.deepEqual((await domain.listProducts(true,candle.id))[0].images,[]);
+    await deleteOrder(placed.id);
+  });
+
+  await t.test('catalog aroma orders store trusted chapters and remain unchanged after aroma rename or deletion',async()=>{
+    const form=await saveForm({name:'Форма для аромата',active:true});
+    const profile={top:{notes:'Цедра',description:'Яркое начало'},heart:{notes:'Чай',description:'Мягкое сердце'},base:{notes:'Дерево',description:'Долгий шлейф'}};
+    const scent=Number((await pool.query("INSERT INTO scents(name,profile) VALUES('Авторский чай',$1::jsonb) RETURNING id",[JSON.stringify(profile)])).rows[0].id);
+    const recipe={formId:form.id,color:'ivory',scentId:scent};const request=orderBody([{customRecipe:{...recipe,scentName:'Fake',aromaProfile:{},price:1},quantity:2}]);
+    const before=(await pool.query('SELECT id,stock FROM products ORDER BY id')).rows;const placed=await createOrder(request);
+    assert.equal(placed.stockReserved,false);assert.equal(placed.total,0);assert.deepEqual(placed.items[0].customRecipe,recipe);assert.equal(placed.items[0].scentName,'Авторский чай');assert.deepEqual(placed.items[0].aromaProfile,profile);
+    assert.deepEqual((await pool.query('SELECT id,stock FROM products ORDER BY id')).rows,before);
+    await pool.query("UPDATE scents SET name='Новое название',active=FALSE,profile='{}' WHERE id=$1",[scent]);
+    await assert.rejects(createOrder(orderBody([{customRecipe:recipe,quantity:1}])),error=>error.status===409);
+    await assert.rejects(createOrder(orderBody([{customRecipe:{...recipe,scentId:999999},quantity:1}])),error=>error.status===409);
+    await assert.rejects(createOrder(orderBody([{productId:1,scentId:1,colorId:defaultColorId,quantity:1},{customRecipe:recipe,quantity:1}])),error=>error.status===409);
+    assert.deepEqual((await pool.query('SELECT id,stock FROM products ORDER BY id')).rows,before);
+    await pool.query('DELETE FROM scents WHERE id=$1',[scent]);
+    assert.equal((await createOrder(request)).id,placed.id);
+    const saved=domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[placed.id])).rows[0]);assert.equal(saved.items[0].scentName,'Авторский чай');assert.deepEqual(saved.items[0].aromaProfile,profile);
+    await deleteOrder(placed.id);
+  });
+
   await t.test('aroma profiles preserve three explicitly authored chapters independently of candle and scent notes', async () => {
     const profile={top:{notes:'Цитрус',description:'Первое впечатление'},heart:{notes:'Цветы',description:'Сердце композиции'},base:{notes:'Дерево',description:'Тёплый шлейф'}};
     assert.deepEqual(parseAromaProfile(profile),profile);

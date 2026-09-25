@@ -4,21 +4,17 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } f
 import {
   atelierColors,
   atelierColorHex,
-  atelierTopNotes,
-  atelierHeartNotes,
-  atelierBaseNotes,
   type Recipe,
-  type FormRecipe,
+  type ScentRecipe,
 } from "@/lib/atelier";
+import { emptyAromaProfile } from "@/lib/catalog";
 import { CandlePreview } from "./candle-preview";
 import { useShopping } from "./storefront-commerce";
 
-const initialRecipe: FormRecipe = {
+const initialRecipe: ScentRecipe = {
   formId: 0,
   color: "ivory",
-  top: "bergamot",
-  heart: "honey",
-  base: "tonka",
+  scentId: 0,
 };
 
 const steps = ["Форма", "Цвет", "Аромат", "Результат"];
@@ -40,41 +36,13 @@ function animateReveal(element: HTMLElement | null, duration: number, distance: 
   return () => animation.cancel();
 }
 
-function NoteChoices<T extends string>({
-  title,
-  legend,
-  name,
-  options,
-  value,
-  onChange,
-}: {
-  title: string;
-  legend: string;
-  name: string;
-  options: Record<T, string>;
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="ingredient-group">
-      <span className="ingredient-label">{title}</span>
-      <fieldset className="ingredient-options">
-        <legend className="sr-only">{legend}</legend>
-        {(Object.keys(options) as T[]).map(option => (
-          <label key={option}>
-            <input type="radio" name={name} value={option} checked={value === option} onChange={() => onChange(option)} />
-            <span>{options[option]}</span>
-          </label>
-        ))}
-      </fieldset>
-    </div>
-  );
-}
-
 export function Atelier() {
-  const { addCustom, forms, formsLoading, formsError, loadForms, locked } = useShopping();
-  const [recipe, setRecipe] = useState<FormRecipe>(initialRecipe);
+  const { addCustom, forms, formsLoading, formsError, loadForms, scents, loading, catalogError, loadCatalog, locked } = useShopping();
+  const [recipe, setRecipe] = useState<ScentRecipe>(initialRecipe);
   const selectedForm = recipe.formId === 0 ? forms[0] : forms.find(form => form.id === recipe.formId);
+  const selectedScent = recipe.scentId === 0 ? scents[0] : scents.find(scent => scent.id === recipe.scentId);
+  const profile = selectedScent?.profile ?? emptyAromaProfile();
+  const scentReady = !!selectedScent && !loading && !catalogError;
   const formName = selectedForm?.name ?? "Выберите форму";
   const [step, setStep] = useState(0);
   const [status, setStatus] = useState("");
@@ -94,7 +62,7 @@ export function Atelier() {
     return animateReveal(panelRefs.current[step], 470, 8);
   }, [step]);
 
-  const updateRecipe = <K extends keyof FormRecipe>(field: K, value: FormRecipe[K]) => {
+  const updateRecipe = <K extends keyof ScentRecipe>(field: K, value: ScentRecipe[K]) => {
     setRecipe(previous => ({ ...previous, [field]: value }));
     setStatus("");
   };
@@ -119,10 +87,10 @@ export function Atelier() {
   };
 
   const addRecipe = () => {
-    if (!selectedForm || formsLoading || formsError || locked) return;
+    if (!selectedForm || formsLoading || formsError || !scentReady || locked) return;
     try {
       // Keep an independent snapshot so later experiments never change the cart.
-      const added = addCustom(Object.freeze({ ...recipe, formId: selectedForm.id }));
+      const added = addCustom(Object.freeze({ ...recipe, formId: selectedForm.id, scentId: selectedScent!.id }));
       setStatus(added
         ? "Ваша композиция добавлена в корзину. Можно продолжить экспериментировать."
         : "Не удалось добавить свечу. Проверьте количество и текущий заказ в корзине.");
@@ -134,16 +102,17 @@ export function Atelier() {
   const summary = [
     ["Форма", formName],
     ["Цвет", atelierColors[recipe.color]],
-    ["Начало", atelierTopNotes[recipe.top]],
-    ["Сердце", atelierHeartNotes[recipe.heart]],
-    ["Шлейф", atelierBaseNotes[recipe.base]],
+    ["Аромат", selectedScent?.name ?? "Выберите аромат"],
+    ["Начало", profile.top.notes || "Описание готовится"],
+    ["Сердце", profile.heart.notes || "Описание готовится"],
+    ["Шлейф", profile.base.notes || "Описание готовится"],
   ];
 
   return (
     <section className="studio pad" id="studio" aria-labelledby="studio-title" data-step={step}>
       <div className="studio-heading">
         <div><p className="eyebrow">ВАШЕ МЕСТО В МАСТЕРСКОЙ</p><h2 id="studio-title">Побыть <span>мастером.</span></h2></div>
-        <p>От первой формы до собственного аромата.<br />Создайте свечу, которой ещё нет в коллекции.</p>
+        <p>Любимая форма, цвет и аромат.<br />Создайте свечу, которой ещё нет в коллекции.</p>
       </div>
       <div className="studio-layout">
         <div className="studio-scene">
@@ -155,7 +124,7 @@ export function Atelier() {
           <div ref={candleRef} id="studio-candle" className="studio-form-preview" data-form-id={selectedForm?.id}>
             <CandlePreview silhouette={selectedForm?.silhouette} shape={selectedForm?.shape} color={atelierColorHex[recipe.color]} label={`${formName}, ${atelierColors[recipe.color]}`} />
           </div>
-          <div className="scene-recipe"><span id="scene-form">{formName}</span><p id="scene-ingredients">{[atelierTopNotes[recipe.top], atelierHeartNotes[recipe.heart], atelierBaseNotes[recipe.base]].join(" · ")}</p></div>
+          <div className="scene-recipe"><span id="scene-form">{formName}</span><p id="scene-ingredients">{selectedScent?.name ?? "Выберите аромат"}</p></div>
           <span className="scene-disclaimer">Визуализация будущей свечи</span>
         </div>
         <div className="studio-controls">
@@ -206,23 +175,30 @@ export function Atelier() {
             </fieldset>
           </div>
           <div ref={element => { panelRefs.current[2] = element; }} className="studio-panel" id="studio-panel-2" role="tabpanel" aria-labelledby="studio-step-2" hidden={step !== 2}>
-            <p className="eyebrow">СОБИРАЕМ КОМПОЗИЦИЮ</p><h3>Три ноты. Ваша история.</h3><p>Выберите по одной ноте для каждой главы аромата.</p>
-            <NoteChoices title="01 / Начало" legend="Верхняя нота" name="recipe-top" options={atelierTopNotes} value={recipe.top} onChange={value => updateRecipe("top", value)} />
-            <NoteChoices title="02 / Сердце" legend="Нота сердца" name="recipe-heart" options={atelierHeartNotes} value={recipe.heart} onChange={value => updateRecipe("heart", value)} />
-            <NoteChoices title="03 / Шлейф" legend="Базовая нота" name="recipe-base" options={atelierBaseNotes} value={recipe.base} onChange={value => updateRecipe("base", value)} />
+            <p className="eyebrow">ВЫБИРАЕМ КОМПОЗИЦИЮ</p><h3>Три ноты. Ваша история.</h3><p>Выберите аромат мастерской и познакомьтесь с тремя главами его раскрытия.</p>
+            {loading && <p role="status" className="builder-form-message">Загружаем ароматы…</p>}
+            {catalogError && <div role="alert" className="builder-form-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void loadCatalog()}>Попробовать ещё раз ↗</button></div>}
+            {!loading && !catalogError && !scents.length && <p className="builder-form-message">Мастерская готовит новые ароматы. Загляните немного позже.</p>}
+            {!loading && !catalogError && recipe.scentId !== 0 && !selectedScent && scents.length > 0 && <p role="status" className="builder-form-message">Этот аромат больше недоступен. Выберите другой.</p>}
+            <fieldset className="builder-scent-options" disabled={loading || !!catalogError}>
+              <legend className="sr-only">Аромат авторской свечи</legend>
+              {scents.map(scent => <label key={scent.id}><input type="radio" name="recipe-scent" value={scent.id} checked={selectedScent?.id === scent.id} onChange={() => updateRecipe("scentId", scent.id)} /><span>{scent.name}</span></label>)}
+            </fieldset>
+            {selectedScent && <div className="builder-aroma" aria-live="polite"><h4>{selectedScent.name}</h4>{selectedScent.description && <p>{selectedScent.description}</p>}<div className="builder-aroma-chapters">{([['top', 'Начало'], ['heart', 'Сердце'], ['base', 'Шлейф']] as const).map(([key, title], index) => <section key={key}><span className="eyebrow">0{index + 1} / {title}</span>{profile[key].notes && <h5>{profile[key].notes}</h5>}<p>{profile[key].description || (!profile[key].notes ? "Мастерская скоро добавит описание этой главы." : "")}</p></section>)}</div></div>}
+
           </div>
           <div ref={element => { panelRefs.current[3] = element; }} className="studio-panel" id="studio-panel-3" role="tabpanel" aria-labelledby="studio-step-3" hidden={step !== 3}>
             <p className="eyebrow">ВАШ АВТОРСКИЙ ЭСКИЗ</p><h3>Так звучит ваша тишина.</h3>
             <dl className="recipe-summary" id="recipe-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
             <div className="custom-price">Индивидуальная свеча <span>Стоимость по запросу</span></div>
-            <p className="recipe-note">Перед изготовлением мастер согласует форму, состав, сочетаемость нот и стоимость. Оттенок готовой свечи может отличаться от изображения.</p>
-            <button type="button" className="button button-light" id="add-custom" disabled={!selectedForm || formsLoading || !!formsError || locked} onClick={addRecipe}>Добавить мою свечу в корзину <span aria-hidden="true">+</span></button>
-            <p className="builder-status" id="builder-status" role="status">{formsLoading ? "Загружаем формы мастерской…" : formsError || (!selectedForm ? "Для заказа выберите доступную форму на первом шаге." : status)}</p>
+            <p className="recipe-note">Перед изготовлением мастер согласует детали изготовления и стоимость. Оттенок готовой свечи может отличаться от изображения.</p>
+            <button type="button" className="button button-light" id="add-custom" disabled={!selectedForm || formsLoading || !!formsError || !scentReady || locked} onClick={addRecipe}>Добавить мою свечу в корзину <span aria-hidden="true">+</span></button>
+            <p className="builder-status" id="builder-status" role="status">{formsLoading ? "Загружаем формы мастерской…" : formsError || (!selectedForm ? "Для заказа выберите доступную форму на первом шаге." : !scentReady ? "Для заказа выберите доступный аромат на третьем шаге." : status)}</p>
             <p className="recipe-note">Оформите заявку в корзине — мастер свяжется с вами и обсудит вашу композицию.</p>
           </div>
           <div className="studio-navigation">
             <button type="button" id="studio-back" disabled={step === 0} onClick={() => goToStep(step - 1, true)}>← Назад</button>
-            <button type="button" id="studio-next" disabled={step === 0 && (!selectedForm || formsLoading || !!formsError)} hidden={step === 3} onClick={() => goToStep(step + 1, true)}>{nextLabels[step]} <span aria-hidden="true">→</span></button>
+            <button type="button" id="studio-next" disabled={(step === 0 && (!selectedForm || formsLoading || !!formsError)) || (step === 2 && !scentReady)} hidden={step === 3} onClick={() => goToStep(step + 1, true)}>{nextLabels[step]} <span aria-hidden="true">→</span></button>
           </div>
         </div>
       </div>
