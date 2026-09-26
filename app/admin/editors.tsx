@@ -27,6 +27,7 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
     event.preventDefault(); if (saving) return; setSaving(true); setError("");
     const data = new FormData();
     for (const key of ["formId", "colorId", "scentId", "notes", "price", "stock", "published"] as const) data.set(key, String(draft[key] ?? ""));
+    data.set("accentColorId", String(forms.find(form => form.id === draft.formId)?.twoTone ? draft.accentColorId ?? "" : ""));
     data.set("expectedStock", String(product.stock));
     let upload = 0;
     data.set("photos", JSON.stringify(photos.map(photo => { if (photo.file) { data.append("images", photo.file); return { upload: upload++ }; } return { url: photo.src }; })));
@@ -43,12 +44,13 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
   return <Modal className="product-editor" label={product.id ? "Редактирование свечи" : "Новая свеча"} onClose={() => { if (!saving) onClose(); }}><form onSubmit={save}>
     <header><div><span className="admin-kicker">Свеча · {product.id ? `№ ${product.id}` : "новая позиция"}</span><h2>{product.id ? "Редактировать свечу" : "Новая свеча"}</h2></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
     <fieldset disabled={saving} className="editor-fields">
-      <div className="candle-selects">{choices.map(({ key, label, placeholder, options }) => <label key={key}>{label}<select required value={draft[key] ?? ""} onChange={event => setDraft({ ...draft, [key]: Number(event.target.value) })}><option value="" disabled>{placeholder}</option>{options.filter(option => option.active || option.id === draft[key]).map(option => <option key={option.id} value={option.id}>{option.name}{!option.active ? " · отключён" : ""}</option>)}</select></label>)}</div>
+      <div className="candle-selects">{choices.map(({ key, label, placeholder, options }) => <label key={key}>{label}<select required value={draft[key] ?? ""} onChange={event => setDraft({ ...draft, [key]: Number(event.target.value), ...(key === "formId" && !forms.find(form => form.id === Number(event.target.value))?.twoTone ? { accentColorId: null } : {}) })}><option value="" disabled>{placeholder}</option>{options.filter(option => option.active || option.id === draft[key]).map(option => <option key={option.id} value={option.id}>{option.name}{!option.active ? " · отключён" : ""}</option>)}</select></label>)}</div>
+      {selectedForm?.twoTone && <label>Цвет декора<select value={draft.accentColorId ?? ""} onChange={event => setDraft({ ...draft, accentColorId: event.target.value ? Number(event.target.value) : null })}><option value="">Как корпус — один цвет</option>{colors.filter(color => color.active || color.id === draft.accentColorId).map(color => <option key={color.id} value={color.id}>{color.name}{!color.active ? " · отключён" : ""}</option>)}</select></label>}
       <p className="editor-hint">Новые варианты добавляются в разделах «Формы», «Цвета» и «Ароматы». Остаток относится только к выбранному сочетанию.</p>
       <label>Описание свечи<textarea maxLength={2000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Размер, вес, особенности — напишите своими словами" /></label>
       <div className="candle-image-field"><h3>Фотографии свечи <small>{photos.length} / {MAX_PRODUCT_IMAGES}</small></h3>
         {!!photos.length && <div className="editor-photo-grid">{photos.map((photo, index) => <div className="editor-photo" key={photo.src ?? `${photo.file?.name}-${index}`}><ImagePreview file={photo.file} src={photo.src} alt={`Фото свечи ${index + 1}`} /><span className="photo-role">{index === 0 ? "Главное фото" : `Фото ${index + 1}`}</span><div className="editor-photo-actions"><button type="button" disabled={index === 0} onClick={() => setPhotos([photo, ...photos.filter((_, i) => i !== index)])}>{index === 0 ? "Главное" : "Сделать главным"}</button><button type="button" aria-label={`Удалить фото ${index + 1}`} onClick={() => setPhotos(photos.filter((_, i) => i !== index))}>Убрать фото</button></div></div>)}</div>}
-        {!photos.length && <div className="candle-editor-silhouette"><CandlePreview shape={selectedForm?.shape} silhouette={selectedForm?.silhouette} color={selectedColor?.hex} label={selectedForm?.name ?? "Форма свечи"} /></div>}
+        {!photos.length && <div className="candle-editor-silhouette"><CandlePreview shape={selectedForm?.shape} silhouette={selectedForm?.silhouette} color={selectedColor?.hex} twoTone={selectedForm?.twoTone} accentColor={colors.find(color => color.id === draft.accentColorId)?.hex} label={selectedForm?.name ?? "Форма свечи"} /></div>}
         <label className="photo-upload-label">Добавить фотографии<input type="file" multiple aria-label="Фотографии свечи" accept="image/jpeg,image/png,image/webp" disabled={photos.length >= MAX_PRODUCT_IMAGES} onChange={event => {
           const files = Array.from(event.target.files ?? []); event.target.value = "";
           if (photos.length + files.length > MAX_PRODUCT_IMAGES) { setError(`Можно добавить до ${MAX_PRODUCT_IMAGES} фотографий.`); return; }
@@ -95,30 +97,33 @@ export function ColorEditor({ color, onSave, onClose }: { color: CandleColor; on
   </form></Modal>;
 }
 
-function SilhouettePreview({ file, src, shape }: { file?: File; src?: string | null; shape?: CandleShape | null }) {
+function SilhouettePreview({ file, src, shape, twoTone }: { file?: File; src?: string | null; shape?: CandleShape | null; twoTone?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!file || !ref.current) return;
     const url = URL.createObjectURL(file);
     const element = ref.current.querySelector<HTMLElement>(".wax-uploaded");
     element?.style.setProperty("--silhouette", `url(${JSON.stringify(url)})`);
+    ref.current.querySelector(".wax-color-map image")?.setAttribute("href", url);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
-  return <div ref={ref} className="editor-preview silhouette-preview"><CandlePreview silhouette={file ? "about:blank" : src} shape={shape} color="#8a7050" label="Предпросмотр силуэта формы" /></div>;
+  }, [file, twoTone]);
+  return <div ref={ref} className="editor-preview silhouette-preview"><CandlePreview silhouette={file ? "about:blank" : src} shape={shape} twoTone={twoTone} accentColor="#c8c9cb" color="#285543" label="Предпросмотр силуэта формы" /></div>;
 }
 
 export function FormEditor({ form, onSave, onClose }: { form: CandleForm; onSave: (data: FormData) => Promise<void>; onClose: () => void }) {
-  const [draft, setDraft] = useState(form); const [file, setFile] = useState<File>(); const [remove, setRemove] = useState(false);
+  const [draft, setDraft] = useState(form);
+  const [preset, setPreset] = useState(false); const [file, setFile] = useState<File>(); const [remove, setRemove] = useState(false);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const save = async (event: FormEvent) => {
     event.preventDefault(); if (saving) return; setSaving(true); setError("");
-    const data = new FormData(); data.set("name", draft.name); data.set("active", String(draft.active)); data.set("removeSilhouette", String(remove));
+    const data = new FormData(); data.set("name", draft.name); data.set("active", String(draft.active)); data.set("twoTone", String(Boolean(draft.twoTone))); data.set("removeSilhouette", String(remove));
     if (file) data.set("silhouette", file);
+    if (preset) data.set("silhouettePreset", "snake-two-tone");
     try { await onSave(data); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить форму"); } finally { setSaving(false); }
   };
   return <Modal className="product-editor form-editor" label="Редактирование формы" onClose={() => { if (!saving) onClose(); }}><form onSubmit={save}>
     <header><div><span className="admin-kicker">Форма / силуэт</span><h2>{form.id ? "Редактировать форму" : "Новая форма"}</h2></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
-    <fieldset className="editor-fields" disabled={saving}><label>Название формы / силуэта<input required maxLength={160} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder="Например, Колонна" /></label><SilhouettePreview file={file} src={remove ? null : form.silhouette} shape={remove ? null : form.shape} /><label className="silhouette-upload">Изображение силуэта<input key={remove ? "removed" : "silhouette"} type="file" accept="image/png,image/webp" aria-label="Загрузить силуэт" onChange={event => { setFile(event.target.files?.[0]); setRemove(false); }} /></label>{(file || (!remove && (form.silhouette || form.shape))) && <button type="button" className="text-action" onClick={() => { setFile(undefined); setRemove(true); }}>Убрать силуэт</button>}<p className="editor-hint">PNG или WebP на прозрачном фоне, до 10 МБ. Силуэт окрашивается в цвет свечи и показывается, если у неё нет фотографии.</p><label className="inline-check"><input type="checkbox" checked={draft.active} onChange={event => setDraft({ ...draft, active: event.target.checked })} />Форма доступна на сайте</label></fieldset>
+    <fieldset className="editor-fields" disabled={saving}><label>Название формы / силуэта<input required maxLength={160} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} placeholder="Например, Колонна" /></label><SilhouettePreview file={file} src={preset ? "/assets/forms/snake-two-tone.png" : remove ? null : form.silhouette} shape={remove ? null : form.shape} twoTone={draft.twoTone} /><label className="inline-check"><input type="checkbox" checked={Boolean(draft.twoTone)} onChange={event => setDraft({ ...draft, twoTone: event.target.checked })} />Двухцветная форма: корпус и декор</label><button type="button" className="text-action" onClick={() => { setPreset(true); setFile(undefined); setRemove(false); setDraft({ ...draft, twoTone: true }); }}>Использовать готовый силуэт «Змея»</button><label className="silhouette-upload">Изображение силуэта<input key={remove ? "removed" : "silhouette"} type="file" accept="image/png,image/webp" aria-label="Загрузить силуэт" onChange={event => { setFile(event.target.files?.[0]); setRemove(false); setPreset(false); }} /></label>{(file || preset || (!remove && (form.silhouette || form.shape))) && <button type="button" className="text-action" onClick={() => { setFile(undefined); setRemove(true); setPreset(false); }}>Убрать силуэт</button>}<p className="editor-hint">PNG или WebP на прозрачном фоне, до 10 МБ. Силуэт показывается, если у свечи нет фотографии. Для двухцветной формы: чёрная область — корпус, белая — декор. Фон прозрачный. Оба цвета выбираются из палитры мастерской.</p><label className="inline-check"><input type="checkbox" checked={draft.active} onChange={event => setDraft({ ...draft, active: event.target.checked })} />Форма доступна на сайте</label></fieldset>
     {error && <p className="editor-error" role="alert">{error}</p>}<footer><button type="button" className="cancel" disabled={saving} onClick={onClose}>Отмена</button><button className="save" disabled={saving}>{saving ? "Сохраняем…" : "Сохранить форму"}</button></footer>
   </form></Modal>;
 }
@@ -126,7 +131,7 @@ export function FormEditor({ form, onSave, onClose }: { form: CandleForm; onSave
 export function StockEditor({ product, onSave, onClose }: { product: Product; onSave: (stock: number) => Promise<void>; onClose: () => void }) {
   const [stock, setStock] = useState(product.stock); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   return <Modal className="product-editor stock-editor" label="Изменение остатка" onClose={() => { if (!saving) onClose(); }}><form onSubmit={async event => { event.preventDefault(); if (saving) return; setSaving(true); setError(""); try { await onSave(stock); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось изменить остаток"); } finally { setSaving(false); } }}>
-    <header><div><span className="admin-kicker">Остаток · № {product.id}</span><h2>{product.name}</h2><p>{product.color?.name ?? "Цвет не выбран"} · {product.scent?.name ?? "Аромат не выбран"}</p></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
+    <header><div><span className="admin-kicker">Остаток · № {product.id}</span><h2>{product.name}</h2><p>{product.color?.name ?? "Цвет не выбран"}{product.accentColor ? ` / ${product.accentColor.name}` : ""} · {product.scent?.name ?? "Аромат не выбран"}</p></div><button type="button" disabled={saving} aria-label="Закрыть редактор" onClick={onClose}>×</button></header>
     <fieldset className="editor-fields" disabled={saving}><p className="stock-current">Сейчас в наличии <strong>{product.stock} шт.</strong></p><label>Новое количество, шт.<input autoFocus type="number" min="0" max="1000000" step="1" required value={stock} onChange={event => setStock(Number(event.target.value))} /></label><p className="editor-hint">Укажите фактическое количество доступных свечей, без уже оформленных заказов. При новом заказе остаток уменьшается автоматически.</p><output className="stock-difference">{stock === product.stock ? "Без изменений" : `${stock > product.stock ? "+" : ""}${stock - product.stock} шт. к текущему остатку`}</output></fieldset>
     {error && <p className="editor-error" role="alert">{error}</p>}<footer><button type="button" className="cancel" disabled={saving} onClick={onClose}>Отмена</button><button className="save" disabled={saving}>{saving ? "Сохраняем…" : "Сохранить остаток"}</button></footer>
   </form></Modal>;

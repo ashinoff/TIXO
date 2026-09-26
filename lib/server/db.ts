@@ -131,13 +131,14 @@ export async function ensureSchema() {
       id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, shape TEXT NOT NULL DEFAULT 'ribbed', active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
-    await db.query("ALTER TABLE candle_forms ADD COLUMN IF NOT EXISTS silhouette TEXT");
+    await db.query("ALTER TABLE candle_forms ADD COLUMN IF NOT EXISTS silhouette TEXT, ADD COLUMN IF NOT EXISTS two_tone BOOLEAN NOT NULL DEFAULT FALSE");
     await db.query("ALTER TABLE candle_forms ALTER COLUMN shape DROP NOT NULL, ALTER COLUMN shape DROP DEFAULT");
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS candle_forms_name_unique ON candle_forms(LOWER(name))");
     await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS profile JSONB NOT NULL DEFAULT '{}'::jsonb");
     await db.query(`ALTER TABLE products
       ADD COLUMN IF NOT EXISTS form_id BIGINT REFERENCES candle_forms(id) ON DELETE RESTRICT,
       ADD COLUMN IF NOT EXISTS color_id BIGINT REFERENCES colors(id) ON DELETE RESTRICT,
+      ADD COLUMN IF NOT EXISTS accent_color_id BIGINT REFERENCES colors(id) ON DELETE RESTRICT,
       ADD COLUMN IF NOT EXISTS scent_id BIGINT REFERENCES scents(id) ON DELETE RESTRICT,
       ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS legacy_variant_id BIGINT UNIQUE,
@@ -182,7 +183,7 @@ export async function ensureSchema() {
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
   const images = Array.isArray(row.images) ? row.images.map(String) : row.image ? [String(row.image)] : [];
   return { formId: row.form_id ? Number(row.form_id) : null, colorId: row.color_id ? Number(row.color_id) : null, scentId: row.scent_id ? Number(row.scent_id) : null,
-    images,
+    images, accentColorId: row.accent_color_id ? Number(row.accent_color_id) : null, accentColor: row.accent_color ? mapColor(row.accent_color as Record<string, unknown>) : null,
     form: row.form ? mapForm(row.form as Record<string, unknown>) : null, color: row.color ? mapColor(row.color as Record<string, unknown>) : null, scent: row.scent ? mapScent(row.scent as Record<string, unknown>) : null,
     id:Number(row.id), name:String(row.form_name || row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[], shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : productShape({id:Number(row.id)}) };
 }
@@ -210,16 +211,16 @@ export function mapVariant(row: Record<string, unknown>): Variant {
 }
 
 export function mapForm(row: Record<string, unknown>): CandleForm {
-  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : null, silhouette: row.silhouette ? String(row.silhouette) : null };
+  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : null, silhouette: row.silhouette ? String(row.silhouette) : null, twoTone: Boolean(row.two_tone) };
 }
 
 export async function listProducts(admin = false, id?: number): Promise<Product[]> {
   await ensureSchema();
   const result = await getPool().query(`SELECT p.*, c.name AS category_name, c.slug AS category_slug, f.name AS form_name,
-    COALESCE(f.shape,p.shape) AS shape, to_jsonb(f) AS form, to_jsonb(cl) AS color, to_jsonb(s) AS scent
+    COALESCE(f.shape,p.shape) AS shape, to_jsonb(f) AS form, to_jsonb(cl) AS color, to_jsonb(ac) AS accent_color, to_jsonb(s) AS scent
     FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN candle_forms f ON f.id=p.form_id
-    LEFT JOIN colors cl ON cl.id=p.color_id LEFT JOIN scents s ON s.id=p.scent_id
-    WHERE NOT p.archived AND ($1::boolean OR (p.published AND COALESCE(f.active,TRUE) AND COALESCE(cl.active,TRUE) AND COALESCE(s.active,TRUE)))
+    LEFT JOIN colors cl ON cl.id=p.color_id LEFT JOIN colors ac ON ac.id=p.accent_color_id LEFT JOIN scents s ON s.id=p.scent_id
+    WHERE NOT p.archived AND ($1::boolean OR (p.published AND COALESCE(f.active,TRUE) AND COALESCE(cl.active,TRUE) AND COALESCE(ac.active,TRUE) AND COALESCE(s.active,TRUE)))
       AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
   return result.rows.map(mapProduct);
 }

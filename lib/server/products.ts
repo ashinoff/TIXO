@@ -34,6 +34,8 @@ function photoPlan(form: FormData, previous: string[]): { choices: PhotoChoice[]
 export async function saveProduct(form: FormData, id?: number) {
   const formId = integer(form.get("formId"), "Форма", 1);
   const colorId = integer(form.get("colorId"), "Цвет", 1);
+  const requestedAccent = form.get("accentColorId");
+  const accentColorId = requestedAccent ? integer(requestedAccent, "Цвет декора", 1) : null;
   const scentId = integer(form.get("scentId"), "Аромат", 1);
   const notes = textValue(form.get("notes") ?? "", "Описание свечи", 2000, false);
   const price = integer(form.get("price"), "Цена", 0, 10000000);
@@ -53,8 +55,10 @@ export async function saveProduct(form: FormData, id?: number) {
     const color = (await db.query("SELECT * FROM colors WHERE id=$1 FOR SHARE", [colorId])).rows[0];
     const scent = (await db.query("SELECT * FROM scents WHERE id=$1 FOR SHARE", [scentId])).rows[0];
     if (!candleForm || !color || !scent) throw new InputError("Форма, цвет или аромат больше не существуют. Обновите справочники.", 409);
-    if (published && (!candleForm.active || !color.active || !scent.active)) throw new InputError("Для публикации включите выбранные форму, цвет и аромат в справочниках.", 409);
-    if (old && (Number(old.form_id) !== formId || Number(old.color_id) !== colorId || Number(old.scent_id) !== scentId)) {
+    const accentColor = accentColorId ? (await db.query("SELECT * FROM colors WHERE id=$1 FOR SHARE", [accentColorId])).rows[0] : null;
+    if (accentColorId && (!accentColor || !candleForm.two_tone)) throw new InputError("Цвет декора доступен только для двухцветной формы", 409);
+    if (published && (!candleForm.active || !color.active || !scent.active || (accentColor && !accentColor.active))) throw new InputError("Для публикации включите выбранные форму, цвет и аромат в справочниках.", 409);
+    if (old && (Number(old.form_id) !== formId || Number(old.color_id) !== colorId || Number(old.scent_id) !== scentId || (old.accent_color_id ? Number(old.accent_color_id) : null) !== accentColorId)) {
       const reserved = await db.query(`SELECT 1 FROM orders o WHERE o.stock_reserved AND o.status<>'completed'
         AND EXISTS(SELECT 1 FROM jsonb_array_elements(o.items) item WHERE item->>'productId'=$1
           OR (item->>'productId'=$2 AND item->>'variantId'=$3)) LIMIT 1`, [String(id), String(old.legacy_parent_id ?? ""), String(old.legacy_variant_id ?? "")]);
@@ -64,11 +68,11 @@ export async function saveProduct(form: FormData, id?: number) {
     for (const file of files) if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) throw new InputError("Фото: JPG, PNG или WebP, не более 10 МБ каждое");
     for (const file of files) newImages.push(await saveImage(file));
     const images = choices.map(choice => "url" in choice ? choice.url : newImages[choice.upload]);
-    const values = [candleForm.name, notes, price, stock, published, images[0] ?? null, formId, colorId, scentId, candleForm.shape, JSON.stringify(images)];
+    const values = [candleForm.name, notes, price, stock, published, images[0] ?? null, formId, colorId, scentId, candleForm.shape, JSON.stringify(images), accentColorId];
     if (id) await db.query(`UPDATE products SET name=$1,notes=$2,price=$3,stock=$4,published=$5,image=$6,
-      form_id=$7,color_id=$8,scent_id=$9,shape=$10,images=$11::jsonb,updated_at=NOW() WHERE id=$12`, [...values, id]);
-    else productId = Number((await db.query(`INSERT INTO products(name,notes,price,stock,published,image,form_id,color_id,scent_id,shape,images,category)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,'') RETURNING id`, values)).rows[0].id);
+      form_id=$7,color_id=$8,scent_id=$9,shape=$10,images=$11::jsonb,accent_color_id=$12,updated_at=NOW() WHERE id=$13`, [...values, id]);
+    else productId = Number((await db.query(`INSERT INTO products(name,notes,price,stock,published,image,form_id,color_id,scent_id,shape,images,accent_color_id,category)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,'') RETURNING id`, values)).rows[0].id);
     await db.query("COMMIT");
   } catch (error) {
     await db.query("ROLLBACK");

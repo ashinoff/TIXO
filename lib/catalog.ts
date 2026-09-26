@@ -2,7 +2,7 @@ import type { Recipe } from "./atelier";
 
 export type AromaProfile = Record<"top" | "heart" | "base", { notes: string; description: string }>;
 export const emptyAromaProfile = (): AromaProfile => ({ top: { notes: "", description: "" }, heart: { notes: "", description: "" }, base: { notes: "", description: "" } });
-export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null };
+export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null; twoTone?: boolean };
 
 export type Scent = {
   image?: string | null;
@@ -37,6 +37,8 @@ export type Variant = {
 };
 
 export type Product = {
+  accentColorId?: number | null;
+  accentColor?: CandleColor | null;
   formId?: number | null;
   colorId?: number | null;
   scentId?: number | null;
@@ -60,6 +62,10 @@ export type Product = {
 };
 
 export type OrderItem = {
+  twoTone?: boolean;
+  accentColorId?: number | null;
+  accentColor?: string;
+  accentColorName?: string;
   aromaProfile?: AromaProfile;
   formName?: string;
   silhouette?: string | null;
@@ -80,8 +86,8 @@ export type OrderItem = {
   quotePending?: boolean;
 };
 
-export type CartLine = { productId: number; variantId: number | null; scentId?: number | null; colorId?: number | null; quantity: number };
-export const cartKey = (productId: number, variantId: number | null, scentId?: number | null, colorId?: number | null) => `${productId}:${variantId ?? "original"}${scentId ? `:scent-${scentId}` : ""}${colorId ? `:color-${colorId}` : ""}`;
+export type CartLine = { productId: number; variantId: number | null; scentId?: number | null; colorId?: number | null; accentColorId?: number | null; quantity: number };
+export const cartKey = (productId: number, variantId: number | null, scentId?: number | null, colorId?: number | null, accentColorId?: number | null) => `${productId}:${variantId ?? "original"}${scentId ? `:scent-${scentId}` : ""}${colorId ? `:color-${colorId}` : ""}${accentColorId ? `:accent-${accentColorId}` : ""}`;
 export const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
 
 export const MAX_PRODUCT_IMAGES = 10;

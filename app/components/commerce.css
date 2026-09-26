@@ -151,3 +151,12 @@
 .tiho-site .product-detail-body{min-height:calc(100% - 58px)}
 .tiho-site .detail-photo img{-webkit-user-drag:none;user-select:none}
 .tiho-site .detail-specs dd{overflow-wrap:anywhere}
+
+/* Full photographs, including square and portrait uploads, remain uncropped. */
+.tiho-site .product-dialog .detail-photo{height:auto;min-height:0;max-height:none;aspect-ratio:auto}
+.tiho-site .product-dialog .detail-photo>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain;object-position:center;transform:none}
+.tiho-site .product-dialog .detail-photo>.candle-silhouette-visual{height:auto;min-height:0;aspect-ratio:1}
+.tiho-site .photo-navigation button,.tiho-site .photo-navigation span{background:transparent;border-color:transparent;color:#fff;text-shadow:0 1px 5px #000;filter:drop-shadow(0 1px 2px #0009)}
+.tiho-site .photo-navigation button{border-radius:50%}
+.tiho-site .photo-navigation button:hover{background:#0002}
+.tiho-site .photo-navigation button:focus-visible{outline-color:#fff}

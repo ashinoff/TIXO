@@ -121,3 +121,9 @@
  .tiho-site #studio .workshop-atmosphere-layer.is-revealing,.tiho-site #studio .workshop-background img,.tiho-site #studio .studio-panel,.tiho-site #studio .builder-aroma-chapters section{animation:none}
  .tiho-site #studio .studio-steps button,.tiho-site #studio .builder-scent-options label>span{transition:none}
 }
+
+/* A shared palette window keeps both color lists within the existing stable panel. */
+.studio-palette-window{display:block;max-height:360px;overflow-y:auto;overscroll-behavior-y:auto;padding-right:8px}
+.studio-palette-window .color-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 22px}
+.studio-palette-window .color-options legend{font-size:14px;padding:0 0 14px;color:var(--text)}
+.studio-palette-window .color-options label{min-width:0;overflow-wrap:anywhere}

@@ -42,8 +42,8 @@ export function parseColor(body: Record<string, unknown>) {
   return { name: textValue(body.name, "Название цвета", 80), hex, active: body.active };
 }
 
-type CatalogOrderLine = { productId: number; variantId: number | null; scentId?: number; colorId?: number; quantity: number; customRecipe?: never };
-type CustomOrderLine = { customRecipe: Recipe; quantity: number; productId?: never; variantId?: never; scentId?: never; colorId?: never };
+type CatalogOrderLine = { productId: number; variantId: number | null; scentId?: number; colorId?: number; accentColorId?: number; quantity: number; customRecipe?: never };
+type CustomOrderLine = { customRecipe: Recipe; quantity: number; productId?: never; variantId?: never; scentId?: never; colorId?: never; accentColorId?: never };
 export type OrderLine = CatalogOrderLine | CustomOrderLine;
 
 export function parseRecipe(value: unknown): Recipe {
@@ -68,7 +68,7 @@ export function parseOrder(body: Record<string, unknown>) {
   for (const value of body.items) {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new InputError("Проверьте состав заказа");
     if (Object.hasOwn(value, "customRecipe")) {
-      if (value.productId != null || value.variantId != null || value.scentId != null || value.colorId != null) throw new InputError("Авторская свеча не должна содержать вариант из каталога");
+      if (value.productId != null || value.variantId != null || value.scentId != null || value.colorId != null || value.accentColorId != null) throw new InputError("Авторская свеча не должна содержать вариант из каталога");
       const customRecipe = parseRecipe(value.customRecipe);
       const key = recipeKey(customRecipe);
       const quantity = integer(value.quantity, "Количество", 1, 99) + (lines.get(key)?.quantity ?? 0);
@@ -80,10 +80,11 @@ export function parseOrder(body: Record<string, unknown>) {
     const variantId = value.variantId == null ? null : integer(value.variantId, "Вариант", 1);
     const scentId = value.scentId == null ? undefined : integer(value.scentId, "Аромат", 1);
     const colorId = value.colorId == null ? undefined : integer(value.colorId, "Цвет", 1);
-    const key = `${productId}:${variantId}:${scentId ?? ""}:${colorId ?? ""}`;
+    const accentColorId = value.accentColorId == null ? undefined : integer(value.accentColorId, "Цвет декора", 1);
+    const key = `${productId}:${variantId}:${scentId ?? ""}:${colorId ?? ""}:${accentColorId ?? ""}`;
     const quantity = integer(value.quantity, "Количество", 1, 99) + (lines.get(key)?.quantity ?? 0);
     if (quantity > 99) throw new InputError("Не более 99 свечей одного варианта в заказе");
-    lines.set(key, { productId, variantId, ...(scentId ? { scentId } : {}), ...(colorId ? { colorId } : {}), quantity });
+    lines.set(key, { productId, variantId, ...(scentId ? { scentId } : {}), ...(colorId ? { colorId } : {}), ...(accentColorId ? { accentColorId } : {}), quantity });
   }
   return { customerName, phone, email, address, delivery, comment, requestKey, items: [...lines.values()] };
 }
@@ -91,9 +92,10 @@ export function parseOrder(body: Record<string, unknown>) {
 export function parseForm(body: Record<string, unknown>) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные формы");
   if (typeof body.active !== "boolean") throw new InputError("Укажите доступность формы");
+  if (body.twoTone !== undefined && typeof body.twoTone !== "boolean") throw new InputError("Укажите, является ли форма двухцветной");
   const shape = body.shape == null ? null : textValue(body.shape, "Силуэт", 20);
   if (shape !== null && !["twist", "ribbed", "bubble", "arch", "shell", "knot"].includes(shape)) throw new InputError("Выберите силуэт для предпросмотра");
-  return { name: textValue(body.name, "Название формы", 160), active: body.active, shape };
+  return { name: textValue(body.name, "Название формы", 160), active: body.active, shape, ...(body.twoTone !== undefined ? { twoTone: body.twoTone as boolean } : {}) };
 }
 
 export function parseAromaProfile(body: Record<string, unknown>) {

@@ -120,6 +120,19 @@ test('one selected aroma drives a variant, and hidden variants stay unavailable 
   assert.equal(parsed.items.length,2);
 });
 
+test('two-color recipes use catalog IDs, keep combinations distinct and reject invalid extra colors', () => {
+  const value={formId:9,scentId:3,color:'ivory',colorId:21,accentColorId:22};
+  assert.equal(isRecipe(value),true);
+  for(const accentColorId of [0,-1,1.5,'22',null])assert.equal(isRecipe({...value,accentColorId}),false);
+  assert.equal(isRecipe({...value,colorId:undefined}),false);
+  assert.equal(isRecipe({...recipe,accentColorId:22}),false);
+  const parsed=parseOrder(orderBody([{customRecipe:value,quantity:1},{customRecipe:value,quantity:2},{customRecipe:{...value,accentColorId:23},quantity:1}]));
+  assert.deepEqual(parsed.items.map(line=>line.quantity),[3,1]);
+  assert.notEqual(recipeKey(value),recipeKey({...value,accentColorId:23}));
+  assert.notEqual(cartKey(1,null,3,21,22),cartKey(1,null,3,21,23));
+  assert.throws(()=>parseForm({name:'Змея',active:true,twoTone:'true'}));
+});
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 // A local verification harness may inject a PostgreSQL-compatible test pool.
 const injectedPool = globalThis.tixoVerificationPool;
@@ -490,4 +503,29 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     assert.deepEqual(domain.mapScent((await pool.query('SELECT * FROM scents WHERE id=$1',[red])).rows[0]).profile,profile);
     assert.deepEqual(domain.mapScent((await pool.query('SELECT * FROM scents WHERE id=$1',[red])).rows[0]).notes,['вишня']);
   });
+  await t.test('two-color templates, ready candles and custom recipes preserve trusted colors and stock',async()=>{
+    const setup=new FormData();setup.set('name','Змея два цвета');setup.set('active','true');setup.set('twoTone','true');setup.set('silhouettePreset','snake-two-tone');
+    const form=await saveForm(setup);assert.equal(form.twoTone,true);assert.equal(form.silhouette,'/assets/forms/snake-two-tone.png');
+    const base=Number((await pool.query("INSERT INTO colors(name,hex) VALUES('Наш изумруд','#123456') RETURNING id")).rows[0].id);
+    const accent=Number((await pool.query("INSERT INTO colors(name,hex) VALUES('Наше серебро','#c8c9cb') RETURNING id")).rows[0].id);
+    const scent=Number((await pool.query("INSERT INTO scents(name) VALUES('Двухцветный аромат') RETURNING id")).rows[0].id);
+    const recipe={formId:form.id,color:'ivory',colorId:base,accentColorId:accent,scentId:scent};
+    const custom=await createOrder(orderBody([{customRecipe:recipe,quantity:2}]));
+    assert.equal(custom.items[0].color,'#123456');assert.equal(custom.items[0].colorName,'Наш изумруд');assert.equal(custom.items[0].accentColorName,'Наше серебро');assert.equal(custom.items[0].twoTone,true);assert.equal(custom.stockReserved,false);
+    await assert.rejects(createOrder(orderBody([{customRecipe:{...recipe,accentColorId:undefined},quantity:1}])),error=>error.status===409);
+    const data=formFor({formId:form.id,colorId:base,scentId:scent,notes:'',price:1800,stock:3,published:true});data.set('accentColorId',String(accent));
+    const candle=await saveProduct(data);assert.equal(candle.accentColorId,accent);assert.equal(candle.accentColor.name,'Наше серебро');
+    const line={productId:candle.id,colorId:base,scentId:scent,accentColorId:accent,quantity:1};
+    await assert.rejects(createOrder(orderBody([{...line,accentColorId:base}])),error=>error.status===409);
+    const ready=await createOrder(orderBody([line]));assert.equal(ready.items[0].accentColorId,accent);assert.equal((await domain.listProducts(true,candle.id))[0].stock,2);
+    data.set('stock','2');data.set('expectedStock','2');data.set('accentColorId',String(base));await assert.rejects(saveProduct(data,candle.id),error=>error.status===409);
+    await assert.rejects(saveForm({name:form.name,active:true,twoTone:false},form.id),error=>error.status===409);
+    await pool.query("UPDATE colors SET active=FALSE,name='Позднее название' WHERE id=$1",[accent]);
+    await assert.rejects(createOrder(orderBody([{customRecipe:recipe,quantity:1}])),error=>error.status===409);
+    assert.equal((await domain.listProducts()).some(p=>p.id===candle.id),false);
+    const saved=domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[custom.id])).rows[0]);assert.equal(saved.items[0].accentColorName,'Наше серебро');
+    await deleteOrder(ready.id);assert.equal((await domain.listProducts(true,candle.id))[0].stock,3);
+    await deleteOrder(custom.id);
+  });
+
 });

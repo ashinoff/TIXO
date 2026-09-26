@@ -16,7 +16,7 @@ export function ProductCard({ product, index, scent, color, favorite, onFavorite
   const photo = variant?.image ?? product.image;
   return <article className="product-card" data-product-id={product.id} data-scent-id={scent?.id} style={{ "--candle-color": color?.hex ?? "#f7f5ef", "--card-delay": `${Math.min(index, 5) * 60}ms` } as CSSProperties}>
     <div className="product-art">
-      <CandlePreview shape={product.form ? product.form.shape : productShape(product)} silhouette={product.form?.silhouette} color={color?.hex} label={`${product.name} — предпросмотр, ${color?.name ?? "цвет свечи"}`} />
+      <CandlePreview shape={product.form ? product.form.shape : productShape(product)} silhouette={product.form?.silhouette} twoTone={product.form?.twoTone} accentColor={product.accentColor?.hex} color={color?.hex} label={`${product.name} — предпросмотр, ${color?.name ?? "цвет свечи"}`} />
       <span className="art-number">{String(index + 1).padStart(2, "0")}</span>
       <button className={favorite ? "favorite favorite-active" : "favorite"} onClick={onFavorite} aria-label={`${favorite ? "Убрать" : "Добавить"} ${product.name} ${favorite ? "из избранного" : "в избранное"}`} aria-pressed={favorite}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill={favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>

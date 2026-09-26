@@ -112,12 +112,12 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
     await click(document.querySelector('#studio-step-3'));
     await click(document.querySelector('#add-custom'));
     await click(document.querySelector('#studio-step-2'));
-    await click(document.querySelector('input[name="candle-color"][value="red"]'));
+    await click(document.querySelector('input[name="candle-color"][value="2"]'));
     await click(document.querySelector('#studio-step-3'));
     await click(document.querySelector('#add-custom'));
     await click(document.querySelector('.cart-trigger'));
     const cart=document.querySelector('.cart-items').textContent;
-    assert.match(cart,/Слоновая кость/);assert.match(cart,/Винный/);
+    assert.match(cart,/Красный/);assert.match(cart,/Чёрный/);
     assert.equal(document.querySelectorAll('.cart-item').length,2);
     const form=document.querySelector('#checkout-form');
     for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Тестовый адрес'}))form.elements.namedItem(name).value=value;
@@ -126,7 +126,7 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
     assert.match(document.querySelector('.pending-order').textContent,/Повторить отправку/);
     await click(button('Повторить отправку'));
     assert.deepEqual(sent[1],sent[0]);
-    assert.deepEqual(sent[0].items.map(item=>item.customRecipe.color),['ivory','red']);
+    assert.deepEqual(sent[0].items.map(item=>item.customRecipe.colorId),[1,2]);
     assert.match(document.querySelector('.order-success').textContent,/T-TEST/);
     assert.match(document.querySelector('.order-success').textContent,/мастер согласует/);
     assert.equal(document.querySelector('.cart-count').textContent,'(00)');
@@ -363,8 +363,8 @@ test('workshop uses active catalog forms and carries their silhouettes through c
     assert.match(document.querySelector('.shape-options').textContent,/Наша ракушка/);assert.doesNotMatch(document.querySelector('.shape-options').textContent,/Скрытая форма|Гладкая колонна/);
     assert.equal(document.querySelector('#studio-candle').dataset.formId,'21');
     assert.match(document.querySelector('#studio-candle .wax-uploaded').getAttribute('style'),/our-shell\.png/);
-    await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="candle-color"][value="red"]'));
-    assert.equal(document.querySelector('#studio-candle .wax-uploaded').style.getPropertyValue('--wax'),'#6d2636');
+    await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="candle-color"][value="2"]'));
+    assert.equal(document.querySelector('#studio-candle .wax-uploaded').style.getPropertyValue('--wax'),'#222225');
     await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
     await click(document.querySelector('#studio-step-1'));await click(document.querySelector('input[name="candle-shape"][value="22"]'));
     assert.match(document.querySelector('#scene-form').textContent,/Наш куб/);
@@ -434,7 +434,7 @@ test('builder chooses catalog aromas and displays their authored chapters withou
     await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
     assert.match(document.querySelector('.cart-items').textContent,/Вишня и миндаль/);assert.match(document.querySelector('.cart-items').textContent,/Сандал и дым/);
     const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))form.elements.namedItem(name).value=value;
-    await submit(form);assert.deepEqual(sent.items.map(item=>item.customRecipe),[{formId:1,color:'ivory',scentId:1},{formId:1,color:'ivory',scentId:2}]);
+    await submit(form);assert.deepEqual(sent.items.map(item=>item.customRecipe),[{formId:1,color:'ivory',colorId:1,scentId:1},{formId:1,color:'ivory',colorId:1,scentId:2}]);
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
 
@@ -635,7 +635,7 @@ test('workshop begins with aroma and keeps the photo, chapters and candle mounte
     await click(document.querySelector('#studio-step-1'));await setValue(document.querySelector('#studio-panel-1 .studio-search input'),'ракушка');
     assert.equal(document.querySelectorAll('input[name="candle-shape"]').length,1);await click(document.querySelector('input[name="candle-shape"][value="2"]'));
     await click(document.querySelector('#studio-next'));assert.equal(document.querySelector('#studio-panel-2').hidden,false);
-    await click(document.querySelector('input[name="candle-color"][value="red"]'));assert.equal(document.querySelector('.workshop-background img'),photo);
+    await click(document.querySelector('input[name="candle-color"][value="2"]'));assert.equal(document.querySelector('.workshop-background img'),photo);
     await click(document.querySelector('#studio-next'));assert.equal(document.querySelector('#studio-panel-3').hidden,false);assert.match(document.querySelector('#recipe-summary').textContent,/Ракушка/);
     await click(document.querySelector('#add-custom'));await click(document.querySelector('.cart-trigger'));
     assert.match(document.querySelector('.cart-item.custom').textContent,/WINE/);assert.match(document.querySelector('.cart-item.custom').textContent,/Ракушка/);
@@ -871,7 +871,7 @@ test('product swipes follow the filtered catalog, separate photo gestures and pr
     const trigger=document.querySelector('.product-image');trigger.focus();await click(trigger);
     const modal=document.querySelector('.product-dialog');
     assert.equal(document.querySelector('#detail-scent'),null);assert.equal(document.querySelector('.detail-colors'),null);
-    assert.equal(document.body.style.position,'fixed');
+    assert.equal(document.documentElement.style.overflow,'hidden');assert.equal(document.body.style.position,'');
     const src=()=>document.querySelector('.detail-photo img').getAttribute('src');
     const current=()=>document.querySelector('.product-detail-body').dataset.productId;
     await swipe('.detail-photo',-95);assert.equal(src(),'/1-b.png');assert.equal(current(),'1');
@@ -896,4 +896,45 @@ test('product swipes follow the filtered catalog, separate photo gestures and pr
     await click(button('Добавить в корзину'));await click(document.querySelector('.cart-trigger'));
     assert.match(document.querySelector('.cart-item').textContent,/Свеча 3/);assert.match(document.querySelector('.cart-item').textContent,new RegExp(scents[0].name));
   }finally{await act(async()=>root.unmount());window.scrollTo=oldScroll;window.localStorage.clear();}
+});
+
+test('two-color workshop uses the administrator palette and keeps both colors through cart restore and checkout',async()=>{
+  window.localStorage.clear();let sent;
+  const palette=[{id:21,name:'Изумруд мастерской',hex:'#12563b',active:true},{id:22,name:'Серебро мастерской',hex:'#c8c9cb',active:true},{id:23,name:'Золото мастерской',hex:'#baa35a',active:true},{id:24,name:'Отключённый',hex:'#cc00cc',active:false}];
+  const shapes=[{id:51,name:'Змея',shape:null,silhouette:'/assets/forms/snake-two-tone.png',twoTone:true,active:true},forms[0]];
+  globalThis.fetch=async(url,init={})=>url==='/api/colors'?response(palette):url==='/api/forms'?response(shapes):url==='/api/products'?response([]):url==='/api/scents'?response(scents):url==='/api/orders'?(sent=JSON.parse(init.body),response({orderNumber:'T-TWO-TONE',total:0,quotePending:true})):response({});
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('#studio-step-2'));
+    assert.equal(document.querySelectorAll('input[name="candle-color"]').length,3);
+    assert.equal(document.querySelectorAll('input[name="candle-accent-color"]').length,3);
+    assert.doesNotMatch(document.querySelector('#studio-panel-2').textContent,/Отключённый/);
+    const initial=document.querySelector('#studio-candle feColorMatrix').getAttribute('values');
+    await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
+    await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="candle-accent-color"][value="23"]'));
+    assert.notEqual(document.querySelector('#studio-candle feColorMatrix').getAttribute('values'),initial);
+    await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
+    await click(document.querySelector('#studio-step-1'));await click(document.querySelector('input[name="candle-shape"][value="1"]'));
+    assert.equal(document.querySelectorAll('input[name="candle-accent-color"]').length,0);
+    await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+    await act(async()=>root.render(React.createElement(Home)));await click(document.querySelector('.cart-trigger'));
+    assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
+    assert.equal(document.querySelectorAll('.cart-custom-preview .wax-two-tone').length,2);
+    assert.match(document.querySelector('.cart-items').textContent,/Изумруд мастерской.*Серебро мастерской/s);assert.match(document.querySelector('.cart-items').textContent,/Золото мастерской/);
+    const checkout=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))checkout.elements.namedItem(name).value=value;
+    await submit(checkout);assert.deepEqual(sent.items.map(item=>[item.customRecipe.colorId,item.customRecipe.accentColorId]),[[21,22],[21,23]]);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('form editor installs the prepared two-color snake template without an upload',async()=>{
+  const {FormEditor}=require('./app/admin/editors.js');let saved;
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(FormEditor,{form:{id:0,name:'Змея',active:true,shape:null},onClose(){},onSave:async data=>{saved=data;}})));
+    await click(button('Использовать готовый силуэт'));
+    assert.equal(document.querySelector('.silhouette-preview .wax-color-map image').getAttribute('href'),'/assets/forms/snake-two-tone.png');
+    await submit(document.querySelector('.form-editor form'));
+    assert.equal(saved.get('twoTone'),'true');assert.equal(saved.get('silhouettePreset'),'snake-two-tone');
+  }finally{await act(async()=>root.unmount());}
 });
