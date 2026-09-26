@@ -19,6 +19,7 @@
 .tiho-site #care .ritual-story-frame.is-leaving{pointer-events:none}
 .tiho-site #care .ritual-story-frame img{width:100%;height:100%;object-fit:cover;object-position:68% center;animation:ritual-scene-drift 18s ease-out both;pointer-events:none}
 .tiho-site #care .ritual-story-frame.is-leaving img{animation-play-state:paused}
+.tiho-site #care .ritual-story.is-held .ritual-story-frame,.tiho-site #care .ritual-story.is-held .ritual-story-frame img{animation-play-state:paused}
 .tiho-site #care .ritual-story-shade{background:linear-gradient(90deg,#080907d9,#0809078c 35%,#0809071a 70%),linear-gradient(0deg,#080907eb,transparent 40%,#08090726);pointer-events:none}
 .tiho-site #care .ritual-story-top{position:absolute;top:30px;left:34px;right:34px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:10px;letter-spacing:.14em;color:#d7cfbb;pointer-events:none}
 .tiho-site #care .ritual-story-top>span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:14px;letter-spacing:.09em}

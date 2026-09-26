@@ -725,3 +725,60 @@ test('ritual advances every two seconds during hover, focus and scrolling, with 
     await act(async()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await tick(24000);assert.equal(scene(),1);
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
 });
+
+test('left-button hold freezes the ritual until release, without losing swipe or explicit pause',async t=>{
+  const {EveningRitual}=require('./app/components/evening-ritual.js');
+  const oldMedia=window.matchMedia,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
+  Object.defineProperty(document,'hidden',{configurable:true,value:false});
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+  t.mock.timers.enable({apis:['setTimeout']});const root=createRoot(document.getElementById('root'));
+  const carousel=()=>document.querySelector('.ritual-story');
+  const scene=()=>Number(carousel().dataset.scene);
+  const tick=async ms=>act(async()=>t.mock.timers.tick(ms));
+  const pointer=async(type,{target=carousel(),button=0,x=200,pointerType='mouse',id=7}={})=>{
+    const event=new MouseEvent(type,{bubbles:true,clientX:x,clientY:200,button});
+    Object.defineProperties(event,{pointerId:{value:id},pointerType:{value:pointerType}});
+    await act(async()=>target.dispatchEvent(event));
+  };
+  try{
+    await act(async()=>root.render(React.createElement(EveningRitual)));await tick(2000);
+    assert.equal(scene(),1);assert.equal(document.querySelectorAll('.ritual-story-frame').length,2);
+    await pointer('pointerdown');assert.equal(carousel().dataset.playing,'false');assert.ok(carousel().classList.contains('is-held'));
+    await pointer('pointerup',{target:document.body,id:8});assert.equal(carousel().dataset.playing,'false','An unrelated pointer cannot end the hold');
+    await tick(8000);assert.equal(scene(),1);assert.equal(document.querySelectorAll('.ritual-story-frame').length,2,'Keep both photographs when a crossfade is frozen');
+    await pointer('pointerup',{target:document.body});assert.equal(carousel().dataset.playing,'true');assert.ok(!carousel().classList.contains('is-dragging'));
+    await tick(1999);assert.equal(scene(),1);await tick(1);assert.equal(scene(),2);
+    await pointer('pointerdown',{button:2});await tick(2000);assert.equal(scene(),3,'Right mouse button does not pause autoplay');
+    await pointer('pointerdown',{target:document.querySelector('.ritual-story-frame:last-child .ritual-story-care')});
+    assert.ok(!carousel().classList.contains('is-dragging'),'Text can still be selected');await tick(6000);assert.equal(scene(),3);
+    await pointer('pointerup',{target:document.body});assert.equal(carousel().dataset.playing,'true');
+    await pointer('pointerdown');await tick(6000);assert.equal(scene(),3);await pointer('pointerup',{x:100});assert.equal(scene(),4,'A held horizontal drag still changes the scene on release');
+    for(const type of ['pointercancel','lostpointercapture','blur']){
+      await pointer('pointerdown');assert.equal(carousel().dataset.playing,'false');
+      if(type==='blur')await act(async()=>window.dispatchEvent(new Event('blur')));else await pointer(type);
+      assert.equal(carousel().dataset.playing,'true',`${type} must clear the hold`);
+    }
+    await pointer('pointerdown',{pointerType:'touch'});assert.equal(carousel().dataset.playing,'true','Touch scrolling does not silently stop playback');await pointer('pointercancel',{pointerType:'touch'});
+    await act(async()=>carousel().dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true})));
+    const paused=scene();await pointer('pointerdown');await pointer('pointerup');await tick(6000);assert.equal(scene(),paused);assert.equal(carousel().dataset.playing,'false','Release preserves an explicit Space-key pause');
+  }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
+});
+
+test('a photograph finishing its download cannot replace the scene while held',async t=>{
+  const {EveningRitual}=require('./app/components/evening-ritual.js');
+  const oldMedia=window.matchMedia,oldImage=window.Image,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden'),requests=[];
+  Object.defineProperty(document,'hidden',{configurable:true,value:false});
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+  window.Image=class {constructor(){requests.push(this);}set src(value){this.url=value;}decode(){return Promise.resolve();}};
+  t.mock.timers.enable({apis:['setTimeout']});const root=createRoot(document.getElementById('root'));
+  const pointer=async type=>{const event=new MouseEvent(type,{bubbles:true,button:0});Object.defineProperties(event,{pointerId:{value:7},pointerType:{value:'mouse'}});await act(async()=>document.querySelector('.ritual-story').dispatchEvent(event));};
+  try{
+    await act(async()=>root.render(React.createElement(EveningRitual)));await act(async()=>requests[0].onload());
+    await act(async()=>t.mock.timers.tick(2000));const stale=requests.at(-1).onload;
+    assert.equal(document.querySelector('.ritual-story').getAttribute('aria-busy'),'true');
+    await pointer('pointerdown');await act(async()=>stale());await act(async()=>t.mock.timers.tick(6000));
+    assert.equal(document.querySelector('.ritual-story').dataset.scene,'0');
+    await pointer('pointerup');await act(async()=>requests.at(-1).onload());
+    assert.equal(document.querySelector('.ritual-story').dataset.scene,'1');assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');
+  }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;window.Image=oldImage;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
+});

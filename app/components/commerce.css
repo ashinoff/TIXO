@@ -93,14 +93,17 @@
 .tiho-site .scent-library{position:relative;z-index:1;background:transparent;backdrop-filter:none;text-shadow:0 1px 12px #000b}
 .tiho-site .scent-library-top>.eyebrow,.tiho-site .scent-name-list button,.tiho-site .scent-chapters .note-instruction{color:#d9dfcd}
 .tiho-site .scent-library-top,.tiho-site .scent-chapters,.tiho-site .scent-name-list button{border-color:#d6dfc63d}
-.tiho-site .scent-name-list button[aria-pressed=true]{background:#dce6cb24;border-color:#dce6cb99}
 .tiho-site .scent-chapters .note-tabs{background:transparent}
-.tiho-site .scent-chapters .note-tabs button{background:transparent}
-.tiho-site .scent-chapters .note-tabs button[aria-selected=true]{background:#dce6cb26;color:#f0f1e8}
 .tiho-site .scent-library>.button{text-shadow:none}
+/* Match the workshop's soft translucent hover and selection across every control. */
+.tiho-site #aromas button{background:transparent;color:#e2e3d8;transition:background .5s,border-color .5s,color .5s}
+.tiho-site #aromas .scent-library>.button{border:1px solid #d4ddbf3b}
+.tiho-site #aromas button:is(:hover,:focus-visible){background:#dce3cf16;color:#fffbed}
+.tiho-site #aromas button:is([aria-pressed=true],[aria-selected=true],:active){background:#dce3cf24;border-color:#dce3cfaa;color:#fffbed}
+.tiho-site #aromas button:focus-visible{outline-color:#dce3cf}
 .tiho-site .scent-portrait-chapter{display:grid;isolation:isolate}
 .tiho-site .scent-chapter-copy{grid-area:1/1;min-width:0}
 .tiho-site .scent-chapter-copy.is-revealing{animation:scent-caption-reveal 1.8s ease both}
 .tiho-site .scent-chapter-copy.is-leaving{animation:scent-caption-leave .9s ease both;pointer-events:none}
 @media(max-width:760px){.tiho-site .scent-portrait-captions,.tiho-site .scent-portrait-navigation-shell{inset:0 0 auto;aspect-ratio:1}.tiho-site .scent-portrait-frame img{object-position:60% center}.tiho-site .scent-portrait-shade{background:linear-gradient(180deg,#080a07a6,transparent 30%,#080a074d 48%,#080a0799)}}
-@media(prefers-reduced-motion:reduce){.tiho-site .scent-chapter-copy.is-revealing,.tiho-site .scent-chapter-copy.is-leaving{animation:none}.tiho-site .scent-chapter-copy.is-leaving{opacity:0}}
+@media(prefers-reduced-motion:reduce){.tiho-site .scent-chapter-copy.is-revealing,.tiho-site .scent-chapter-copy.is-leaving{animation:none}.tiho-site .scent-chapter-copy.is-leaving{opacity:0}.tiho-site #aromas button{transition:none}}
