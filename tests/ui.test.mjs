@@ -39,6 +39,7 @@ const forms=[{id:1,name:'Спираль',shape:'twist',active:true},{id:2,name:'
 const products=['Спираль','Ракушка'].map((name,i)=>({id:i+1,name,shape:i?'shell':'twist',notes:'Форма',price:1500,stock:3,published:true,image:null,hasVariants:false,variants:[]}));
 const response=(data,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}}));
 const button=(name)=>[...document.querySelectorAll('.catalog-filter-panel button'),...document.querySelectorAll('button')].find(node=>node.textContent.includes(name));
+const editCard=name=>[...document.querySelectorAll('.scent-admin-card')].find(card=>card.querySelector('h2')?.textContent===name)?.querySelector('footer button');
 const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const setValue=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});};
 
@@ -109,6 +110,8 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
   const root=createRoot(document.getElementById('root'));
   try {
     await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('#studio-step-2'));
+    await click(document.querySelector('input[name="candle-color"][value="1"]'));
     await click(document.querySelector('#studio-step-3'));
     await click(document.querySelector('#add-custom'));
     await click(document.querySelector('#studio-step-2'));
@@ -154,15 +157,15 @@ test('admin stays authenticated if orders fail; scents still load, edit and save
     assert.match(document.querySelector('[role=alert]').textContent,/Временная ошибка/);
     await click(button('Ароматы'));
     assert.equal(document.querySelectorAll('.scent-admin-card').length,4);
-    await click(document.querySelector('.scent-admin-card footer button'));
+    await click(editCard(scents[0].name));
     assert.equal(document.querySelector('.scent-editor input[type=color]'),null);
     await setValue(document.querySelector('input[placeholder="Например, Вишня и миндаль"]'),'Моя вишня');
     await act(async()=>document.querySelector('.scent-editor form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.equal(edited.name,'Моя вишня');assert.ok(document.querySelector('.admin-shell'));
     assert.equal(document.querySelector('[role=dialog]'),null);
-    assert.match(document.querySelector('.scent-admin-card h2').textContent,/Моя вишня/);
+    assert.ok(editCard('Моя вишня'));
     await click(button('Цвета'));
-    await click(document.querySelector('.scent-admin-card footer button'));
+    await click(editCard(colors[0].name));
     await setValue(document.querySelector('input[placeholder="Например, Слоновая кость"]'),'Гранат');
     await act(async()=>document.querySelector('.color-editor form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.equal(editedColor.name,'Гранат');assert.equal(edited.name,'Моя вишня');
@@ -361,6 +364,7 @@ test('workshop uses active catalog forms and carries their silhouettes through c
     await act(async()=>root.render(React.createElement(Home)));
     assert.equal(document.querySelectorAll('input[name="candle-shape"]').length,2);
     assert.match(document.querySelector('.shape-options').textContent,/Наша ракушка/);assert.doesNotMatch(document.querySelector('.shape-options').textContent,/Скрытая форма|Гладкая колонна/);
+    await click(document.querySelector('#studio-step-1'));await click(document.querySelector('input[name="candle-shape"][value="21"]'));
     assert.equal(document.querySelector('#studio-candle').dataset.formId,'21');
     assert.match(document.querySelector('#studio-candle .wax-uploaded').getAttribute('style'),/our-shell\.png/);
     await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="candle-color"][value="2"]'));
@@ -434,7 +438,7 @@ test('builder chooses catalog aromas and displays their authored chapters withou
     await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
     assert.match(document.querySelector('.cart-items').textContent,/Вишня и миндаль/);assert.match(document.querySelector('.cart-items').textContent,/Сандал и дым/);
     const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))form.elements.namedItem(name).value=value;
-    await submit(form);assert.deepEqual(sent.items.map(item=>item.customRecipe),[{formId:1,color:'ivory',colorId:1,scentId:1},{formId:1,color:'ivory',colorId:1,scentId:2}]);
+    await submit(form);assert.deepEqual(sent.items.map(item=>item.customRecipe),[{formId:2,color:'ivory',colorId:3,scentId:1},{formId:2,color:'ivory',colorId:3,scentId:2}]);
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
 
@@ -453,7 +457,7 @@ test('aroma editor saves three chapters in the same settings as the scent name',
   globalThis.fetch=async(url,init={})=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/scents?admin=1'?response(scents):url==='/api/scents/1'?(saved=JSON.parse(init.body),response(saved)):response([]);
   const root=createRoot(document.getElementById('root'));
   try{
-    await act(async()=>root.render(React.createElement(Admin)));await click(button('Ароматы'));await click(document.querySelector('.scent-admin-card footer button'));
+    await act(async()=>root.render(React.createElement(Admin)));await click(button('Ароматы'));await click(editCard(scents[0].name));
     const chapters=[...document.querySelectorAll('.scent-editor .aroma-chapter')];assert.equal(chapters.length,3);
     for(const [index,chapter] of chapters.entries()){
       await setValue(chapter.querySelector('input'),['Цедра','Чай','Дерево'][index]);
@@ -517,7 +521,7 @@ test('portrait browsing preserves the catalog until explicitly applying its arom
     await act(async()=>root.render(React.createElement(Home)));
     assert.deepEqual([...document.querySelectorAll('.tiho-site main>section')].slice(0,3).map(section=>section.id),['home','collection','aromas']);
     assert.equal(document.querySelectorAll('.scent-name-list button').length,26);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
-    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/cherry.webp');
+    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/absinthe.webp');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.equal(document.querySelectorAll('.product-card').length,3);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'02 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
     await click(document.querySelector('.scent-library>.button'));
@@ -528,7 +532,7 @@ test('portrait browsing preserves the catalog until explicitly applying its arom
     await click(document.querySelector('.catalog-reset'));assert.equal(document.querySelectorAll('.product-card').length,3);
     await click(document.querySelector('#filter-scent'));assert.equal(document.querySelectorAll('.filter-aroma-list button').length,27);
     await click([...document.querySelectorAll('.filter-aroma-list button')].find(node=>node.textContent.includes('CHERRY')));assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');
-    await click(document.querySelector('[aria-label="Следующий аромат"]'));assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'BLACK HONEY');await click(document.querySelector('[aria-label="Предыдущий аромат"]'));await click(document.querySelector('.scent-library>.button'));assert.match(document.querySelector('#filter-scent').textContent,/WINE/);
+    await click(document.querySelector('[aria-label="Следующий аромат"]'));assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'YUZU');await click(document.querySelector('[aria-label="Предыдущий аромат"]'));await click(document.querySelector('.scent-library>.button'));assert.match(document.querySelector('#filter-scent').textContent,/WINE/);
     await click(document.querySelector('#filter-color'));assert.equal(document.querySelectorAll('.catalog-filter-panel').length,1);
     await act(async()=>document.activeElement.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));assert.equal(document.querySelector('.catalog-filter-panel'),null);assert.equal(document.activeElement.id,'filter-color');
     await click(document.querySelector('#filter-form'));await act(async()=>document.querySelector('#hero-title').dispatchEvent(new Event('pointerdown',{bubbles:true})));assert.equal(document.querySelector('.catalog-filter-panel'),null);
@@ -912,6 +916,7 @@ test('two-color workshop uses the administrator palette and keeps both colors th
     assert.equal(document.querySelectorAll('input[name="candle-color"]').length,3);
     assert.equal(document.querySelectorAll('input[name="candle-accent-color"]').length,3);
     assert.doesNotMatch(document.querySelector('#studio-panel-2').textContent,/Отключённый/);
+    await click(document.querySelector('input[name="candle-color"][value="21"]'));
     const initial=document.querySelector('#studio-candle feColorMatrix').getAttribute('values');
     await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
     await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="candle-accent-color"][value="23"]'));
@@ -939,4 +944,65 @@ test('form editor installs the prepared two-color snake template without an uplo
     await submit(document.querySelector('.form-editor form'));
     assert.equal(saved.get('twoTone'),'true');assert.equal(saved.get('silhouettePreset'),'snake-two-tone');
   }finally{await act(async()=>root.unmount());}
+});
+
+test('alphabetical dictionaries reach filters, workshop, both colors, admin cards and photo presets without changing selections',async()=>{
+  window.localStorage.clear();
+  const shapeList=[...forms,{id:8,name:'Змея',shape:null,silhouette:'/assets/forms/snake-two-tone.png',twoTone:true,active:true}];
+  const candle={...products[0],formId:8,form:shapeList[2],colorId:2,color:colors[1],accentColorId:4,accentColor:colors[3],scentId:2,scent:scents[1]};
+  globalThis.fetch=async url=>url==='/api/admin/session'?response({authenticated:true}):url.startsWith('/api/forms')?response(shapeList):url.startsWith('/api/colors')?response(colors):url.startsWith('/api/scents')?response(scents):url.startsWith('/api/products')?response([candle]):response([]);
+  const values=selector=>[...document.querySelectorAll(selector)].filter(n=>n.value).map(n=>Number(n.value));
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.deepEqual(values('input[name="candle-shape"]'),[8,2,1]);
+    assert.deepEqual(values('input[name="recipe-scent"]'),[3,1,4,2]);
+    assert.deepEqual(values('input[name="candle-color"]'),[3,1,4,2]);
+    assert.deepEqual(values('input[name="candle-accent-color"]'),[3,1,4,2]);
+    assert.deepEqual([...document.querySelectorAll('.scent-name-label')].map(n=>n.textContent),['Белая ваниль','Вишня и миндаль','Роза и пион','Сандал и дым']);
+    for(const [kind,labels] of [['color',['Белый','Красный','Розовый','Чёрный']],['form',['Змея','Ракушка','Спираль']],['scent',['Белая ваниль','Вишня и миндаль','Роза и пион','Сандал и дым']]]){
+      await click(document.querySelector(`#filter-${kind}`));
+      assert.deepEqual([...document.querySelectorAll(`#filter-panel-${kind} button`)].slice(1).map(n=>n.querySelector(':scope > span:last-of-type').textContent),labels);
+      await click(document.querySelector(`#filter-${kind}`));
+    }
+    await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+    await act(async()=>root.render(React.createElement(Admin)));
+    const filters=[...document.querySelectorAll('.inventory-filters select')];
+    assert.deepEqual(filters.slice(0,3).map(n=>[...n.options].filter(o=>o.value).map(o=>Number(o.value))),[[8,2,1],[3,1,4,2],[3,1,4,2]]);
+    await click(document.querySelector('[aria-label="Редактировать свечу № 1"]'));
+    const selects=[...document.querySelectorAll('.candle-selects select')];
+    assert.deepEqual(selects.map(n=>n.value),['8','2','2']);
+    assert.deepEqual(selects.map(n=>[...n.options].filter(o=>o.value).map(o=>Number(o.value))),[[8,2,1],[3,1,4,2],[3,1,4,2]]);
+    const accent=[...document.querySelectorAll('.product-editor label')].find(n=>n.textContent.startsWith('Цвет декора')).querySelector('select');
+    assert.equal(accent.value,'4');assert.deepEqual([...accent.options].filter(o=>o.value).map(o=>Number(o.value)),[3,1,4,2]);
+    await click(document.querySelector('[aria-label="Закрыть редактор"]'));
+    for(const [tab,names] of [['Формы',['Змея','Ракушка','Спираль']],['Цвета',['Белый','Красный','Розовый','Чёрный']],['Ароматы',['Белая ваниль','Вишня и миндаль','Роза и пион','Сандал и дым']]]){
+      await click(button(tab));assert.deepEqual([...document.querySelectorAll('.scent-admin-card h2')].map(n=>n.textContent),names);
+    }
+    await click(editCard(scents[0].name));
+    const presets=[...document.querySelectorAll('.scent-portrait-editor option')].filter(n=>n.value).map(n=>n.textContent);
+    assert.deepEqual(presets.slice(0,4),['ABSINTHE','AMBER WOOD','BLACK HONEY','BOUNTY']);assert.deepEqual(presets.slice(-2),['WINE','YUZU']);
+    assert.deepEqual(forms.map(f=>f.id),[1,2]);assert.deepEqual(colors.map(c=>c.id),[1,2,3,4]);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('optional volume is editable and appears with color and aroma in catalog and candle details',async()=>{
+  window.localStorage.clear();let saved;
+  const candle={...products[0],formId:1,form:forms[0],colorId:1,color:colors[0],scentId:1,scent:scents[0],volumeMl:180};
+  const {ProductEditor}=require('./app/admin/editors.js');
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(ProductEditor,{product:candle,forms,colors,scents,onClose(){},onSave:async data=>{saved=data;}})));
+    const volume=document.querySelector('input[name="volumeMl"]');assert.equal(volume.value,'180');assert.equal(volume.required,false);
+    await setValue(volume,'250');await submit(document.querySelector('.product-editor form'));assert.equal(saved.get('volumeMl'),'250');
+    await setValue(volume,'');await submit(document.querySelector('.product-editor form'));assert.equal(saved.get('volumeMl'),'');
+    await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+    globalThis.fetch=async url=>url==='/api/products'?response([candle,{...candle,id:2,volumeMl:null}]):url==='/api/forms'?response(forms):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):response({});
+    await act(async()=>root.render(React.createElement(Home)));
+    const captions=[...document.querySelectorAll('.product-card .product-category')];
+    assert.equal(captions[0].textContent,'Красный · Вишня и миндаль · 180 мл');
+    assert.equal(captions[1].textContent,'Красный · Вишня и миндаль');
+    await click(document.querySelector('.product-card .product-image'));
+    assert.match(document.querySelector('.detail-specs').textContent,/Объём180 мл/);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });

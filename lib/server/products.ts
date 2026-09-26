@@ -1,7 +1,7 @@
 import { ensureSchema, getPool, listProducts } from "./db";
 import { saveImage, removeImage } from "./uploads";
 import { InputError, integer, textValue } from "./validation";
-import { MAX_PRODUCT_IMAGES, productImages } from "../catalog";
+import { MAX_PRODUCT_IMAGES, MAX_PRODUCT_VOLUME_ML, productImages } from "../catalog";
 
 type PhotoChoice = { url: string } | { upload: number };
 function photoPlan(form: FormData, previous: string[]): { choices: PhotoChoice[]; files: File[] } {
@@ -38,6 +38,9 @@ export async function saveProduct(form: FormData, id?: number) {
   const accentColorId = requestedAccent ? integer(requestedAccent, "Цвет декора", 1) : null;
   const scentId = integer(form.get("scentId"), "Аромат", 1);
   const notes = textValue(form.get("notes") ?? "", "Описание свечи", 2000, false);
+  // Missing fields from older editors preserve the saved volume; an empty field clears it.
+  const requestedVolume = form.get("volumeMl");
+  const volumeMl = !form.has("volumeMl") ? undefined : requestedVolume === "" ? null : integer(requestedVolume, "Объём, мл", 1, MAX_PRODUCT_VOLUME_ML);
   const price = integer(form.get("price"), "Цена", 0, 10000000);
   const stock = integer(form.get("stock"), "Остаток", 0, 1000000);
   const published = form.get("published") === "true";
@@ -68,11 +71,11 @@ export async function saveProduct(form: FormData, id?: number) {
     for (const file of files) if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) throw new InputError("Фото: JPG, PNG или WebP, не более 10 МБ каждое");
     for (const file of files) newImages.push(await saveImage(file));
     const images = choices.map(choice => "url" in choice ? choice.url : newImages[choice.upload]);
-    const values = [candleForm.name, notes, price, stock, published, images[0] ?? null, formId, colorId, scentId, candleForm.shape, JSON.stringify(images), accentColorId];
+    const values = [candleForm.name, notes, price, stock, published, images[0] ?? null, formId, colorId, scentId, candleForm.shape, JSON.stringify(images), accentColorId, volumeMl === undefined ? old?.volume_ml ?? null : volumeMl];
     if (id) await db.query(`UPDATE products SET name=$1,notes=$2,price=$3,stock=$4,published=$5,image=$6,
-      form_id=$7,color_id=$8,scent_id=$9,shape=$10,images=$11::jsonb,accent_color_id=$12,updated_at=NOW() WHERE id=$13`, [...values, id]);
-    else productId = Number((await db.query(`INSERT INTO products(name,notes,price,stock,published,image,form_id,color_id,scent_id,shape,images,accent_color_id,category)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,'') RETURNING id`, values)).rows[0].id);
+      form_id=$7,color_id=$8,scent_id=$9,shape=$10,images=$11::jsonb,accent_color_id=$12,volume_ml=$13,updated_at=NOW() WHERE id=$14`, [...values, id]);
+    else productId = Number((await db.query(`INSERT INTO products(name,notes,price,stock,published,image,form_id,color_id,scent_id,shape,images,accent_color_id,volume_ml,category)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,'') RETURNING id`, values)).rows[0].id);
     await db.query("COMMIT");
   } catch (error) {
     await db.query("ROLLBACK");

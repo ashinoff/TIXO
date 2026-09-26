@@ -1,5 +1,11 @@
 import type { Recipe } from "./atelier";
 
+const nameCollator = new Intl.Collator("ru", { sensitivity: "base", numeric: true });
+/** One display order for workshop dictionaries; never mutate their IDs or source arrays. */
+export function sortByName<T extends { name: string }>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => nameCollator.compare(a.name.trim(), b.name.trim()));
+}
+
 export type AromaProfile = Record<"top" | "heart" | "base", { notes: string; description: string }>;
 export const emptyAromaProfile = (): AromaProfile => ({ top: { notes: "", description: "" }, heart: { notes: "", description: "" }, base: { notes: "", description: "" } });
 export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null; twoTone?: boolean };
@@ -51,6 +57,7 @@ export type Product = {
   categoryId: number | null;
   categorySlug: string | null;
   notes: string;
+  volumeMl?: number | null;
   price: number;
   stock: number;
   published: boolean;
@@ -91,6 +98,7 @@ export const cartKey = (productId: number, variantId: number | null, scentId?: n
 export const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
 
 export const MAX_PRODUCT_IMAGES = 10;
+export const MAX_PRODUCT_VOLUME_ML = 100000;
 export function productImages(product: { images?: string[] | null; image?: string | null }): string[] {
   return Array.isArray(product.images) ? product.images : product.image ? [product.image] : [];
 }

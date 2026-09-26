@@ -177,6 +177,8 @@
  .tiho-site .detail-toolbar{grid-area:1/2;position:relative;min-width:0;height:58px}
  .tiho-site .product-detail-body,.tiho-site .detail-gallery{display:contents}
  .tiho-site .product-dialog .detail-photo{grid-area:1/1/4/2;width:100%;height:100%;min-height:0;aspect-ratio:auto;background:#ded8ca}
+ /* Fill the actual photograph too, not just its full-height frame. */
+ .tiho-site .product-dialog .detail-photo-track>:is(.photo-current,.photo-adjacent){object-fit:cover}
  .tiho-site .product-dialog .detail-photo>.candle-silhouette-visual{aspect-ratio:auto}
  .tiho-site .photo-thumbnails{grid-area:2/2;min-width:0;gap:8px;padding:12px 22px 0;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain}
  .tiho-site .photo-thumbnails button{flex:0 0 48px;width:48px;height:60px;padding:2px}
@@ -201,3 +203,9 @@
  .tiho-site .detail-kicker{gap:8px;flex-wrap:wrap}
 }
 @keyframes product-dialog-arrive{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* Color and aroma are useful product details, not faint decorative captions. */
+.tiho-site .product-card .product-category{font-size:14px;font-weight:600;line-height:1.55;letter-spacing:.025em;color:#34472d;overflow-wrap:anywhere}
+@media(max-width:760px){.tiho-site .product-card .product-category{font-size:13px;letter-spacing:0}}
+
+.tiho-site .product-card .product-volume{white-space:nowrap}

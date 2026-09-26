@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { money, productShape, type CandleForm, type CandleColor, type Product, type Scent, type OrderItem } from "@/lib/catalog";
+import { sortByName, money, productShape, type CandleForm, type CandleColor, type Product, type Scent, type OrderItem } from "@/lib/catalog";
 import { recipeFormName, atelierColors, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "@/lib/atelier";
 import { ImagePreview, ProductEditor, ScentEditor, ColorEditor, FormEditor, StockEditor, AromaProfileEditor } from "./editors";
 import { CandlePreview } from "../components/candle-preview";
@@ -74,11 +74,11 @@ export default function Admin() {
     const sections: Tab[] = ["products", "scents", "colors", "orders", "content", "forms"];
     const results = await Promise.allSettled([
       request<Product[]>("/api/products?admin=1").then(setProducts),
-      request<Scent[]>("/api/scents?admin=1").then(setScents),
-      request<CandleColor[]>("/api/colors?admin=1").then(setColors),
+      request<Scent[]>("/api/scents?admin=1").then(items => setScents(sortByName(items))),
+      request<CandleColor[]>("/api/colors?admin=1").then(items => setColors(sortByName(items))),
       request<Order[]>("/api/orders").then(setOrders),
       request<Record<string, { value:string; kind:string }>>("/api/content").then(setContent),
-      request<CandleForm[]>("/api/forms?admin=1").then(setForms),
+      request<CandleForm[]>("/api/forms?admin=1").then(items => setForms(sortByName(items))),
     ]);
     const failures: Partial<Record<Tab, string>> = {};
     results.forEach((result, index) => {

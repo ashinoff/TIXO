@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { aromaPortraits } from "../aroma-portraits";
 import type { Product, OrderItem, Scent, Variant, CandleColor, CandleForm } from "../catalog";
-import { candleShapes, emptyAromaProfile, productShape, type CandleShape } from "../catalog";
+import { candleShapes, emptyAromaProfile, productShape, MAX_PRODUCT_VOLUME_ML, type CandleShape } from "../catalog";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
@@ -157,6 +157,7 @@ export async function ensureSchema() {
     }
     // Null marks legacy single-photo rows; an explicit empty list means silhouette only.
     await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB");
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS volume_ml INTEGER CHECK (volume_ml > 0 AND volume_ml <= ${MAX_PRODUCT_VOLUME_ML})`);
     await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS image TEXT");
     const portraits = await db.query("INSERT INTO app_migrations(key) VALUES('aroma-portraits-v1') ON CONFLICT DO NOTHING RETURNING key");
     if (portraits.rowCount) {
@@ -183,7 +184,7 @@ export async function ensureSchema() {
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
   const images = Array.isArray(row.images) ? row.images.map(String) : row.image ? [String(row.image)] : [];
   return { formId: row.form_id ? Number(row.form_id) : null, colorId: row.color_id ? Number(row.color_id) : null, scentId: row.scent_id ? Number(row.scent_id) : null,
-    images, accentColorId: row.accent_color_id ? Number(row.accent_color_id) : null, accentColor: row.accent_color ? mapColor(row.accent_color as Record<string, unknown>) : null,
+    images, volumeMl: row.volume_ml == null ? null : Number(row.volume_ml), accentColorId: row.accent_color_id ? Number(row.accent_color_id) : null, accentColor: row.accent_color ? mapColor(row.accent_color as Record<string, unknown>) : null,
     form: row.form ? mapForm(row.form as Record<string, unknown>) : null, color: row.color ? mapColor(row.color as Record<string, unknown>) : null, scent: row.scent ? mapScent(row.scent as Record<string, unknown>) : null,
     id:Number(row.id), name:String(row.form_name || row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[], shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : productShape({id:Number(row.id)}) };
 }

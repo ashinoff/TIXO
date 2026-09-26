@@ -183,6 +183,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await Promise.all([domain.ensureSchema(), domain.ensureSchema()]);
     const legacy = (await domain.listProducts(true,1))[0];
     assert.equal(legacy.stock,12); assert.equal(legacy.image,before[0].image);assert.deepEqual(legacy.images,[before[0].image]);
+    assert.equal(legacy.volumeMl,null);
     assert.equal(legacy.colorId,null); assert.equal(legacy.scentId,null); assert.ok(legacy.formId);
     assert.equal((await pool.query("SELECT value FROM site_content WHERE key='hero.title'")).rows[0].value, 'Сохранённый заголовок');
     originalOrder = domain.mapOrder((await pool.query("SELECT * FROM orders WHERE order_number='OLD-01'")).rows[0]);
@@ -327,6 +328,25 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     await assert.rejects(pool.query("DELETE FROM candle_forms WHERE id=$1",[formId]),error=>['23503','23001'].includes(error.code));
     await assert.rejects(pool.query("DELETE FROM colors WHERE id=$1",[redColor]),error=>['23503','23001'].includes(error.code));
     await assert.rejects(pool.query("DELETE FROM scents WHERE id=$1",[red]),error=>['23503','23001'].includes(error.code));
+  });
+  await t.test('optional candle volume survives legacy editors, can be cleared and rejects invalid values', async () => {
+    const create=formFor({...product,stock:0,published:false});create.set('volumeMl','180');
+    let candle=await saveProduct(create);
+    assert.equal(candle.volumeMl,180);
+    assert.equal((await domain.listProducts(true,candle.id))[0].volumeMl,180);
+    const edit=formFor(candle);edit.set('volumeMl','250');
+    candle=await saveProduct(edit,candle.id);assert.equal(candle.volumeMl,250);
+    candle=await saveProduct(formFor({...candle,notes:'Старый редактор'}),candle.id);
+    assert.equal(candle.volumeMl,250);assert.equal(candle.notes,'Старый редактор');
+    for(const invalid of ['0','-1','1.5','100001','abc']) {
+      const invalidForm=formFor(candle);invalidForm.set('volumeMl',invalid);
+      await assert.rejects(saveProduct(invalidForm,candle.id),error=>error.status===400);
+      assert.equal((await domain.listProducts(true,candle.id))[0].volumeMl,250);
+    }
+    const clear=formFor(candle);clear.set('volumeMl','');
+    candle=await saveProduct(clear,candle.id);assert.equal(candle.volumeMl,null);
+    const unset=await saveProduct(formFor({...product,stock:0,published:false}));assert.equal(unset.volumeMl,null);
+    await assert.rejects(pool.query('UPDATE products SET volume_ml=0 WHERE id=$1',[candle.id]),error=>error.code==='23514');
   });
   const candleLine = (quantity=1) => ({productId:product.id,scentId:red,colorId:redColor,quantity});
   await t.test('orders require the configured combination, snapshot the current form and use the server price', async () => {
