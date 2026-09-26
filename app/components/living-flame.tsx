@@ -121,13 +121,17 @@ export function LivingFlame() {
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
 
+    const hero = document.getElementById("home") ?? container;
+    const nextSection = document.querySelector<HTMLElement>('[data-section-anchor="aromas"]');
     const observer = "IntersectionObserver" in window
-      ? new IntersectionObserver(entries => {
-        visible = entries[0]?.isIntersecting ?? false;
+      ? new IntersectionObserver(() => {
+        // A sticky hero is still geometrically on screen after the next panel covers it.
+        visible = hero.getBoundingClientRect().bottom > 0 && (!nextSection || nextSection.getBoundingClientRect().top > 0);
         sync();
       })
       : null;
-    observer?.observe(document.getElementById("home") ?? container);
+    observer?.observe(hero);
+    if (nextSection) observer?.observe(nextSection);
 
     // decode also handles cached photographs whose load event has already fired.
     if (photo.complete && photo.naturalWidth) void photo.decode().then(load).catch(fail);

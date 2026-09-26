@@ -1,0 +1,24 @@
+.tiho-site .section-anchor{height:0;pointer-events:none;overflow-anchor:none}
+
+@media(max-width:760px){
+ .tiho-site #home{height:100svh;min-height:600px;max-height:none}
+ .tiho-site #home .hero-content{padding-top:112px}
+ .tiho-site #home .hero-content>.eyebrow{margin-bottom:22px}
+ .tiho-site #home .hero-description{display:none}
+ .tiho-site #home .button{margin-top:24px}
+ .tiho-site #home .hero-caption{position:relative;inset:auto;margin:28px var(--gutter) 0;width:auto}
+ .tiho-site #intro{padding-top:30px;padding-bottom:30px}
+ .tiho-site #intro .intro-meta,.tiho-site #intro h2,.tiho-site #intro .intro-sensations,.tiho-site #intro .text-link{display:none}
+ .tiho-site #intro .intro-bottom{display:block;margin:0;opacity:1;transform:none}
+ .tiho-site #intro .intro-bottom p{max-width:34ch;margin:0 auto;text-align:center;font-size:clamp(16px,4.1vw,19px);line-height:1.65;color:#dedbd1;text-wrap:balance}
+}
+
+@media(max-width:760px) and (prefers-reduced-motion:no-preference){
+ .tiho-site main.stack-ready>section{
+  position:sticky;
+  top:min(0px,calc(100svh - var(--stack-panel-height,100svh)));
+  z-index:var(--stack-order,1);
+  box-shadow:0 -14px 36px #00000024;
+ }
+ .tiho-site .footer{position:relative;z-index:8}
+}
