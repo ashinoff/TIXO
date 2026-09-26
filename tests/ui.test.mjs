@@ -22,7 +22,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -241,14 +241,16 @@ test('configured candles show one real combination and the merged aroma block us
     await click(document.querySelector('[aria-label="Познакомиться с ароматом Сандал и дым"]'));
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
     assert.match(document.querySelector('.scent-portrait-caption').textContent,/Яркое начало/);
-    assert.doesNotMatch(document.querySelector('.scent-library').textContent,/Яркое начало/);
+    assert.equal(document.querySelector('.note-mobile-description').textContent,'Яркое начало');
     assert.equal(document.querySelector('.scent-library-selection'),null);
     await click(document.querySelector('#note-tab-1'));
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
     assert.match(document.querySelector('.scent-portrait-caption').textContent,/Мягкое сердце/);
+    assert.equal(document.querySelector('.note-mobile-description').textContent,'Мягкое сердце');
     await click(document.querySelector('#note-tab-2'));
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
     assert.match(document.querySelector('.scent-portrait-caption').textContent,/Тёплый шлейф/);
+    assert.equal(document.querySelector('.note-mobile-description').textContent,'Тёплый шлейф');
     assert.ok(document.querySelector('#aromas #note-panel'));
     assert.match(document.querySelector('.scent-portrait-missing').textContent,/Портрет аромата/);
     await click(document.querySelector('[aria-label="Познакомиться с ароматом Вишня и миндаль"]'));

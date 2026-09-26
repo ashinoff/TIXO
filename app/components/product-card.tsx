@@ -4,6 +4,7 @@ import { CSSProperties, useState } from "react";
 import { money, productShape, selectVariant, type CandleColor, type Product, type Scent, type Variant } from "@/lib/catalog";
 import { CandlePreview } from "./candle-preview";
 import { Modal } from "./modal";
+import { ArrowIcon } from "./ui-icon";
 
 export function ProductCard({ product, index, scent, color, favorite, onFavorite, onAdd }: {
   product: Product; index: number; scent?: Scent; color?: CandleColor; favorite: boolean;
@@ -21,7 +22,7 @@ export function ProductCard({ product, index, scent, color, favorite, onFavorite
         <svg width="22" height="22" viewBox="0 0 24 24" fill={favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
       </button>
       {scent && <span className="photo-color"><i style={{ background: color?.hex }} />{color?.name}</span>}
-      {photo && <button className="form-photo-button" onClick={() => setPhotoOpen(true)}>Фото формы ↗</button>}
+      {photo && <button className="form-photo-button" onClick={() => setPhotoOpen(true)}>Фото формы <ArrowIcon /></button>}
     </div>
     <div className="product-info">
       <div className="product-topline"><h3>{product.name}</h3><strong>{money(product.price)}</strong></div>

@@ -9,6 +9,7 @@ import {
 } from "@/lib/atelier";
 import { CandlePreview } from "./candle-preview";
 import { WorkshopScene } from "./workshop-scene";
+import { ArrowIcon } from "./ui-icon";
 import "./workshop.css";
 import { useShopping } from "./storefront-commerce";
 
@@ -119,13 +120,13 @@ export function Atelier() {
           <div className="studio-panel" id="studio-panel-0" role="tabpanel" aria-labelledby="studio-step-0" hidden={step !== 0}>
             <p className="eyebrow">01 / НАЧНИ С ОЩУЩЕНИЯ</p><h3>Как звучит твоя тишина?</h3><p>Выбери аромат. Его история раскроется слева — от первой ноты до шлейфа.</p>
             {loading && <p role="status" className="builder-form-message">Загружаем ароматы…</p>}
-            {catalogError && <div role="alert" className="builder-form-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void loadCatalog()}>Попробовать ещё раз ↗</button></div>}
+            {catalogError && <div role="alert" className="builder-form-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void loadCatalog()}>Попробовать ещё раз <ArrowIcon /></button></div>}
             {!loading && !catalogError && !scents.length && <p className="builder-form-message">Мастерская готовит новые ароматы. Загляните немного позже.</p>}
             {!loading && !catalogError && recipe.scentId !== 0 && !selectedScent && scents.length > 0 && <p role="status" className="builder-form-message">Этот аромат больше недоступен. Выберите другой.</p>}
             <label className="studio-search"><span className="sr-only">Найти аромат в мастерской</span><input type="search" placeholder="Найти свой аромат" value={scentSearch} onChange={event => setScentSearch(event.target.value)} /><span aria-hidden="true">⌕</span></label>
             <fieldset className="builder-scent-options studio-options-window" disabled={loading || !!catalogError}>
               <legend className="sr-only">Аромат авторской свечи</legend>
-              {visibleScents.map(scent => <label key={scent.id}><input type="radio" name="recipe-scent" value={scent.id} checked={selectedScent?.id === scent.id} onChange={() => updateRecipe("scentId", scent.id)} /><span><small>{String(scents.indexOf(scent) + 1).padStart(2, "0")}</small>{scent.name}<i aria-hidden="true">↗</i></span></label>)}
+              {visibleScents.map(scent => <label key={scent.id}><input type="radio" name="recipe-scent" value={scent.id} checked={selectedScent?.id === scent.id} onChange={() => updateRecipe("scentId", scent.id)} /><span><small>{String(scents.indexOf(scent) + 1).padStart(2, "0")}</small>{scent.name}<i aria-hidden="true"><ArrowIcon /></i></span></label>)}
               {!!scents.length && !visibleScents.length && <p className="studio-search-empty">Такого аромата пока нет. Попробуй другое название.</p>}
             </fieldset>
             <p className="studio-selection">Твой аромат <strong>{selectedScent?.name ?? "Ещё не выбран"}</strong></p>
@@ -134,7 +135,7 @@ export function Atelier() {
           <div className="studio-panel" id="studio-panel-1" role="tabpanel" aria-labelledby="studio-step-1" hidden={step !== 1}>
             <p className="eyebrow">02 / ПРИДАЙ ОЩУЩЕНИЮ ФОРМУ</p><h3>Линии с характером.</h3><p>Выбери силуэт — твоя свеча появится на камне.</p>
             {formsLoading && <p role="status" className="builder-form-message">Загружаем формы мастерской…</p>}
-            {formsError && <div role="alert" className="builder-form-message">{formsError}<button type="button" className="text-link" onClick={() => void loadForms()}>Попробовать ещё раз ↗</button></div>}
+            {formsError && <div role="alert" className="builder-form-message">{formsError}<button type="button" className="text-link" onClick={() => void loadForms()}>Попробовать ещё раз <ArrowIcon /></button></div>}
             {!formsLoading && !formsError && !forms.length && <p className="builder-form-message">Мастерская готовит новые формы. Загляните немного позже.</p>}
             {!formsLoading && !formsError && recipe.formId !== 0 && !selectedForm && forms.length > 0 && <p role="status" className="builder-form-message">Эта форма больше недоступна. Выберите другую.</p>}
             <label className="studio-search"><span className="sr-only">Найти форму в мастерской</span><input type="search" placeholder="Найти форму" value={formSearch} onChange={event => setFormSearch(event.target.value)} /><span aria-hidden="true">⌕</span></label>
@@ -174,8 +175,8 @@ export function Atelier() {
             <p className="recipe-note">Оформите заявку в корзине — мастер свяжется с вами и обсудит вашу композицию.</p>
           </div>
           <div className="studio-navigation">
-            <button type="button" id="studio-back" disabled={step === 0} onClick={() => goToStep(step - 1, true)}>← Назад</button>
-            <button type="button" id="studio-next" disabled={(step === 0 && !scentReady) || (step === 1 && (!selectedForm || formsLoading || !!formsError))} hidden={step === 3} onClick={() => goToStep(step + 1, true)}>{nextLabels[step]} <span aria-hidden="true">→</span></button>
+            <button type="button" id="studio-back" disabled={step === 0} onClick={() => goToStep(step - 1, true)}><ArrowIcon direction="left" /> Назад</button>
+            <button type="button" id="studio-next" disabled={(step === 0 && !scentReady) || (step === 1 && (!selectedForm || formsLoading || !!formsError))} hidden={step === 3} onClick={() => goToStep(step + 1, true)}>{nextLabels[step]} <span aria-hidden="true"><ArrowIcon direction="right" /></span></button>
           </div>
         </div>
       </div>

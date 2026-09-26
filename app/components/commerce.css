@@ -53,7 +53,8 @@
 @media(prefers-reduced-motion:reduce){.tiho-site .scent-portrait-frame,.tiho-site .catalog-filter-panel{animation:none}.tiho-site .filter-value svg{transition:none}}
 
 /* Chapters belong to the selected portrait and use the workshop's authored profile. */
-.tiho-site .scent-library .scent-name-list{height:230px;max-height:230px;flex-shrink:0;align-content:start}
+.tiho-site .scent-library .scent-name-list{height:230px;max-height:230px;flex-shrink:0;align-content:start;grid-auto-rows:minmax(min-content,max-content)}
+.tiho-site .scent-name-list .scent-name-label{min-width:0;flex:1;font-size:inherit;line-height:inherit;color:inherit;overflow-wrap:anywhere}
 .tiho-site .scent-chapters{border-top:1px solid #404938;padding-top:20px;margin-top:25px;margin-bottom:25px;min-width:0}
 .tiho-site .scent-chapters .note-instruction{font-size:12px;line-height:1.7;color:#b5c1a5;margin:0}
 .tiho-site .scent-chapters .note-tabs{margin-top:9px;gap:10px}
@@ -63,6 +64,7 @@
 .tiho-site .scent-chapters .note-panel{padding-top:22px;height:150px;min-height:150px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;animation:scent-chapter-reveal 1.8s ease both;overflow-wrap:anywhere}
 .tiho-site .scent-chapters .note-panel h3{font-size:25px;font-weight:400}
 .tiho-site .scent-chapters .note-panel>p{font-size:13px;line-height:1.8}
+.tiho-site .scent-chapters .note-mobile-description{display:none}
 @media(max-width:760px){.tiho-site .scent-library .scent-name-list{height:230px;max-height:230px;flex-shrink:0;align-content:start}.tiho-site .scent-chapters .note-tabs{gap:7px}.tiho-site .scent-chapters .note-tabs button{gap:6px;font-size:12px}.tiho-site .scent-chapters .note-panel{min-height:150px}}
 @media(prefers-reduced-motion:reduce){.tiho-site .scent-portrait-frame.is-revealing,.tiho-site .scent-portrait-drift,.tiho-site .scent-chapters .note-panel{animation:none}.tiho-site .scent-portrait-frame img{transform:none;transition:none}.tiho-site .scent-chapters .note-tabs button:after{transition:none}}
 
@@ -105,5 +107,35 @@
 .tiho-site .scent-chapter-copy{grid-area:1/1;min-width:0}
 .tiho-site .scent-chapter-copy.is-revealing{animation:scent-caption-reveal 1.8s ease both}
 .tiho-site .scent-chapter-copy.is-leaving{animation:scent-caption-leave .9s ease both;pointer-events:none}
-@media(max-width:760px){.tiho-site .scent-portrait-captions,.tiho-site .scent-portrait-navigation-shell{inset:0 0 auto;aspect-ratio:1}.tiho-site .scent-portrait-frame img{object-position:60% center}.tiho-site .scent-portrait-shade{background:linear-gradient(180deg,#080a07a6,transparent 30%,#080a074d 48%,#080a0799)}}
+/* Reserve a real mobile portrait height instead of relying on an empty grid
+   item's intrinsic sizing. Each row contains its own text and controls. */
+@media(max-width:760px){
+ .tiho-site .scent-discovery-layout{display:block}
+ .tiho-site .scent-portrait{position:relative;height:clamp(420px,112vw,560px);min-height:420px;aspect-ratio:auto;overflow:hidden}
+ .tiho-site .scent-portrait-captions,.tiho-site .scent-portrait-navigation-shell{inset:0;aspect-ratio:auto}
+ .tiho-site .scent-portrait-caption{top:24px;left:22px;right:22px;bottom:84px;max-height:none}
+ .tiho-site .scent-portrait-caption h3{font-size:clamp(27px,7.2vw,38px);line-height:1.2}
+ .tiho-site .scent-portrait-description{font-size:14px;line-height:1.8;margin-top:16px}
+ .tiho-site .scent-portrait-chapter{display:none}
+ .tiho-site .scent-portrait-frame img{object-position:center}
+ .tiho-site .scent-portrait-shade{background:linear-gradient(180deg,#080a07c9, #080a0799 42%,#080a071a 75%,#080a0773)}
+ .tiho-site .scent-portrait-navigation{right:22px;bottom:20px;grid-template-columns:repeat(2,44px);gap:10px}
+ .tiho-site .scent-portrait-navigation button{width:44px;height:44px}
+ .tiho-site .scent-library{padding:26px 20px 28px;border-top:1px solid #d6dfc63d;background:linear-gradient(145deg,#dce3cf08,transparent 65%)}
+ .tiho-site .scent-library-top{align-items:center;flex-wrap:wrap;row-gap:8px}
+ .tiho-site .scent-library .scent-name-list{height:250px;max-height:250px;column-gap:12px;overscroll-behavior-y:contain}
+ .tiho-site .scent-name-list button{min-width:0;min-height:50px;padding:12px 5px;gap:6px}
+ .tiho-site .scent-name-list button>i{display:none}
+ .tiho-site .scent-chapters{margin-top:24px;padding-top:22px;margin-bottom:24px}
+ .tiho-site .scent-chapters .note-tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:14px}
+ .tiho-site .scent-chapters .note-tabs button{min-width:0;min-height:72px;flex-direction:column;align-items:flex-start;gap:8px;padding:12px 10px;font-size:13px;text-align:left}
+ .tiho-site .scent-chapters .note-panel{height:180px;min-height:180px;padding-top:22px}
+ .tiho-site .scent-chapters .note-panel h3{font-size:23px;line-height:1.35}
+ .tiho-site .scent-chapters .note-mobile-description{display:block;margin-top:12px}
+ .tiho-site .scent-library>.button{margin-top:0;min-height:54px;font-size:12px;gap:12px}
+}
+@media(max-width:360px){
+ .tiho-site .scent-library .scent-name-list{grid-template-columns:minmax(0,1fr)}
+ .tiho-site .scent-name-list button{font-size:12px}
+}
 @media(prefers-reduced-motion:reduce){.tiho-site .scent-chapter-copy.is-revealing,.tiho-site .scent-chapter-copy.is-leaving{animation:none}.tiho-site .scent-chapter-copy.is-leaving{opacity:0}.tiho-site #aromas button{transition:none}}

@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- editorial ritual photographs retain their composition */
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { ArrowIcon } from "./ui-icon";
 
 const SCENE_MS = 2000;
 const FADE_MS = 1600;
@@ -199,6 +200,6 @@ export function EveningRitual() {
       <p className="ritual-drag-hint" aria-hidden="true">Листайте влево или вправо <span>мышью · свайпом · Shift + колесо · удерживайте для паузы</span></p>
       <p id="ritual-gesture-help" className="sr-only">Стрелки влево и вправо меняют сцену. Home — первая, End — последняя. Пробел останавливает или продолжает автосмену. Удерживайте левую кнопку мыши на фотографии, чтобы остановить её. Отпустите, чтобы продолжить.</p>
     </div>
-    <div className="ritual-afterglow"><div><p className="eyebrow">ВАШ МАЛЕНЬКИЙ ПЛАН НА ВЕЧЕР</p><h2>Меньше спешки.<br /><span>Больше себя.</span></h2></div><div><p>Одна свеча. Любимый аромат.<br />И немного времени, которое только твоё.</p><a className="button button-glass" href="#collection">Выбрать свою свечу <span aria-hidden="true">↗</span></a></div></div>
+    <div className="ritual-afterglow"><div><p className="eyebrow">ВАШ МАЛЕНЬКИЙ ПЛАН НА ВЕЧЕР</p><h2>Меньше спешки.<br /><span>Больше себя.</span></h2></div><div><p>Одна свеча. Любимый аромат.<br />И немного времени, которое только твоё.</p><a className="button button-glass" href="#collection">Выбрать свою свечу <span aria-hidden="true"><ArrowIcon /></span></a></div></div>
   </section>;
 }
