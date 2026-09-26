@@ -5,7 +5,9 @@ import { ShoppingProvider, Catalog, ScentDiscovery, CartOverlay, CartTrigger } f
 import { Atelier } from "./components/atelier";
 import { LivingFlame } from "./components/living-flame";
 import { EveningRitual } from "./components/evening-ritual";
+import { SectionNavigation } from "./components/section-navigation";
 import "./components/evening-ritual.css";
+import "./components/section-navigation.css";
 import "./storefront.css";
 import "./components/commerce.css";
 
@@ -55,5 +57,6 @@ export default function Home() {
   <div className="footer-bottom"><span>© ТИХО / TIXO, {new Date().getFullYear()}</span><a href="#workshop">Мастерская свечей ручной работы</a><span>Создано для ваших вечеров</span></div>
 </footer>
 <CartOverlay />
+<SectionNavigation />
 </div></ShoppingProvider>;
 }

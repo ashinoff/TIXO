@@ -22,7 +22,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -667,45 +667,59 @@ test('hero keeps the burning photograph without controls and section numbers fol
     assert.equal(document.querySelector('#hero-image img').getAttribute('src'),'/assets/hero.png');assert.ok(document.querySelector('#home .button-glass'));
     assert.equal(document.querySelector('.wordmark').textContent,'тихо');assert.equal(document.querySelector('.footer-wordmark').textContent,'тихо');assert.equal(document.querySelector('#care details'),null);
     const labels=['.scent-discovery-heading .eyebrow','#collection .section-heading .eyebrow','#workshop .section-heading .eyebrow','#studio .studio-heading .eyebrow','#care .ritual-story-heading .eyebrow'].map(selector=>document.querySelector(selector).textContent.slice(0,2));
-    assert.deepEqual(labels,['01','02','03','04','05']);assert.equal(document.querySelectorAll('.ritual-story-chapters button').length,5);
+    assert.deepEqual(labels,['01','02','03','04','05']);assert.equal(document.querySelectorAll('.ritual-story button').length,0);
+    const links=[...document.querySelectorAll('.section-navigation a')];assert.deepEqual(links.map(link=>link.getAttribute('href')),['#home','#aromas','#collection','#workshop','#studio','#care']);assert.ok(links.every(link=>document.querySelector(link.getAttribute('href')) && link.getAttribute('aria-label')));
   }finally{await act(async()=>root.unmount());}
 });
 
-test('five-scene ritual supports chapter buttons, keyboard, mouse swipes and touch cancellation',async()=>{
+test('button-free ritual supports keyboard, horizontal wheel, mouse swipes and touch cancellation',async t=>{
   const {EveningRitual}=require('./app/components/evening-ritual.js');const root=createRoot(document.getElementById('root'));
+  t.mock.timers.enable({apis:['Date']});
   const pointer=async(type,x,y=200)=>{const event=new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0});Object.defineProperty(event,'pointerId',{value:7});await act(async()=>document.querySelector('.ritual-story').dispatchEvent(event));};
+  const key=async key=>act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true})));
+  const wheel=async options=>{const event=new dom.window.WheelEvent('wheel',{bubbles:true,cancelable:true,...options});await act(async()=>document.querySelector('.ritual-story').dispatchEvent(event));return event.defaultPrevented;};
   try{
     await act(async()=>root.render(React.createElement(EveningRitual)));
     const scene=()=>Number(document.querySelector('.ritual-story').dataset.scene);
-    await click(document.querySelector('[aria-label="Предыдущая сцена ритуала"]'));assert.equal(scene(),4);assert.match(document.querySelector('.ritual-story-care').textContent,/полностью остынет/);
-    await click(document.querySelector('[aria-label="Следующая сцена ритуала"]'));assert.equal(scene(),0);
-    await click(document.querySelector('[aria-label="3. Мгновение"]'));assert.equal(scene(),2);assert.match(document.querySelector('.ritual-story-frame img').getAttribute('src'),/03-stay/);
-    await act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true})));assert.equal(scene(),3);
+    assert.equal(document.querySelector('.ritual-story button'),null);
+    await key('ArrowLeft');assert.equal(scene(),4);assert.match(document.querySelector('.ritual-story-care').textContent,/полностью остынет/);
+    await key('ArrowRight');assert.equal(scene(),0);
+    await key('ArrowRight');await key('ArrowRight');assert.equal(scene(),2);assert.match(document.querySelector('.ritual-story-frame img').getAttribute('src'),/03-stay/);
+    await key('ArrowRight');assert.equal(scene(),3);
     await pointer('pointerdown',200);await pointer('pointerup',100);assert.equal(scene(),4);
     await pointer('pointerdown',100);await pointer('pointerup',200);assert.equal(scene(),3);
     await pointer('pointerdown',200);await pointer('pointerup',195,400);assert.equal(scene(),3,'Vertical scrolling must not change the scene');
     await pointer('pointerdown',200);await pointer('pointercancel',80);assert.equal(scene(),3);
-    await act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Home',bubbles:true,cancelable:true})));assert.equal(scene(),0);
-    assert.equal(document.querySelector('.ritual-play').hidden,true,'Reduced motion disables autoplay');assert.equal(document.querySelectorAll('.ritual-story-frame').length,1);
-  }finally{await act(async()=>root.unmount());}
+    await key('Home');assert.equal(scene(),0);
+    assert.equal(await wheel({deltaY:200}),false,'Vertical wheel remains available to the page');assert.equal(scene(),0);
+    assert.equal(await wheel({deltaX:100,ctrlKey:true}),false,'Zoom gesture remains untouched');
+    assert.equal(await wheel({deltaX:20}),true);assert.equal(scene(),0);
+    await wheel({deltaX:30});assert.equal(scene(),1);
+    await wheel({deltaX:200});assert.equal(scene(),1,'Wheel inertia advances only one scene');
+    t.mock.timers.tick(1000);await wheel({deltaX:-80});assert.equal(scene(),0);
+    t.mock.timers.tick(1000);await wheel({deltaY:80,shiftKey:true});assert.equal(scene(),1,'Shift + wheel supports ordinary mouse wheels');
+    await key('End');assert.equal(scene(),4);await key('Home');assert.equal(scene(),0);
+    assert.equal(document.querySelector('.ritual-story').dataset.playing,'false','Reduced motion disables autoplay');assert.equal(document.querySelectorAll('.ritual-story-frame').length,1);
+  }finally{await act(async()=>root.unmount());t.mock.timers.reset();}
 });
 
-test('ritual autoplay pauses for reading, background tabs and the explicit pause control',async t=>{
+test('ritual advances every three seconds and pauses for reading, background tabs and the space key',async t=>{
   const {EveningRitual}=require('./app/components/evening-ritual.js');
   const oldMedia=window.matchMedia,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
   window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});Object.defineProperty(document,'hidden',{configurable:true,value:false});
   t.mock.timers.enable({apis:['setTimeout']});const root=createRoot(document.getElementById('root'));
   const tick=async ms=>act(async()=>t.mock.timers.tick(ms));
   const hover=async type=>{const event=new MouseEvent(type,{bubbles:true,relatedTarget:document.body});Object.defineProperty(event,'pointerType',{value:'mouse'});await act(async()=>document.querySelector('.ritual-story').dispatchEvent(event));};
+  const space=async()=>act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true})));
   try{
     await act(async()=>root.render(React.createElement(EveningRitual)));
     await act(async()=>document.querySelector('.ritual-story-frame img').dispatchEvent(new Event('load')));
     const scene=()=>Number(document.querySelector('.ritual-story').dataset.scene);
-    assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');await tick(11999);assert.equal(scene(),0);await tick(1);assert.equal(scene(),1);
+    assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');await tick(2999);assert.equal(scene(),0);await tick(1);assert.equal(scene(),1);
     await hover('pointerover');await tick(24000);assert.equal(scene(),1);assert.equal(document.querySelector('.ritual-story').dataset.playing,'false');
-    await hover('pointerout');await tick(12000);assert.equal(scene(),2);
-    await click(document.querySelector('.ritual-play'));await tick(24000);assert.equal(scene(),2);
-    await click(document.querySelector('.ritual-play'));await tick(12000);assert.equal(scene(),3);
-    Object.defineProperty(document,'hidden',{configurable:true,value:true});await act(async()=>document.dispatchEvent(new Event('visibilitychange')));await tick(24000);assert.equal(scene(),3);
+    await hover('pointerout');await tick(3000);assert.equal(scene(),2);
+    await space();await tick(24000);assert.equal(scene(),2);
+    await space();await tick(3000);assert.equal(scene(),3);
+    await act(async()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await tick(24000);assert.equal(scene(),3);
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
 });

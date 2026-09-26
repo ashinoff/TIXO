@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
-const SCENE_MS = 12000;
+const SCENE_MS = 3000;
 const FADE_MS = 2400;
 export const ritualScenes = [
   { image: "/assets/ritual/01-space.webp", label: "Место", moment: "ПЕРЕД ПЕРВЫМ ОГНЁМ", title: "Освободи место\nдля тишины.", lead: "Вечер начинается с маленькой паузы.", care: "Поставь свечу на устойчивую негорючую подставку. Оставь вокруг свободное пространство — вдали от сквозняков, штор и других вещей, которые могут загореться.", alt: "Незажжённая чёрная свеча на широкой каменной подставке в спокойном тёмном интерьере" },
@@ -33,7 +33,7 @@ export function EveningRitual() {
   const busy = requested.index !== currentIndex;
   const paused = !playing || reduced || !visible || !pageVisible || hovered || focused || dragging || busy || !frames.current.ready;
   const select = useCallback((index: number) => setRequested(last => ({ index: wrap(index), revision: last.revision + 1 })), []);
-  const move = (direction: number) => select(requested.index + direction);
+  const move = useCallback((direction: number) => setRequested(last => ({ index: wrap(last.index + direction), revision: last.revision + 1 })), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +47,33 @@ export function EveningRitual() {
     document.addEventListener("visibilitychange", onVisibility);
     return () => { cancelled = true; observer?.disconnect(); motion.removeEventListener("change", onMotion); document.removeEventListener("visibilitychange", onVisibility); };
   }, []);
+
+  useEffect(() => {
+    const element = root.current;
+    if (!element) return;
+    let distance = 0, lastEvent = 0, consumed = false, lockedUntil = 0;
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
+      const horizontal = event.deltaX || (event.shiftKey ? event.deltaY : 0);
+      if (!horizontal || (!event.shiftKey && Math.abs(horizontal) <= Math.abs(event.deltaY))) return;
+      event.preventDefault();
+      const now = Date.now();
+      if (now - lastEvent > 220) { distance = 0; consumed = false; }
+      lastEvent = now;
+      // One scene per gesture: trackpad inertia must not race through the story.
+      if (consumed || now < lockedUntil) return;
+      const delta = horizontal * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientWidth : 1);
+      if (Math.sign(delta) !== Math.sign(distance)) distance = 0;
+      distance += delta;
+      if (Math.abs(distance) >= 45) {
+        move(distance > 0 ? 1 : -1);
+        consumed = true;
+        lockedUntil = now + 900;
+      }
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [move]);
 
   useEffect(() => {
     if (requested.index === currentIndex) return;
@@ -79,6 +106,11 @@ export function EveningRitual() {
     if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
     if (event.key === "Home") { event.preventDefault(); select(0); }
     if (event.key === "End") { event.preventDefault(); select(ritualScenes.length - 1); }
+    if (event.key === " " && event.target === event.currentTarget) {
+      event.preventDefault();
+      setPlaying(value => !value);
+      if (!playing) { setFocused(false); setHovered(false); }
+    }
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("button, a, .ritual-story-copy")) return;
@@ -100,7 +132,7 @@ export function EveningRitual() {
 
   return <section className="evening-ritual pad" id="care" aria-labelledby="care-title">
     <header className="ritual-story-heading"><div><p className="eyebrow">05 / ПРОСТОЙ РИТУАЛ</p><h2 id="care-title">Чтобы свет<br /><span>радовал дольше.</span></h2></div><p>Пять мгновений одного вечера.<br />От первого огня до следующей встречи.</p></header>
-    <div ref={root} className={`ritual-story${dragging ? " is-dragging" : ""}`} role="region" aria-roledescription="карусель" aria-label="Пять мгновений тихого вечера" tabIndex={0} data-scene={currentIndex} data-playing={!paused} aria-busy={busy}
+    <div ref={root} className={`ritual-story${dragging ? " is-dragging" : ""}`} role="region" aria-roledescription="карусель" aria-label="Пять мгновений тихого вечера" tabIndex={0} aria-describedby="ritual-gesture-help" aria-keyshortcuts="ArrowLeft ArrowRight Home End Space" data-scene={currentIndex} data-playing={!paused} aria-busy={busy}
       onKeyDown={onKey} onPointerDown={onPointerDown} onPointerUp={event => finishGesture(event)} onPointerCancel={event => finishGesture(event, true)}
       onPointerEnter={event => { if (event.pointerType === "mouse") setHovered(true); }} onPointerLeave={() => setHovered(false)}
       onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}>
@@ -119,14 +151,8 @@ export function EveningRitual() {
         })}
       </div>
       <div className="ritual-story-top"><span>ТИХО / ИСКУССТВО МАЛЕНЬКИХ ПАУЗ</span><span>{String(currentIndex + 1).padStart(2, "0")} <i>/ 05</i></span></div>
-      <div className="ritual-story-controls">
-        <div className="ritual-story-tools"><span className="ritual-drag-hint">Перелистывайте мышью или свайпом</span><div>
-          <button type="button" className="ritual-play" hidden={reduced} aria-label={playing ? "Приостановить смену сцен" : "Продолжить смену сцен"} aria-pressed={!playing} onClick={() => { setPlaying(value => !value); if (!playing) { setFocused(false); setHovered(false); } }}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">{playing ? <path d="M8 5v14M16 5v14" /> : <path d="m8 5 11 7-11 7V5Z" />}</svg></button>
-          <button type="button" aria-label="Предыдущая сцена ритуала" onClick={() => move(-1)}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12H4m6-6-6 6 6 6" /></svg></button>
-          <button type="button" aria-label="Следующая сцена ритуала" onClick={() => move(1)}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></button>
-        </div></div>
-        <div className="ritual-story-chapters" role="group" aria-label="Выбрать мгновение">{ritualScenes.map((scene, index) => <button type="button" key={scene.image} aria-label={`${index + 1}. ${scene.label}`} aria-current={currentIndex === index ? "step" : undefined} onClick={() => select(index)}><span>0{index + 1}</span><strong>{scene.label}</strong><i aria-hidden="true" /></button>)}</div>
-      </div>
+      <p className="ritual-drag-hint" aria-hidden="true">Листайте влево или вправо <span>мышью · свайпом · Shift + колесо</span></p>
+      <p id="ritual-gesture-help" className="sr-only">Стрелки влево и вправо меняют сцену. Home — первая, End — последняя. Пробел останавливает или продолжает автосмену. При наведении и фокусе смена сцен приостанавливается.</p>
     </div>
     <div className="ritual-afterglow"><div><p className="eyebrow">ВАШ МАЛЕНЬКИЙ ПЛАН НА ВЕЧЕР</p><h2>Меньше спешки.<br /><span>Больше себя.</span></h2></div><div><p>Одна свеча. Любимый аромат.<br />И немного времени, которое только твоё.</p><a className="button button-glass" href="#collection">Выбрать свою свечу <span aria-hidden="true">↗</span></a></div></div>
   </section>;
