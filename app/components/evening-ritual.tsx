@@ -159,12 +159,11 @@ export function EveningRitual() {
     }
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest("button, a")) return;
-    if (event.pointerType === "mouse") {
-      heldPointer.current = event.pointerId;
-      setHolding(true);
-    }
-    if ((event.target as HTMLElement).closest(".ritual-story-copy")) return;
+    if (event.button !== 0 || event.isPrimary === false || heldPointer.current !== null || (event.target as HTMLElement).closest("button, a")) return;
+    heldPointer.current = event.pointerId;
+    setHolding(true);
+    // Touch can swipe over the caption too; mouse users can still select its text.
+    if (event.pointerType !== "touch" && (event.target as HTMLElement).closest(".ritual-story-copy")) return;
     gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture?.(event.pointerId);
     setDragging(true);
@@ -197,8 +196,8 @@ export function EveningRitual() {
         })}
       </div>
       <div className="ritual-story-top"><span>ТИХО / ИСКУССТВО МАЛЕНЬКИХ ПАУЗ</span><span>{String(currentIndex + 1).padStart(2, "0")} <i>/ 05</i></span></div>
-      <p className="ritual-drag-hint" aria-hidden="true">Листайте влево или вправо <span>мышью · свайпом · Shift + колесо · удерживайте для паузы</span></p>
-      <p id="ritual-gesture-help" className="sr-only">Стрелки влево и вправо меняют сцену. Home — первая, End — последняя. Пробел останавливает или продолжает автосмену. Удерживайте левую кнопку мыши на фотографии, чтобы остановить её. Отпустите, чтобы продолжить.</p>
+      <p className="ritual-drag-hint" aria-hidden="true">Листайте влево или вправо · удерживайте для паузы <span>мышью · свайпом · Shift + колесо</span></p>
+      <p id="ritual-gesture-help" className="sr-only">Стрелки влево и вправо меняют сцену. Home — первая, End — последняя. Пробел останавливает или продолжает автосмену. Удерживайте палец или левую кнопку мыши на фотографии, чтобы остановить её. Отпустите, чтобы продолжить.</p>
     </div>
     <div className="ritual-afterglow"><div><p className="eyebrow">ВАШ МАЛЕНЬКИЙ ПЛАН НА ВЕЧЕР</p><h2>Меньше спешки.<br /><span>Больше себя.</span></h2></div><div><p>Одна свеча. Любимый аромат.<br />И немного времени, которое только твоё.</p><a className="button button-glass" href="#collection">Выбрать свою свечу <span aria-hidden="true"><ArrowIcon /></span></a></div></div>
   </section>;

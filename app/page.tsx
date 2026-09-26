@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- preserve the composition of candle photographs */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { useMobileLayout } from "../lib/use-mobile-layout";
 import { ShoppingProvider, Catalog, ScentDiscovery, CartOverlay, CartTrigger } from "./components/storefront-commerce";
 import { Atelier } from "./components/atelier";
 import { LivingFlame } from "./components/living-flame";
@@ -16,6 +17,7 @@ import "./components/mobile-section-stack.css";
 
 type Content = Record<string, {value:string;kind:string}>;
 export default function Home() {
+  const mobile = useMobileLayout();
   const [content,setContent]=useState<Content>({});
   const c=(key:string,fallback:string)=>content[`atelier.${key}`]?.value || fallback;
   const heroImage=c("image.hero","/assets/hero.png");
@@ -39,20 +41,20 @@ export default function Home() {
   return <ShoppingProvider><div className="tiho-site">
   <a className="skip" href="#collection">Перейти к коллекции</a>
   <main className="motion-ready">
-<MobileSectionStack />
+<MobileSectionStack mobile={mobile} />
 <SectionAnchor section="home" />
 <section className="hero" id="home" aria-labelledby="hero-title">
 <header className="header" id="header"><a className="wordmark" href="#home" aria-label="ТИХО — на главную">тихо</a><nav aria-label="Основная навигация"><a href="#collection">Коллекция</a><a href="#workshop">Мастерская</a><a href="#aromas">Ароматы</a></nav><CartTrigger /></header>
 <div className="hero-image" id="hero-image"><img src={heroImage} alt="Горящая чёрная ребристая свеча на тёмном камне" width="1536" height="1024" fetchPriority="high" /></div><div className="hero-shade" aria-hidden="true"></div>
 <div className="hero-content"><p className="eyebrow intro-enter"><span className="tiny-line"></span> СВЕЧИ РУЧНОЙ РАБОТЫ</p><h1 id="hero-title" className="intro-enter">{c("hero.title", "Пусть мир")}<br /><span>{c("hero.emphasis", "подождёт.")}</span></h1><p className="hero-description intro-enter">{c("hero.description", "Один огонь. Любимый аромат.\nИ вечер, который снова принадлежит вам.")}</p><a className="button button-glass intro-enter" href="#collection">Найти свою свечу <span aria-hidden="true"><ArrowIcon /></span></a></div>
 <a className="hero-caption" href="#aromas"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ / ТИХО</span><span>Время для себя</span><span className="caption-notes">Живой свет · любимый аромат</span></a>
-{heroImage === "/assets/hero.png" && <LivingFlame />}
-<div className="hero-bottom"><a className="scroll-cue" href="#aromas">Почувствовать тишину <span aria-hidden="true"><ArrowIcon direction="down" /></span></a></div>
+{heroImage === "/assets/hero.png" && <LivingFlame nextSection={mobile ? "collection" : "aromas"} />}
+<div className="hero-bottom"><a className="scroll-cue" href={mobile ? "#collection" : "#aromas"}>Почувствовать тишину <span aria-hidden="true"><ArrowIcon direction="down" /></span></a></div>
 </section>
-<SectionAnchor section="aromas" />
-<ScentDiscovery />
-<SectionAnchor section="collection" />
-<Catalog />
+{(mobile ? ["collection", "aromas"] : ["aromas", "collection"]).map((section, index) => <Fragment key={section}>
+  <SectionAnchor section={section} />
+  {section === "collection" ? <Catalog number={`0${index + 1}`} /> : <ScentDiscovery number={`0${index + 1}`} />}
+</Fragment>)}
 <SectionAnchor section="intro" />
 <section className="introduction pad" id="intro" aria-labelledby="intro-quote"><div className="intro-meta reveal"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ</span><span className="eyebrow">БОЛЬШЕ, ЧЕМ СВЕТ</span></div><h2 className="reveal" id="intro-title">Есть вещи, которые<br />возвращают <span>к себе.</span></h2><div className="intro-bottom reveal"><p><span className="intro-sensations">Тёплый свет на стене. Знакомый аромат.<br /></span><span id="intro-quote">Свеча, которую выбирают не по случаю —<br />а по ощущению.</span></p><a className="text-link" href="#collection">С этого начинается ТИХО <span aria-hidden="true"><ArrowIcon direction="down-right" /></span></a></div></section>
 <SectionAnchor section="workshop" />

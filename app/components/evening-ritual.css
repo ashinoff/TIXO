@@ -64,6 +64,7 @@
  .tiho-site #care .ritual-story-heading h2{font-size:44px;margin-top:18px}
  .tiho-site #care .ritual-story-heading>p{margin-top:21px;max-width:none;font-size:13px;line-height:1.8}
  .tiho-site #care .ritual-story{height:720px}
+ .tiho-site #care .ritual-story,.tiho-site #care .ritual-story-copy{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
  .tiho-site #care .ritual-story-top{top:22px;left:22px;right:22px;gap:15px;font-size:8px;line-height:1.7}
  .tiho-site #care .ritual-story-top>span:first-child{max-width:190px}
  .tiho-site #care .ritual-story-frame img{object-position:69% center}

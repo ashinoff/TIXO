@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /** Animate the flame already present in the photograph, keeping its wick fixed. */
-export function LivingFlame() {
+export function LivingFlame({ nextSection = "aromas" }: { nextSection?: string }) {
 
   useEffect(() => {
     const container = document.getElementById("hero-image");
@@ -122,16 +122,16 @@ export function LivingFlame() {
     window.addEventListener("pageshow", onPageShow);
 
     const hero = document.getElementById("home") ?? container;
-    const nextSection = document.querySelector<HTMLElement>('[data-section-anchor="aromas"]');
+    const nextAnchor = document.querySelector<HTMLElement>(`[data-section-anchor="${nextSection}"]`);
     const observer = "IntersectionObserver" in window
       ? new IntersectionObserver(() => {
         // A sticky hero is still geometrically on screen after the next panel covers it.
-        visible = hero.getBoundingClientRect().bottom > 0 && (!nextSection || nextSection.getBoundingClientRect().top > 0);
+        visible = hero.getBoundingClientRect().bottom > 0 && (!nextAnchor || nextAnchor.getBoundingClientRect().top > 0);
         sync();
       })
       : null;
     observer?.observe(hero);
-    if (nextSection) observer?.observe(nextSection);
+    if (nextAnchor) observer?.observe(nextAnchor);
 
     // decode also handles cached photographs whose load event has already fired.
     if (photo.complete && photo.naturalWidth) void photo.decode().then(load).catch(fail);
@@ -148,7 +148,7 @@ export function LivingFlame() {
       window.removeEventListener("pageshow", onPageShow);
       canvas.remove();
     };
-  }, []);
+  }, [nextSection]);
 
   return null;
 }

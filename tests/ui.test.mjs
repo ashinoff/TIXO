@@ -13,7 +13,7 @@ const dom=new JSDOM('<!doctype html><html><body><div id="root"></div></body></ht
 for(const key of ['window','document','HTMLElement','HTMLInputElement','Event','MouseEvent','FormData']) globalThis[key]=dom.window[key];
 globalThis.self=dom.window;
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
-window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
+window.matchMedia=query=>({matches:query.includes("prefers-reduced-motion: reduce"),addEventListener(){},removeEventListener(){}});
 // Decode downloaded portrait replacements before React starts their transition.
 window.Image=class { set src(value){this.url=value;queueMicrotask(()=>this.onload?.());} decode(){return Promise.resolve();} };
 window.HTMLCanvasElement.prototype.getContext=()=>null;
@@ -22,7 +22,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/section-scroll.ts','app/components/mobile-section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/mobile-section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -760,7 +760,7 @@ test('left-button hold freezes the ritual until release, without losing swipe or
       if(type==='blur')await act(async()=>window.dispatchEvent(new Event('blur')));else await pointer(type);
       assert.equal(carousel().dataset.playing,'true',`${type} must clear the hold`);
     }
-    await pointer('pointerdown',{pointerType:'touch'});assert.equal(carousel().dataset.playing,'true','Touch scrolling does not silently stop playback');await pointer('pointercancel',{pointerType:'touch'});
+    await pointer('pointerdown',{pointerType:'touch'});assert.equal(carousel().dataset.playing,'false','A finger freezes the photograph');await pointer('pointercancel',{pointerType:'touch'});assert.equal(carousel().dataset.playing,'true','Native vertical scrolling cancels the hold and resumes playback');
     await act(async()=>carousel().dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true})));
     const paused=scene();await pointer('pointerdown');await pointer('pointerup');await tick(6000);assert.equal(scene(),paused);assert.equal(carousel().dataset.playing,'false','Release preserves an explicit Space-key pause');
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
@@ -783,4 +783,62 @@ test('a photograph finishing its download cannot replace the scene while held',a
     await pointer('pointerup');await act(async()=>requests.at(-1).onload());
     assert.equal(document.querySelector('.ritual-story').dataset.scene,'1');assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;window.Image=oldImage;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
+});
+
+test('mobile section order and navigation numbers change together without losing catalog choices',async()=>{
+  const oldMedia=window.matchMedia,subscribers=new Set();let mobile=true;
+  window.matchMedia=query=>({matches:query==='(max-width: 760px)'?mobile:query.includes('prefers-reduced-motion: reduce'),addEventListener(type,listener){if(query==='(max-width: 760px)')subscribers.add(listener);},removeEventListener(type,listener){subscribers.delete(listener);}});
+  window.localStorage.clear();
+  globalThis.fetch=async url=>url==='/api/forms'?response(forms):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/products'?response(products):response({});
+  const root=createRoot(document.getElementById('root'));
+  const order=()=>[...document.querySelectorAll('.tiho-site main>section')].map(section=>section.id);
+  const nav=()=>[...document.querySelectorAll('.section-navigation a')].map(link=>[link.getAttribute('href'),link.querySelector('.section-navigation-circle').textContent]);
+  const resize=async value=>act(async()=>{mobile=value;for(const notify of subscribers)notify();});
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.deepEqual(order(),['home','collection','aromas','intro','workshop','studio','care']);
+    assert.deepEqual(nav(),[['#home',''],['#collection','01'],['#aromas','02'],['#workshop','03'],['#studio','04'],['#care','05']]);
+    assert.match(document.querySelector('#collection .eyebrow').textContent,/^01/);assert.match(document.querySelector('#aromas .eyebrow').textContent,/^02/);
+    assert.equal(document.querySelector('.scroll-cue').getAttribute('href'),'#collection');
+    await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Чёрный"]'));
+    await click(document.querySelector('[aria-label="Познакомиться с ароматом Сандал и дым"]'));
+    const catalog=document.querySelector('#collection'),aromas=document.querySelector('#aromas');
+    await resize(false);
+    assert.deepEqual(order().slice(0,3),['home','aromas','collection']);
+    assert.deepEqual(nav().slice(0,3),[['#home',''],['#aromas','01'],['#collection','02']]);
+    assert.equal(document.querySelector('#collection'),catalog);assert.equal(document.querySelector('#aromas'),aromas);
+    assert.match(document.querySelector('#filter-color').textContent,/Чёрный/);assert.match(document.querySelector('#filter-scent').textContent,/Сандал и дым/);
+    await resize(true);
+    assert.deepEqual(order().slice(0,3),['home','collection','aromas']);assert.equal(document.querySelector('#collection'),catalog);
+    await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelector('.empty-cart>p').textContent,'Здесь пока ТИХО');
+  }finally{await act(async()=>root.unmount());window.matchMedia=oldMedia;window.localStorage.clear();}
+});
+
+test('touch hold freezes transitions, swipes on captions work both ways, and vertical cancellation resumes autoplay',async t=>{
+  const {EveningRitual}=require('./app/components/evening-ritual.js');
+  const oldMedia=window.matchMedia,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});Object.defineProperty(document,'hidden',{configurable:true,value:false});
+  t.mock.timers.enable({apis:['setTimeout']});const root=createRoot(document.getElementById('root'));
+  const carousel=()=>document.querySelector('.ritual-story');
+  const scene=()=>Number(carousel().dataset.scene);
+  const tick=async ms=>act(async()=>t.mock.timers.tick(ms));
+  const pointer=async(type,{target=carousel(),x=200,y=200,id=21,primary=true}={})=>{
+    const event=new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0});
+    Object.defineProperties(event,{pointerId:{value:id},pointerType:{value:'touch'},isPrimary:{value:primary}});
+    await act(async()=>target.dispatchEvent(event));
+  };
+  try{
+    await act(async()=>root.render(React.createElement(EveningRitual)));await tick(2000);assert.equal(scene(),1);
+    await pointer('pointerdown');assert.equal(carousel().dataset.playing,'false');
+    await tick(8000);assert.equal(scene(),1);assert.equal(document.querySelectorAll('.ritual-story-frame').length,2,'Crossfade layers stay frozen together');
+    await pointer('pointerdown',{id:22,primary:false});await pointer('pointerup',{id:22});assert.equal(carousel().dataset.playing,'false','A second finger cannot release the first');
+    await pointer('pointerup',{target:document.body});assert.equal(carousel().dataset.playing,'true');await tick(2000);assert.equal(scene(),2);
+    await pointer('pointerdown',{target:document.querySelector('.ritual-story-frame:last-child .ritual-story-copy')});await tick(5000);assert.equal(scene(),2);
+    await pointer('pointerup',{x:110});assert.equal(scene(),3,'A swipe left on the caption advances');
+    await pointer('pointerdown',{target:document.querySelector('.ritual-story-frame:last-child .ritual-story-care'),x:110});
+    await pointer('pointerup',{x:210});assert.equal(scene(),2,'A swipe right returns to the previous scene');
+    await pointer('pointerdown');await pointer('pointercancel',{y:350});assert.equal(scene(),2);assert.equal(carousel().dataset.playing,'true');
+    await tick(2000);assert.equal(scene(),3,'Autoplay resumes after the browser starts vertical scrolling');
+    await pointer('pointerdown');await pointer('lostpointercapture');assert.equal(carousel().dataset.playing,'true');
+  }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
 });
