@@ -13,7 +13,7 @@
  .tiho-site #intro .intro-bottom p{max-width:34ch;margin:0 auto;text-align:center;font-size:clamp(16px,4.1vw,19px);line-height:1.65;color:#dedbd1;text-wrap:balance}
 }
 
-@media(max-width:760px) and (prefers-reduced-motion:no-preference){
+@media(prefers-reduced-motion:no-preference){
  .tiho-site main.stack-ready>section{
   position:sticky;
   top:min(0px,calc(100svh - var(--stack-panel-height,100svh)));

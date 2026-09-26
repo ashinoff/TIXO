@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/mobile-section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -515,11 +515,11 @@ test('portrait browsing preserves the catalog until explicitly applying its arom
   const root=createRoot(document.getElementById('root'));
   try{
     await act(async()=>root.render(React.createElement(Home)));
-    assert.deepEqual([...document.querySelectorAll('.tiho-site main>section')].slice(0,3).map(section=>section.id),['home','aromas','collection']);
+    assert.deepEqual([...document.querySelectorAll('.tiho-site main>section')].slice(0,3).map(section=>section.id),['home','collection','aromas']);
     assert.equal(document.querySelectorAll('.scent-name-list button').length,26);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/cherry.webp');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
-    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.equal(document.querySelectorAll('.product-card').length,3);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'01 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
+    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.equal(document.querySelectorAll('.product-card').length,3);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'02 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
     await click(document.querySelector('.scent-library>.button'));
     assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);
     await click(document.querySelector('#filter-form'));assert.ok(document.querySelector('.filter-form-preview .wax-stage'));await click(document.querySelector('[aria-label="Форма: Спираль"]'));
@@ -673,8 +673,8 @@ test('hero keeps the burning photograph without controls and section numbers fol
     assert.equal(document.querySelector('#hero-image img').getAttribute('src'),'/assets/hero.png');assert.ok(document.querySelector('#home .button-glass'));
     assert.equal(document.querySelector('.wordmark').textContent,'тихо');assert.equal(document.querySelector('.footer-wordmark').textContent,'тихо');assert.equal(document.querySelector('#care details'),null);
     const labels=['.scent-discovery-heading .eyebrow','#collection .section-heading .eyebrow','#workshop .section-heading .eyebrow','#studio .studio-heading .eyebrow','#care .ritual-story-heading .eyebrow'].map(selector=>document.querySelector(selector).textContent.slice(0,2));
-    assert.deepEqual(labels,['01','02','03','04','05']);assert.equal(document.querySelectorAll('.ritual-story button').length,0);
-    const links=[...document.querySelectorAll('.section-navigation a')];assert.deepEqual(links.map(link=>link.getAttribute('href')),['#home','#aromas','#collection','#workshop','#studio','#care']);assert.ok(links.every(link=>document.querySelector(link.getAttribute('href')) && link.getAttribute('aria-label')));
+    assert.deepEqual(labels,['02','01','03','04','05']);assert.equal(document.querySelectorAll('.ritual-story button').length,0);
+    const links=[...document.querySelectorAll('.section-navigation a')];assert.deepEqual(links.map(link=>link.getAttribute('href')),['#home','#collection','#aromas','#workshop','#studio','#care']);assert.ok(links.every(link=>document.querySelector(link.getAttribute('href')) && link.getAttribute('aria-label')));
   }finally{await act(async()=>root.unmount());}
 });
 
@@ -789,7 +789,7 @@ test('a photograph finishing its download cannot replace the scene while held',a
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;window.Image=oldImage;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
 });
 
-test('mobile section order and navigation numbers change together without losing catalog choices',async()=>{
+test('desktop and mobile keep the same section order and preserve catalog choices',async()=>{
   const oldMedia=window.matchMedia,subscribers=new Set();let mobile=true;
   window.matchMedia=query=>({matches:query==='(max-width: 760px)'?mobile:query.includes('prefers-reduced-motion: reduce'),addEventListener(type,listener){if(query==='(max-width: 760px)')subscribers.add(listener);},removeEventListener(type,listener){subscribers.delete(listener);}});
   window.localStorage.clear();
@@ -808,8 +808,8 @@ test('mobile section order and navigation numbers change together without losing
     await click(document.querySelector('[aria-label="Познакомиться с ароматом Сандал и дым"]'));
     const catalog=document.querySelector('#collection'),aromas=document.querySelector('#aromas');
     await resize(false);
-    assert.deepEqual(order().slice(0,3),['home','aromas','collection']);
-    assert.deepEqual(nav().slice(0,3),[['#home',''],['#aromas','01'],['#collection','02']]);
+    assert.deepEqual(order().slice(0,3),['home','collection','aromas']);
+    assert.deepEqual(nav().slice(0,3),[['#home',''],['#collection','01'],['#aromas','02']]);
     assert.equal(document.querySelector('#collection'),catalog);assert.equal(document.querySelector('#aromas'),aromas);
     assert.match(document.querySelector('#filter-color').textContent,/Чёрный/);assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.match(document.querySelector('.scent-portrait-caption h3').textContent,/Сандал и дым/);
     await resize(true);

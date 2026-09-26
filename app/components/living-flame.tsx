@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /** Animate the flame already present in the photograph, keeping its wick fixed. */
-export function LivingFlame({ nextSection = "aromas" }: { nextSection?: string }) {
+export function LivingFlame({ nextSection = "collection" }: { nextSection?: string }) {
 
   useEffect(() => {
     const container = document.getElementById("hero-image");

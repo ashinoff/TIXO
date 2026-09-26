@@ -7,13 +7,13 @@ export function SectionAnchor({ section }: { section: string }) {
   return <div className="section-anchor" data-section-anchor={section} aria-hidden="true" />;
 }
 
-/** Native sticky scrolling, including panels taller than the phone screen. */
-export function MobileSectionStack({ mobile }: { mobile: boolean }) {
+/** Native sticky scrolling, including panels taller than the viewport. */
+export function SectionStack() {
   useEffect(() => {
     const main = document.querySelector<HTMLElement>(".tiho-site main");
-    if (!mobile || !main || !("ResizeObserver" in window)) return;
+    if (!main || !("ResizeObserver" in window)) return;
     const panels = [...main.querySelectorAll<HTMLElement>(":scope > section")];
-    const media = window.matchMedia("(max-width: 760px) and (prefers-reduced-motion: no-preference)");
+    const media = window.matchMedia("(prefers-reduced-motion: no-preference)");
     let stop = () => {};
 
     const start = () => {
@@ -95,7 +95,7 @@ export function MobileSectionStack({ mobile }: { mobile: boolean }) {
     start();
     media.addEventListener("change", start);
     return () => { stop(); media.removeEventListener("change", start); };
-  }, [mobile]);
+  }, []);
 
   return null;
 }

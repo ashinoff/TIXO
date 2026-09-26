@@ -17,7 +17,8 @@
 .tiho-site .collection-toolbar .catalog-note{font-size:13px;padding-bottom:20px}
 .tiho-site .product-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:38px 24px;align-items:start;padding-top:0}
 .tiho-site .product-card{margin-top:0!important;min-width:0}
-.tiho-site .product-image{aspect-ratio:3/4;width:100%}
+.tiho-site .product-image{aspect-ratio:4/5;width:100%}
+.tiho-site .product-image>img{width:100%;height:100%;object-fit:contain;object-position:center}
 .tiho-site .product-title{align-items:baseline;gap:10px}
 .tiho-site .product-title button{min-width:0;text-align:left;overflow-wrap:anywhere}
 .tiho-site .product-title>span{white-space:nowrap}
@@ -153,16 +154,30 @@
 .tiho-site .detail-specs dd{overflow-wrap:anywhere}
 
 /* Full photographs, including square and portrait uploads, remain uncropped. */
-.tiho-site .product-dialog .detail-photo{height:auto;min-height:0;max-height:none;aspect-ratio:auto}
+.tiho-site .product-dialog .detail-photo{height:auto;min-height:0;max-height:none;aspect-ratio:4/5}
 .tiho-site .product-dialog .detail-photo>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain;object-position:center;transform:none}
-.tiho-site .product-dialog .detail-photo>.candle-silhouette-visual{height:auto;min-height:0;aspect-ratio:1}
+.tiho-site .product-dialog .detail-photo>.candle-silhouette-visual{height:100%;min-height:0;aspect-ratio:4/5}
 .tiho-site .photo-navigation button,.tiho-site .photo-navigation span{background:transparent;border-color:transparent;color:#fff;text-shadow:0 1px 5px #000;filter:drop-shadow(0 1px 2px #0009)}
 .tiho-site .photo-navigation button{border-radius:50%}
 .tiho-site .photo-navigation button:hover{background:#0002}
 .tiho-site .photo-navigation button:focus-visible{outline-color:#fff}
 
-.tiho-site .detail-photo-track{position:relative;width:100%;will-change:transform;transform:translate3d(0,0,0)}
-.tiho-site .product-dialog .detail-photo-track>.photo-current{display:block;width:100%;height:auto;max-height:none;object-fit:contain;object-position:center;transform:none}
+.tiho-site .detail-photo-track{position:absolute;inset:0;width:100%;height:100%;will-change:transform;transform:translate3d(0,0,0)}
+.tiho-site .product-dialog .detail-photo-track>.photo-current{display:block;width:100%;height:100%;max-height:none;object-fit:contain;object-position:center;transform:none}
 .tiho-site .product-dialog .detail-photo-track>.photo-adjacent{position:absolute;top:0;width:100%;height:100%;object-fit:contain;object-position:center;pointer-events:none}
 .tiho-site .detail-photo-track>.photo-previous{left:-100%}.tiho-site .detail-photo-track>.photo-next{left:100%}
 @media(prefers-reduced-motion:reduce){.tiho-site .detail-photo-track{transition:none!important;will-change:auto}}
+
+/* Desktop product cards sit in the middle; cart and mobile sheets keep their layout. */
+@media(min-width:761px){
+ .tiho-site .modal-backdrop:has(>.product-dialog){align-items:center;justify-content:center;padding:32px}
+ .tiho-site .product-dialog{position:relative;inset:auto;width:min(570px,100%);height:auto;max-height:calc(100dvh - 64px);box-shadow:0 24px 90px #0005;animation:product-dialog-arrive .35s cubic-bezier(.22,1,.36,1)}
+ .tiho-site .product-detail-body{min-height:0}
+}
+@media(min-width:1000px){
+ .tiho-site .product-dialog{width:min(1040px,100%)}
+ .tiho-site .product-detail-body{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+ .tiho-site .detail-gallery,.tiho-site .detail-content{min-width:0}
+ .tiho-site .detail-content{padding:28px}
+}
+@keyframes product-dialog-arrive{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}

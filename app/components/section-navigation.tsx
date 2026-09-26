@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMobileLayout } from "../../lib/use-mobile-layout";
 
 const sections = [
   { id: "home", label: "В начало" },
-  { id: "aromas", label: "Искусство аромата" },
   { id: "collection", label: "Коллекция" },
+  { id: "aromas", label: "Искусство аромата" },
   { id: "workshop", label: "Мастерская ТИХО" },
   { id: "studio", label: "Твоя мастерская" },
   { id: "care", label: "Простой ритуал" },
 ] as const;
-const mobileSections = [sections[0], sections[2], sections[1], ...sections.slice(3)];
 
 export function SectionNavigation() {
-  const mobile = useMobileLayout();
-  const orderedSections = mobile ? mobileSections : sections;
   const [active, setActive] = useState<string>("home");
   useEffect(() => {
     if (!("requestAnimationFrame" in window)) return;
@@ -24,7 +20,7 @@ export function SectionNavigation() {
       frame = 0;
       const marker = window.innerHeight * .4;
       let current: string = "home";
-      for (const section of orderedSections) {
+      for (const section of sections) {
         const element = document.getElementById(section.id);
         if (element && element.getBoundingClientRect().top <= marker) current = section.id;
       }
@@ -43,10 +39,10 @@ export function SectionNavigation() {
       window.removeEventListener("resize", schedule);
       observer?.disconnect();
     };
-  }, [orderedSections]);
+  }, []);
 
   return <nav className="section-navigation" aria-label="Быстрый переход к разделу">
-    {orderedSections.map((section, index) => <a key={section.id} href={`#${section.id}`} aria-label={section.label} aria-current={active === section.id ? "location" : undefined}>
+    {sections.map((section, index) => <a key={section.id} href={`#${section.id}`} aria-label={section.label} aria-current={active === section.id ? "location" : undefined}>
       <span className="section-navigation-circle" aria-hidden="true">{index ? String(index).padStart(2, "0") : <svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m-5 5 5-5 5 5" /></svg>}</span>
       <span className="section-navigation-label" aria-hidden="true">{section.label}</span>
     </a>)}

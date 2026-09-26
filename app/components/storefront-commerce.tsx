@@ -260,7 +260,7 @@ const scentChapters = [
   { key: "base", label: "Шлейф", title: "ПОСЛЕВКУСИЕ" },
 ] as const;
 
-export function ScentDiscovery({ number = "01" }: { number?: string }) {
+export function ScentDiscovery({ number = "02" }: { number?: string }) {
   const shop = useShopping();
   const [previewId, setPreviewId] = useState<number | null>(null);
   const [chapterSelection, setChapterSelection] = useState({ scentId: 0, note: 0 });
@@ -285,7 +285,7 @@ export function ScentDiscovery({ number = "01" }: { number?: string }) {
   </section>;
 }
 
-export function Catalog({ number = "02" }: { number?: string }) {
+export function Catalog({ number = "01" }: { number?: string }) {
   const shop = useShopping();
   const [colorId, setColorId] = useState<number | null>(null);
   const [formId, setFormId] = useState<number | null>(null);
