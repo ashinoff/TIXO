@@ -703,7 +703,7 @@ test('button-free ritual supports keyboard, horizontal wheel, mouse swipes and t
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();}
 });
 
-test('ritual advances every three seconds and pauses for reading, background tabs and the space key',async t=>{
+test('ritual advances every two seconds during hover, focus and scrolling, with explicit pause support',async t=>{
   const {EveningRitual}=require('./app/components/evening-ritual.js');
   const oldMedia=window.matchMedia,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
   window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});Object.defineProperty(document,'hidden',{configurable:true,value:false});
@@ -713,13 +713,15 @@ test('ritual advances every three seconds and pauses for reading, background tab
   const space=async()=>act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true})));
   try{
     await act(async()=>root.render(React.createElement(EveningRitual)));
-    await act(async()=>document.querySelector('.ritual-story-frame img').dispatchEvent(new Event('load')));
+    // No DOM load event: the first SSR photograph may already be cached before hydration.
     const scene=()=>Number(document.querySelector('.ritual-story').dataset.scene);
-    assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');await tick(2999);assert.equal(scene(),0);await tick(1);assert.equal(scene(),1);
-    await hover('pointerover');await tick(24000);assert.equal(scene(),1);assert.equal(document.querySelector('.ritual-story').dataset.playing,'false');
-    await hover('pointerout');await tick(3000);assert.equal(scene(),2);
-    await space();await tick(24000);assert.equal(scene(),2);
-    await space();await tick(3000);assert.equal(scene(),3);
-    await act(async()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await tick(24000);assert.equal(scene(),3);
+    assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');await tick(1999);assert.equal(scene(),0);await tick(1);assert.equal(scene(),1);
+    await hover('pointerover');await tick(2000);assert.equal(scene(),2);assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');
+    await act(async()=>document.querySelector('.ritual-story').focus());await tick(2000);assert.equal(scene(),3,'Keyboard focus does not silently stop playback');
+    await act(async()=>window.dispatchEvent(new Event('scroll')));await tick(2000);assert.equal(scene(),4,'Scrolling does not reset the timer');
+    await hover('pointerout');await tick(2000);assert.equal(scene(),0);
+    await space();await tick(24000);assert.equal(scene(),0);
+    await space();await tick(2000);assert.equal(scene(),1);
+    await act(async()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await tick(24000);assert.equal(scene(),1);
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
 });

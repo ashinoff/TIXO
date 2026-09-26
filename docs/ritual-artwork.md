@@ -10,7 +10,7 @@ Final project assets:
 - `public/assets/ritual/04-extinguish.webp` — extinguish gently.
 - `public/assets/ritual/05-return.webp` — protect the cooled candle until next time.
 
-The site renders care instructions as accessible HTML, never as text embedded in these photographs. The carousel crossfades decoded photographs and their matching copy over 2.4 seconds. Autoplay allows 3 seconds per scene and pauses for reading, keyboard focus, gestures, background tabs and reduced-motion preferences. Pointer dragging, touch swiping, horizontal wheel / Shift + wheel and keyboard arrows support manual navigation without visible carousel buttons. Space pauses or resumes autoplay. A single wheel gesture advances one scene, without intercepting vertical page scrolling.
+The site renders care instructions as accessible HTML, never as text embedded in these photographs. The carousel crossfades decoded photographs and their matching copy over 1.6 seconds. Autoplay advances every 2 seconds, including while the visitor scrolls, hovers, focuses the carousel or is elsewhere on the page. The first photograph loads eagerly and the next is prefetched, so offscreen playback can start without waiting for the section to enter view. Only explicit Space-key pause, a hidden browser tab, reduced-motion preferences or a pending image download suspend automatic changes. Pointer dragging, touch swiping, horizontal wheel / Shift + wheel and keyboard arrows support manual navigation without visible carousel buttons. Space pauses or resumes autoplay. A single wheel gesture advances one scene, without intercepting vertical page scrolling.
 
 ## Scene 1
 

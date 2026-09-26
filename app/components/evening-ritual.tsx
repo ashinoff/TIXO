@@ -3,8 +3,8 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
-const SCENE_MS = 3000;
-const FADE_MS = 2400;
+const SCENE_MS = 2000;
+const FADE_MS = 1600;
 export const ritualScenes = [
   { image: "/assets/ritual/01-space.webp", label: "Место", moment: "ПЕРЕД ПЕРВЫМ ОГНЁМ", title: "Освободи место\nдля тишины.", lead: "Вечер начинается с маленькой паузы.", care: "Поставь свечу на устойчивую негорючую подставку. Оставь вокруг свободное пространство — вдали от сквозняков, штор и других вещей, которые могут загореться.", alt: "Незажжённая чёрная свеча на широкой каменной подставке в спокойном тёмном интерьере" },
   { image: "/assets/ritual/02-light.webp", label: "Огонь", moment: "ПЕРВОЕ ПРИКОСНОВЕНИЕ", title: "Один огонь.\nДругой ритм.", lead: "Зажги свечу — и дай вечеру начаться.", care: "Сними упаковку и съёмный декор. Подготовь фитиль и зажги его по инструкции к своей свече: у каждой формы свои особенности. Погаси использованную спичку.", alt: "Рука подносит длинную зажжённую спичку к фитилю чёрной ребристой свечи" },
@@ -22,16 +22,13 @@ export function EveningRitual() {
   const [requested, setRequested] = useState({ index: 0, revision: 0 });
   const [frames, setFrames] = useState<{ current: Frame; previous: Frame | null }>({ current: { index: 0, key: 0, failed: false, ready: false }, previous: null });
   const [reduced, setReduced] = useState(true);
-  const [visible, setVisible] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [playing, setPlaying] = useState(true);
   const currentIndex = frames.current.index;
   const currentKey = frames.current.key;
   const busy = requested.index !== currentIndex;
-  const paused = !playing || reduced || !visible || !pageVisible || hovered || focused || dragging || busy || !frames.current.ready;
+  const paused = !playing || reduced || !pageVisible || busy || !frames.current.ready;
   const select = useCallback((index: number) => setRequested(last => ({ index: wrap(index), revision: last.revision + 1 })), []);
   const move = useCallback((direction: number) => setRequested(last => ({ index: wrap(last.index + direction), revision: last.revision + 1 })), []);
 
@@ -40,12 +37,24 @@ export function EveningRitual() {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const onMotion = () => setReduced(motion.matches);
     const onVisibility = () => setPageVisible(!document.hidden);
-    const observer = "IntersectionObserver" in window ? new IntersectionObserver(entries => setVisible(entries[0]?.isIntersecting ?? false), { threshold: 0.15 }) : null;
-    if (root.current) observer?.observe(root.current);
-    void Promise.resolve().then(() => { if (!cancelled) { onMotion(); onVisibility(); if (!observer) setVisible(true); } });
+    void Promise.resolve().then(() => { if (!cancelled) { onMotion(); onVisibility(); } });
     motion.addEventListener("change", onMotion);
     document.addEventListener("visibilitychange", onVisibility);
-    return () => { cancelled = true; observer?.disconnect(); motion.removeEventListener("change", onMotion); document.removeEventListener("visibilitychange", onVisibility); };
+    return () => { cancelled = true; motion.removeEventListener("change", onMotion); document.removeEventListener("visibilitychange", onVisibility); };
+  }, []);
+
+  useEffect(() => {
+    // The eager server-rendered image can finish before React attaches onLoad.
+    // A cached image request also reports readiness without needing to scroll here.
+    let cancelled = false;
+    const first = new window.Image();
+    const ready = (failed: boolean) => {
+      if (!cancelled) setFrames(last => last.current.key === 0 ? { ...last, current: { ...last.current, ready: true, failed } } : last);
+    };
+    first.onload = () => ready(false);
+    first.onerror = () => ready(true);
+    first.src = ritualScenes[0].image;
+    return () => { cancelled = true; first.onload = null; first.onerror = null; };
   }, []);
 
   useEffect(() => {
@@ -89,6 +98,11 @@ export function EveningRitual() {
   }, [requested, currentIndex, reduced]);
 
   useEffect(() => {
+    const next = new window.Image();
+    next.src = ritualScenes[wrap(currentIndex + 1)].image;
+  }, [currentIndex]);
+
+  useEffect(() => {
     if (!frames.previous) return;
     const timer = setTimeout(() => setFrames(last => ({ ...last, previous: null })), FADE_MS + 100);
     return () => clearTimeout(timer);
@@ -96,7 +110,7 @@ export function EveningRitual() {
 
   useEffect(() => {
     if (paused) return;
-    // Reading, swiping or changing a chapter always grants a fresh reading interval.
+    // The story keeps its rhythm while scrolling, hovering or outside the viewport.
     const timer = setTimeout(() => select(currentIndex + 1), SCENE_MS);
     return () => clearTimeout(timer);
   }, [paused, currentIndex, currentKey, requested.revision, select]);
@@ -109,7 +123,6 @@ export function EveningRitual() {
     if (event.key === " " && event.target === event.currentTarget) {
       event.preventDefault();
       setPlaying(value => !value);
-      if (!playing) { setFocused(false); setHovered(false); }
     }
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -133,16 +146,14 @@ export function EveningRitual() {
   return <section className="evening-ritual pad" id="care" aria-labelledby="care-title">
     <header className="ritual-story-heading"><div><p className="eyebrow">05 / ПРОСТОЙ РИТУАЛ</p><h2 id="care-title">Чтобы свет<br /><span>радовал дольше.</span></h2></div><p>Пять мгновений одного вечера.<br />От первого огня до следующей встречи.</p></header>
     <div ref={root} className={`ritual-story${dragging ? " is-dragging" : ""}`} role="region" aria-roledescription="карусель" aria-label="Пять мгновений тихого вечера" tabIndex={0} aria-describedby="ritual-gesture-help" aria-keyshortcuts="ArrowLeft ArrowRight Home End Space" data-scene={currentIndex} data-playing={!paused} aria-busy={busy}
-      onKeyDown={onKey} onPointerDown={onPointerDown} onPointerUp={event => finishGesture(event)} onPointerCancel={event => finishGesture(event, true)}
-      onPointerEnter={event => { if (event.pointerType === "mouse") setHovered(true); }} onPointerLeave={() => setHovered(false)}
-      onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}>
+      onKeyDown={onKey} onPointerDown={onPointerDown} onPointerUp={event => finishGesture(event)} onPointerCancel={event => finishGesture(event, true)}>
       <div className="ritual-story-layers" aria-live={paused ? "polite" : "off"}>
         {layers.map((frame, index) => {
           const current = index === layers.length - 1;
           const scene = ritualScenes[frame.index];
           return <article key={frame.key} className={`ritual-story-frame${current && frames.previous ? " is-revealing" : !current ? " is-leaving" : ""}`} aria-hidden={!current || undefined} inert={!current || undefined} aria-label={`${frame.index + 1} из 5: ${scene.label}`}
             onAnimationEnd={event => { if (current && event.target === event.currentTarget) setFrames(last => ({ ...last, previous: null })); }}>
-            {!frame.failed && <img src={scene.image} alt={scene.alt} width="1536" height="1024" loading="lazy" draggable={false}
+            {!frame.failed && <img src={scene.image} alt={scene.alt} width="1536" height="1024" loading="eager" draggable={false}
               onLoad={() => { if (current && !frame.ready) setFrames(last => ({ ...last, current: { ...last.current, ready: true } })); }}
               onError={() => { if (current) setFrames(last => ({ ...last, current: { ...last.current, ready: true, failed: true } })); }} />}
             <div className="ritual-story-shade" />
@@ -152,7 +163,7 @@ export function EveningRitual() {
       </div>
       <div className="ritual-story-top"><span>ТИХО / ИСКУССТВО МАЛЕНЬКИХ ПАУЗ</span><span>{String(currentIndex + 1).padStart(2, "0")} <i>/ 05</i></span></div>
       <p className="ritual-drag-hint" aria-hidden="true">Листайте влево или вправо <span>мышью · свайпом · Shift + колесо</span></p>
-      <p id="ritual-gesture-help" className="sr-only">Стрелки влево и вправо меняют сцену. Home — первая, End — последняя. Пробел останавливает или продолжает автосмену. При наведении и фокусе смена сцен приостанавливается.</p>
+      <p id="ritual-gesture-help" className="sr-only">Стрелки влево и вправо меняют сцену. Home — первая, End — последняя. Пробел останавливает или продолжает автосмену.</p>
     </div>
     <div className="ritual-afterglow"><div><p className="eyebrow">ВАШ МАЛЕНЬКИЙ ПЛАН НА ВЕЧЕР</p><h2>Меньше спешки.<br /><span>Больше себя.</span></h2></div><div><p>Одна свеча. Любимый аромат.<br />И немного времени, которое только твоё.</p><a className="button button-glass" href="#collection">Выбрать свою свечу <span aria-hidden="true">↗</span></a></div></div>
   </section>;
