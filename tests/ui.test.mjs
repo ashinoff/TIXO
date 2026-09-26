@@ -22,7 +22,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/living-flame.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -110,7 +110,7 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
     await act(async()=>root.render(React.createElement(Home)));
     await click(document.querySelector('#studio-step-3'));
     await click(document.querySelector('#add-custom'));
-    await click(document.querySelector('#studio-step-1'));
+    await click(document.querySelector('#studio-step-2'));
     await click(document.querySelector('input[name="candle-color"][value="red"]'));
     await click(document.querySelector('#studio-step-3'));
     await click(document.querySelector('#add-custom'));
@@ -359,10 +359,10 @@ test('workshop uses active catalog forms and carries their silhouettes through c
     assert.match(document.querySelector('.shape-options').textContent,/Наша ракушка/);assert.doesNotMatch(document.querySelector('.shape-options').textContent,/Скрытая форма|Гладкая колонна/);
     assert.equal(document.querySelector('#studio-candle').dataset.formId,'21');
     assert.match(document.querySelector('#studio-candle .wax-uploaded').getAttribute('style'),/our-shell\.png/);
-    await click(document.querySelector('#studio-step-1'));await click(document.querySelector('input[name="candle-color"][value="red"]'));
+    await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="candle-color"][value="red"]'));
     assert.equal(document.querySelector('#studio-candle .wax-uploaded').style.getPropertyValue('--wax'),'#6d2636');
     await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
-    await click(document.querySelector('#studio-step-0'));await click(document.querySelector('input[name="candle-shape"][value="22"]'));
+    await click(document.querySelector('#studio-step-1'));await click(document.querySelector('input[name="candle-shape"][value="22"]'));
     assert.match(document.querySelector('#scene-form').textContent,/Наш куб/);
     assert.match(document.querySelector('#studio-candle .wax-uploaded').getAttribute('style'),/our-cube\.png/);
     await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
@@ -391,7 +391,7 @@ test('workshop handles failed and empty catalogs and blocks a saved cart form th
     await act(async()=>root.render(React.createElement(Home)));
     assert.match(document.querySelector('#studio [role=alert]').textContent,/Не удалось загрузить формы/);assert.equal(document.querySelector('#add-custom').disabled,true);assert.equal(document.querySelectorAll('.product-card').length,8);
     mode='empty';await click(document.querySelector('#studio .builder-form-message button'));
-    assert.match(document.querySelector('#studio-panel-0').textContent,/готовит новые формы/);assert.equal(document.querySelector('#studio [role=alert]'),null);assert.equal(document.querySelector('#add-custom').disabled,true);
+    assert.match(document.querySelector('#studio-panel-1').textContent,/готовит новые формы/);assert.equal(document.querySelector('#studio [role=alert]'),null);assert.equal(document.querySelector('#add-custom').disabled,true);
   }finally{await act(async()=>root.unmount());}
   window.localStorage.setItem('tixo.atelier.cart.v1',JSON.stringify([{customRecipe:{formId:31,color:'ivory',top:'bergamot',heart:'honey',base:'tonka'},formName:'Моя форма',silhouette:'/api/uploads/old-form.png',quantity:1}]));mode='disabled';root=createRoot(document.getElementById('root'));
   try{
@@ -420,11 +420,11 @@ test('builder chooses catalog aromas and displays their authored chapters withou
   const root=createRoot(document.getElementById('root'));
   try{
     await act(async()=>root.render(React.createElement(Home)));
-    await click(document.querySelector('#studio-step-2'));
+    await click(document.querySelector('#studio-step-0'));
     assert.equal(document.querySelectorAll('input[name="recipe-scent"]').length,2);assert.equal(document.querySelector('input[name="recipe-top"]'),null);
     assert.match(document.querySelector('.builder-aroma').textContent,/Цедра/);assert.match(document.querySelector('.builder-aroma').textContent,/Древесное послевкусие/);
     await click(document.querySelector('#studio-step-3'));await click(document.querySelector('#add-custom'));
-    await click(document.querySelector('#studio-step-2'));await click(document.querySelector('input[name="recipe-scent"][value="2"]'));
+    await click(document.querySelector('#studio-step-0'));await click(document.querySelector('input[name="recipe-scent"][value="2"]'));
     assert.match(document.querySelector('.builder-aroma').textContent,/Тёплое дерево/);assert.doesNotMatch(document.querySelector('.builder-aroma').textContent,/Глубокое сердце/);
     await click(document.querySelector('#studio-step-3'));assert.match(document.querySelector('#recipe-summary').textContent,/Сандал и дым/);await click(document.querySelector('#add-custom'));
     await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
@@ -439,7 +439,7 @@ test('disabled saved aroma blocks checkout and empty aroma catalog blocks the bu
   globalThis.fetch=async url=>url==='/api/forms'?response(forms):url==='/api/scents'?response([{...scents[0],active:false}]):url==='/api/colors'?response(colors):response([]);
   const root=createRoot(document.getElementById('root'));
   try{
-    await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('#add-custom').disabled,true);assert.match(document.querySelector('#studio-panel-2').textContent,/готовит новые ароматы/);
+    await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('#add-custom').disabled,true);assert.match(document.querySelector('#studio-panel-0').textContent,/готовит новые ароматы/);
     await click(document.querySelector('.cart-trigger'));assert.match(document.querySelector('.cart-items').textContent,/Старый аромат/);assert.match(document.querySelector('.stock-error').textContent,/аромат больше недоступны/);assert.equal(document.querySelector('#checkout-form button[type=submit]').disabled,true);
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
@@ -598,4 +598,62 @@ test('aroma portraits retain the decoded frame, discard stale loads and support 
     await pointer('pointerover');assert.equal(surface.style.getPropertyValue('--zoom-scale'),'1');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));await act(async()=>requested.at(-1).onload());assert.equal(document.querySelectorAll('.scent-portrait-frame').length,1);assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/WINE.webp');
   }finally{await act(async()=>root.unmount());window.Image=originalImage;window.matchMedia=originalMedia;window.localStorage.clear();}
+});
+
+test('workshop begins with aroma and keeps the photo, chapters and candle mounted across steps and searches',async()=>{
+  window.localStorage.clear();
+  const profile={top:{notes:'Вишня',description:'Первая нота'},heart:{notes:'Вино',description:'Сердце аромата'},base:{notes:'Древесина',description:'Тихий шлейф'}};
+  const aromas=[{...scents[0],name:'CHERRY',image:'/cherry.webp',profile},{...scents[1],name:'WINE',image:'/wine.webp',profile}];
+  globalThis.fetch=async url=>url==='/api/scents'?response(aromas):url==='/api/forms'?response(forms):url==='/api/colors'?response(colors):url==='/api/products'?response([]):response({});
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.match(document.querySelector('#studio-title').textContent,/Твоя мастерская/);
+    assert.deepEqual([...document.querySelectorAll('.studio-steps button')].map(el=>el.textContent),['01Аромат','02Форма','03Цвет','04Результат']);
+    assert.equal(document.querySelector('#studio-panel-0').hidden,false);
+    await setValue(document.querySelector('.studio-search input'),'wine');
+    assert.equal(document.querySelectorAll('input[name="recipe-scent"]').length,1);
+    await click(document.querySelector('input[name="recipe-scent"][value="2"]'));
+    assert.equal(document.querySelector('.workshop-background img').getAttribute('src'),'/wine.webp');
+    const candle=document.querySelector('#studio-candle'),photo=document.querySelector('.workshop-background img'),title=document.querySelector('.builder-aroma h3');
+    const chapterTabs=[...document.querySelectorAll('.workshop-chapter-tabs button')];
+    await click(chapterTabs[1]);assert.match(document.querySelector('.builder-aroma-chapters section:not([hidden])').textContent,/Сердце аромата/);
+    for(const step of [1,2,3,0]){
+      await click(document.querySelector(`#studio-step-${step}`));
+      assert.equal(document.querySelector('#studio-candle'),candle);assert.equal(document.querySelector('.workshop-background img'),photo);assert.equal(document.querySelector('.builder-aroma h3'),title);
+      assert.equal(document.querySelector('.workshop-chapter-tabs button[aria-selected=true]'),chapterTabs[1]);
+    }
+    await setValue(document.querySelector('#studio-panel-0 .studio-search input'),'нет такого аромата');
+    assert.equal(document.querySelectorAll('input[name="recipe-scent"]').length,0);assert.match(document.querySelector('#studio-panel-0 .studio-search-empty').textContent,/Попробуй/);
+    assert.equal(document.querySelector('.builder-aroma h3'),title);assert.match(document.querySelector('#recipe-summary').textContent,/WINE/);
+    await click(document.querySelector('#studio-step-1'));await setValue(document.querySelector('#studio-panel-1 .studio-search input'),'ракушка');
+    assert.equal(document.querySelectorAll('input[name="candle-shape"]').length,1);await click(document.querySelector('input[name="candle-shape"][value="2"]'));
+    await click(document.querySelector('#studio-next'));assert.equal(document.querySelector('#studio-panel-2').hidden,false);
+    await click(document.querySelector('input[name="candle-color"][value="red"]'));assert.equal(document.querySelector('.workshop-background img'),photo);
+    await click(document.querySelector('#studio-next'));assert.equal(document.querySelector('#studio-panel-3').hidden,false);assert.match(document.querySelector('#recipe-summary').textContent,/Ракушка/);
+    await click(document.querySelector('#add-custom'));await click(document.querySelector('.cart-trigger'));
+    assert.match(document.querySelector('.cart-item.custom').textContent,/WINE/);assert.match(document.querySelector('.cart-item.custom').textContent,/Ракушка/);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('workshop atmosphere waits for the selected photo and ignores stale downloads',async()=>{
+  const {WorkshopScene}=require('./app/components/workshop-scene.js');
+  const originalImage=window.Image,originalMedia=window.matchMedia,requests=[];
+  window.Image=class {constructor(){requests.push(this);}set src(value){this.url=value;}decode(){return Promise.resolve();}};
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+  const aromas=['CHERRY','WINE','COAL'].map((name,index)=>({...scents[index],name,image:`/${name}.webp`}));
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(WorkshopScene,{scent:aromas[0]})));
+    await act(async()=>root.render(React.createElement(WorkshopScene,{scent:aromas[1]})));const stale=requests.at(-1).onload;
+    assert.equal(document.querySelector('.builder-aroma h3').textContent,'CHERRY');
+    await act(async()=>root.render(React.createElement(WorkshopScene,{scent:aromas[2]})));
+    await act(async()=>stale());assert.equal(document.querySelector('.builder-aroma h3').textContent,'CHERRY');
+    await act(async()=>requests.at(-1).onload());
+    const current=document.querySelector('.workshop-atmosphere-layer.is-revealing');
+    assert.match(current.textContent,/COAL/);assert.equal(current.querySelector('img').getAttribute('src'),'/COAL.webp');
+    assert.equal(document.querySelector('.workshop-atmosphere-layer.is-leaving').hasAttribute('inert'),true);
+    await act(async()=>current.dispatchEvent(new Event('animationend',{bubbles:true})));assert.equal(document.querySelectorAll('.workshop-atmosphere-layer').length,1);
+    await act(async()=>current.querySelector('img').dispatchEvent(new Event('error')));assert.equal(document.querySelector('.workshop-background img'),null);assert.match(current.textContent,/COAL/);
+  }finally{await act(async()=>root.unmount());window.Image=originalImage;window.matchMedia=originalMedia;}
 });

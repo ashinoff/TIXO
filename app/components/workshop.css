@@ -1,0 +1,117 @@
+/* A fixed scene and control area keep the candle still while option counts change. */
+.tiho-site #studio .studio-layout{position:relative;isolation:isolate;grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:820px;overflow:hidden;background:#100f0d;border-color:#d0d5c62b}
+.tiho-site #studio .studio-scene{min-height:0;height:100%;padding:0;background:transparent;overflow:visible;isolation:auto;pointer-events:none}
+.tiho-site #studio .studio-controls{position:relative;z-index:2;min-height:0;height:100%;padding:30px 32px 24px;background:transparent;display:grid;grid-template-rows:100px minmax(0,1fr) 64px;text-shadow:0 1px 14px #0009}
+.tiho-site #studio .studio-steps{padding-bottom:17px;border-color:#d8dec23b;gap:5px}
+.tiho-site #studio .studio-steps button{min-height:0;padding:12px 9px;color:#d4d9c9;border-color:#d8dec230;background:transparent;gap:10px}
+.tiho-site #studio .studio-steps button>span{color:#b9c1a9}
+.tiho-site #studio .studio-steps button[aria-selected=true]{background:#e1e7d21c;color:#fff7e9;border-color:#e1e7d2}
+.tiho-site #studio .studio-panel{min-height:0;padding:24px 3px 24px 0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#bcc6a64d transparent;animation:workshop-copy-in 1.2s ease both}
+.tiho-site #studio .studio-panel[hidden]{display:none}
+.tiho-site #studio .studio-panel>.eyebrow{color:#c6cbb9;font-size:10px;letter-spacing:.13em}
+.tiho-site #studio .studio-panel h3{font-size:clamp(27px,2.35vw,37px);margin-top:16px;line-height:1.18;font-weight:400}
+.tiho-site #studio .studio-panel>p:not(.eyebrow):not(.recipe-note):not(.builder-status){font-size:14px;line-height:1.75;color:#d5d8cc;margin-top:14px}
+.tiho-site #studio .studio-navigation{margin:0;padding:12px 0 0;border-color:#d8dec23b;min-height:0}
+.tiho-site #studio .studio-navigation button{font-size:14px;color:#edece2}
+.tiho-site #studio .studio-navigation button:disabled{opacity:.3}
+.tiho-site #studio .studio-search{position:relative;display:block;margin:20px 0 14px}
+.tiho-site #studio .studio-search input{width:100%;min-height:46px;border:1px solid #d7ddc648;background:#11140e26;color:#f5f1e6;border-radius:0;padding:12px 42px 12px 14px;font:inherit;font-size:13px;outline-offset:3px}
+.tiho-site #studio .studio-search input::placeholder{color:#c2c8b8}
+.tiho-site #studio .studio-search>span:last-child{position:absolute;right:14px;top:9px;font-size:24px;pointer-events:none}
+.tiho-site #studio .studio-options-window{height:286px;max-height:286px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#a9b69775 transparent;align-content:start;padding:3px!important;margin:0!important}
+.tiho-site #studio .builder-scent-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+.tiho-site #studio .builder-scent-options label{min-width:0;width:100%}
+.tiho-site #studio .builder-scent-options label>span{display:flex;align-items:center;gap:9px;min-height:55px;height:100%;border:0;border-bottom:1px solid #d4ddbf3b;padding:12px 8px;background:transparent;color:#e2e3d8;font-size:11px;line-height:1.5;transition:background .5s,border-color .5s}
+.tiho-site #studio .builder-scent-options small{font-size:9px;color:#bac4a9;flex-shrink:0}
+.tiho-site #studio .builder-scent-options i{font-style:normal;margin-left:auto;opacity:0}
+.tiho-site #studio .builder-scent-options input:checked+span{background:#dce3cf24;border-color:#dce3cfaa;color:#fffbed}
+.tiho-site #studio .builder-scent-options input:checked+span i{opacity:1}
+.tiho-site #studio .builder-scent-options label:hover>span{background:#dce3cf16}
+.tiho-site #studio .studio-search-empty{grid-column:1/-1;padding:18px 5px;font-size:13px;line-height:1.8;color:#d8dfca}
+.tiho-site #studio .studio-panel>.studio-selection{display:flex;justify-content:space-between;gap:14px;border-top:1px solid #d4ddbf3b;padding-top:12px;font-size:11px!important;color:#b9c3ad!important}
+.tiho-site #studio .studio-selection strong{font-weight:400;color:#ececde;text-align:right;max-width:70%;overflow-wrap:anywhere}
+.tiho-site #studio .workshop-form-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px!important}
+.tiho-site #studio .shape-options label{min-height:178px;background:#dce3cf08;border:1px solid #d4ddbf3b;padding:8px}
+.tiho-site #studio .shape-options label:has(input:checked){background:#dce3cf1c;border-color:#dce3cfaa}
+.tiho-site #studio .workshop-shape-preview{height:114px;max-width:150px;--preview-surface:#292b22}
+.tiho-site #studio .shape-options label:has(input:checked) .workshop-shape-preview{--preview-surface:#3f4236}
+.tiho-site #studio .shape-options label>span:last-child{font-size:13px;min-height:36px;margin-top:3px}
+.tiho-site #studio .color-options{gap:12px!important;margin-top:28px!important}
+.tiho-site #studio .color-options label{background:#dce3cf0b;border-color:#d4ddbf40;min-height:88px;padding:16px}
+.tiho-site #studio .color-options label:has(input:checked){background:#dce3cf24;border-color:#dce3cfaa}
+.tiho-site #studio .pigment{width:34px;height:34px}
+.tiho-site #studio .recipe-summary>div{border-color:#d4ddbf38;padding:10px 0;overflow-wrap:anywhere}
+.tiho-site #studio .recipe-summary dt{color:#bdc7ac;flex-shrink:0}
+.tiho-site #studio .recipe-summary dd{color:#ececde}
+.tiho-site #studio .custom-price{margin-top:20px;color:#c7d0b9}
+.tiho-site #studio .recipe-note{color:#c7cbbd!important}
+.tiho-site #studio .studio-panel .button{text-shadow:none}
+
+/* Authored aroma photo spans both columns. Its scale never depends on the step. */
+.tiho-site #studio .workshop-atmosphere,.tiho-site #studio .workshop-atmosphere-layer,.tiho-site #studio .workshop-background,.tiho-site #studio .workshop-background-shade{position:absolute;inset:0;pointer-events:none}
+.tiho-site #studio .workshop-atmosphere{z-index:0}
+.tiho-site #studio .workshop-atmosphere-layer.is-revealing{animation:workshop-copy-in 2.2s ease both}
+.tiho-site #studio .workshop-atmosphere-layer.is-leaving{pointer-events:none}
+.tiho-site #studio .workshop-background{overflow:hidden;background:radial-gradient(ellipse at 30% 55%,#3c3b30,#100f0d 74%)}
+.tiho-site #studio .workshop-background img{width:100%;height:100%;object-fit:cover;object-position:center 56%;animation:workshop-photo-drift 22s ease-in-out infinite alternate;opacity:.72}
+.tiho-site #studio .workshop-background-shade{background:linear-gradient(90deg,#080a077d, #080a071a 42%,#080a0799 100%),linear-gradient(180deg,#080a0799,transparent 62%,#080a0799)}
+.tiho-site #studio .workshop-aroma-copy{position:absolute;top:30px;left:30px;width:calc(50% - 60px);height:310px;pointer-events:auto;text-shadow:0 2px 16px #000b}
+.tiho-site #studio .builder-aroma{display:grid;height:100%;grid-template-rows:12px 62px 62px 40px minmax(0,1fr);gap:10px;min-width:0}
+.tiho-site #studio .builder-aroma>.eyebrow{font-size:10px;letter-spacing:.15em;color:#c5cbbb;margin:0}
+.tiho-site #studio .builder-aroma>h3{font-size:clamp(27px,3vw,44px);font-weight:350;line-height:1.13;letter-spacing:.02em;margin:0;overflow-wrap:anywhere;max-height:100%;overflow:auto;scrollbar-width:thin}
+.tiho-site #studio .workshop-overview{font-size:13px;line-height:1.8;color:#e1e2d6;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain;white-space:pre-line;padding-right:6px}
+.tiho-site #studio .workshop-chapter-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;border-bottom:1px solid #d7ddc63d}
+.tiho-site #studio .workshop-chapter-tabs button{display:flex;align-items:center;gap:9px;font-size:12px;min-height:40px;color:#c6cbb8;border-bottom:1px solid transparent;text-align:left;white-space:nowrap}
+.tiho-site #studio .workshop-chapter-tabs button>span{font-size:10px;color:#a9b697}
+.tiho-site #studio .workshop-chapter-tabs button[aria-selected=true]{color:#fff5df;border-color:#e1e7d2}
+.tiho-site #studio .builder-aroma-chapters{margin:0;display:block;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.tiho-site #studio .builder-aroma-chapters section{border:0;padding:0;animation:workshop-copy-in 1.8s ease both}
+.tiho-site #studio .builder-aroma-chapters section[hidden]{display:none}
+.tiho-site #studio .builder-aroma-chapters h4{font-size:15px;line-height:1.5;margin:0 0 7px;color:#edeade;font-weight:400;overflow-wrap:anywhere}
+.tiho-site #studio .builder-aroma-chapters p{font-size:12px;line-height:1.8;color:#d2d8c7;margin:0;white-space:pre-line;overflow-wrap:anywhere}
+
+/* Only the wax form changes; its baseline is anchored to the same stone. */
+.tiho-site #studio .studio-still-life{position:absolute;z-index:1;width:88%;max-width:530px;aspect-ratio:1.45;left:50%;bottom:82px;transform:translateX(-50%)}
+.tiho-site #studio .studio-plinth{position:absolute;width:100%;height:auto;bottom:0;left:0;filter:brightness(.76) drop-shadow(0 15px 17px #0008)}
+.tiho-site #studio #studio-candle.studio-form-preview{position:absolute;left:10%;bottom:46%;width:80%;height:100%;max-width:none;max-height:none;aspect-ratio:auto;filter:drop-shadow(6px 6px 8px #0005);--preview-surface:#252821;transition:none}
+.tiho-site #studio .studio-form-preview .wax-object{bottom:0;transform:translateX(-50%)}
+.tiho-site #studio .studio-form-preview .wax-silhouette{inset:45% 15% 0}
+.tiho-site #studio .studio-form-preview .wax-ground{bottom:-2%;background:#0008;filter:blur(7px)}
+.tiho-site #studio .scene-recipe{z-index:1;bottom:43px;left:24px;right:24px;max-height:75px;overflow:hidden;text-shadow:0 2px 12px #0009}
+.tiho-site #studio .scene-recipe>span{font-size:22px;line-height:1.25}
+.tiho-site #studio .scene-recipe>p{font-size:12px;margin-top:8px;color:#d4d9c6}
+.tiho-site #studio .scene-disclaimer{z-index:1;bottom:20px;left:0;width:100%;text-align:center;font-size:10px;color:#bdc3b0}
+@keyframes workshop-copy-in{from{opacity:0}to{opacity:1}}
+@keyframes workshop-photo-drift{from{transform:scale(1)}to{transform:scale(1.04)}}
+@media(max-width:1000px){
+ .tiho-site #studio .studio-controls{padding-left:22px;padding-right:22px}
+ .tiho-site #studio .workshop-aroma-copy{left:24px;width:calc(50% - 48px)}
+ .tiho-site #studio .studio-steps button{font-size:12px;padding-left:5px;padding-right:5px}
+ .tiho-site #studio .studio-still-life{bottom:100px;width:96%}
+ .tiho-site #studio .builder-scent-options{column-gap:5px}
+}
+@media(max-width:760px){
+ .tiho-site #studio .studio-heading{display:block}
+ .tiho-site #studio .studio-heading>p{margin-top:20px;line-height:1.8;font-size:14px}
+ .tiho-site #studio .studio-layout{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:720px 710px}
+ .tiho-site #studio .studio-scene{height:720px;min-height:0}
+ .tiho-site #studio .studio-controls{height:710px;padding:22px 18px;grid-template-rows:90px minmax(0,1fr) 58px;border-top:1px solid #d4ddbf3b}
+ .tiho-site #studio .studio-panel{padding-top:22px}
+ .tiho-site #studio .studio-panel h3{font-size:28px}
+ .tiho-site #studio .studio-panel>p:not(.eyebrow):not(.recipe-note):not(.builder-status){font-size:13px}
+ .tiho-site #studio .workshop-aroma-copy{top:25px;left:22px;width:calc(100% - 44px);height:310px}
+ .tiho-site #studio .builder-aroma>h3{font-size:30px}
+ .tiho-site #studio .workshop-overview{font-size:12px}
+ .tiho-site #studio .workshop-chapter-tabs{gap:6px}
+ .tiho-site #studio .workshop-chapter-tabs button{font-size:12px;gap:6px}
+ .tiho-site #studio .studio-still-life{width:96%;max-width:400px;bottom:78px;aspect-ratio:1.45}
+ .tiho-site #studio #studio-candle.studio-form-preview{height:110%;bottom:46%}
+ .tiho-site #studio .scene-recipe>span{font-size:21px}
+ .tiho-site #studio .workshop-background img{object-position:48% center}
+ .tiho-site #studio .workshop-background-shade{background:linear-gradient(180deg,#080a07b3, #080a0740 40%,#080a0799 60%,#080a07bf)}
+ .tiho-site #studio .color-options label{padding:13px 10px;font-size:12px;gap:9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .tiho-site #studio .workshop-atmosphere-layer.is-revealing,.tiho-site #studio .workshop-background img,.tiho-site #studio .studio-panel,.tiho-site #studio .builder-aroma-chapters section{animation:none}
+ .tiho-site #studio .studio-steps button,.tiho-site #studio .builder-scent-options label>span{transition:none}
+}
