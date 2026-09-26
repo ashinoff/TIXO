@@ -58,7 +58,8 @@ export function useProductSwipe(actions: Actions) {
       const target = event.target instanceof window.Element ? event.target : null;
       if (event.touches.length !== 1 || target?.closest("input,select,textarea,[contenteditable=true],.photo-thumbnails")) { gesture = null; reset(); return; }
       const touch = event.touches[0];
-      gesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, photo: !!target?.closest(".detail-gallery"), atTop: dialog.scrollTop <= 1, axis: null, dx: 0, dy: 0 };
+      const information = target?.closest<HTMLElement>(".detail-information");
+      gesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, photo: !!target?.closest(".detail-gallery"), atTop: dialog.scrollTop <= 1 && (!information || information.scrollTop <= 1), axis: null, dx: 0, dy: 0 };
     };
     const move = (event: TouchEvent) => {
       if (!gesture) return;

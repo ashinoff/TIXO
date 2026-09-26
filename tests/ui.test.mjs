@@ -889,7 +889,9 @@ test('product swipes follow the filtered catalog, separate photo gestures and pr
     await touch('touchstart',target,220,300);await touch('touchmove',target,100,300);await touch('touchcancel',target,100,300);assert.equal(current(),'1','Cancellation never navigates');
     modal.scrollTop=180;
     assert.equal((await swipe('.detail-content h2',0,120)).defaultPrevented,false,'Scrolling down from the middle stays native');assert.ok(document.querySelector('.product-dialog'));
-    modal.scrollTop=0;await swipe('.detail-content h2',0,120);
+    modal.scrollTop=0;const information=document.querySelector('.detail-information');information.scrollTop=80;
+    assert.equal((await swipe('.detail-content h2',0,120)).defaultPrevented,false,'The desktop description scrolls without dismissing its dialog');assert.ok(document.querySelector('.product-dialog'));
+    information.scrollTop=0;await swipe('.detail-content h2',0,120);
     assert.equal(document.querySelector('.product-dialog'),null);assert.equal(document.body.style.position,'');assert.equal(document.activeElement,trigger);assert.equal(restored.length,1);
     assert.match(document.querySelector('#filter-scent').textContent,new RegExp(scents[0].name));
     await click(trigger);await click(document.querySelector('[aria-label="Следующая свеча"]'));
