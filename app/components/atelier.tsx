@@ -45,7 +45,7 @@ export function Atelier() {
   const goToStep = (next: number, focus = false) => {
     if (next < 0 || next >= steps.length) return;
     setStep(next);
-    if (focus) tabRefs.current[next]?.focus();
+    if (focus) tabRefs.current[next]?.focus({ preventScroll: true });
   };
 
   const handleTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -117,7 +117,7 @@ export function Atelier() {
               ><span>0{index + 1}</span>{label}</button>
             ))}
           </div>
-          <div className="studio-panel" id="studio-panel-0" role="tabpanel" aria-labelledby="studio-step-0" hidden={step !== 0}>
+          <div className="studio-panel" id="studio-panel-0" role="tabpanel" aria-labelledby="studio-step-0" aria-hidden={step !== 0} inert={step !== 0}>
             <p className="eyebrow">01 / НАЧНИ С ОЩУЩЕНИЯ</p><h3>Как звучит твоя тишина?</h3><p>Выбери аромат. Его история раскроется слева — от первой ноты до шлейфа.</p>
             {loading && <p role="status" className="builder-form-message">Загружаем ароматы…</p>}
             {catalogError && <div role="alert" className="builder-form-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void loadCatalog()}>Попробовать ещё раз <ArrowIcon /></button></div>}
@@ -132,7 +132,7 @@ export function Atelier() {
             <p className="studio-selection">Твой аромат <strong>{selectedScent?.name ?? "Ещё не выбран"}</strong></p>
 
           </div>
-          <div className="studio-panel" id="studio-panel-1" role="tabpanel" aria-labelledby="studio-step-1" hidden={step !== 1}>
+          <div className="studio-panel" id="studio-panel-1" role="tabpanel" aria-labelledby="studio-step-1" aria-hidden={step !== 1} inert={step !== 1}>
             <p className="eyebrow">02 / ПРИДАЙ ОЩУЩЕНИЮ ФОРМУ</p><h3>Линии с характером.</h3><p>Выбери силуэт — твоя свеча появится на камне.</p>
             {formsLoading && <p role="status" className="builder-form-message">Загружаем формы мастерской…</p>}
             {formsError && <div role="alert" className="builder-form-message">{formsError}<button type="button" className="text-link" onClick={() => void loadForms()}>Попробовать ещё раз <ArrowIcon /></button></div>}
@@ -152,7 +152,7 @@ export function Atelier() {
             </fieldset>
             <p className="studio-selection">Твоя форма <strong>{formName}</strong></p>
           </div>
-          <div className="studio-panel" id="studio-panel-2" role="tabpanel" aria-labelledby="studio-step-2" hidden={step !== 2}>
+          <div className="studio-panel" id="studio-panel-2" role="tabpanel" aria-labelledby="studio-step-2" aria-hidden={step !== 2} inert={step !== 2}>
             <p className="eyebrow">03 / ТВОЯ ПАЛИТРА</p><h3>Последний оттенок.</h3><p>Тёмный и выразительный или мягкий и светлый?</p>
             <fieldset className="color-options">
               <legend className="sr-only">Цвет свечи</legend>
@@ -165,7 +165,7 @@ export function Atelier() {
               ))}
             </fieldset>
           </div>
-          <div className="studio-panel" id="studio-panel-3" role="tabpanel" aria-labelledby="studio-step-3" hidden={step !== 3}>
+          <div className="studio-panel" id="studio-panel-3" role="tabpanel" aria-labelledby="studio-step-3" aria-hidden={step !== 3} inert={step !== 3}>
             <p className="eyebrow">ТВОЙ АВТОРСКИЙ ЭСКИЗ</p><h3>Так звучит твоя тишина.</h3>
             <dl className="recipe-summary" id="recipe-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
             <div className="custom-price">Индивидуальная свеча <span>Стоимость по запросу</span></div>

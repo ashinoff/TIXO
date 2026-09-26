@@ -139,3 +139,15 @@
  .tiho-site .scent-name-list button{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.tiho-site .scent-chapter-copy.is-revealing,.tiho-site .scent-chapter-copy.is-leaving{animation:none}.tiho-site .scent-chapter-copy.is-leaving{opacity:0}.tiho-site #aromas button{transition:none}}
+
+/* Product navigation stays mounted while the candle and its gallery change. */
+.tiho-site .detail-toolbar{position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:58px;padding:7px 16px;background:#f2efe8f5;border-bottom:1px solid #c9cdbf}
+.tiho-site .detail-product-navigation{display:flex;align-items:center;gap:15px}
+.tiho-site .detail-product-navigation button{width:42px;height:42px;display:grid;place-items:center;border:1px solid #bcc6ad;color:#394a2c}
+.tiho-site .detail-product-navigation button:disabled{opacity:.25}
+.tiho-site .detail-product-navigation span{min-width:48px;text-align:center;font-size:12px;color:#657455;font-variant-numeric:tabular-nums}
+.tiho-site .detail-toolbar .detail-close{position:static;flex-shrink:0}
+.tiho-site .product-dialog{touch-action:pan-y pinch-zoom;overflow-anchor:none}
+.tiho-site .product-detail-body{min-height:calc(100% - 58px)}
+.tiho-site .detail-photo img{-webkit-user-drag:none;user-select:none}
+.tiho-site .detail-specs dd{overflow-wrap:anywhere}

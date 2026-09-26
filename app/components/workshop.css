@@ -7,7 +7,7 @@
 .tiho-site #studio .studio-steps button>span{color:#b9c1a9}
 .tiho-site #studio .studio-steps button[aria-selected=true]{background:#e1e7d21c;color:#fff7e9;border-color:#e1e7d2}
 .tiho-site #studio .studio-panel{min-height:0;padding:24px 3px 24px 0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#bcc6a64d transparent;animation:workshop-copy-in 1.2s ease both}
-.tiho-site #studio .studio-panel[hidden]{display:none}
+.tiho-site #studio .studio-panel[aria-hidden=true]{display:none}
 .tiho-site #studio .studio-panel>.eyebrow{color:#c6cbb9;font-size:10px;letter-spacing:.13em}
 .tiho-site #studio .studio-panel h3{font-size:clamp(27px,2.35vw,37px);margin-top:16px;line-height:1.18;font-weight:400}
 .tiho-site #studio .studio-panel>p:not(.eyebrow):not(.recipe-note):not(.builder-status){font-size:14px;line-height:1.75;color:#d5d8cc;margin-top:14px}
@@ -93,10 +93,16 @@
 @media(max-width:760px){
  .tiho-site #studio .studio-heading{display:block}
  .tiho-site #studio .studio-heading>p{margin-top:20px;line-height:1.8;font-size:14px}
- .tiho-site #studio .studio-layout{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:720px 710px}
+ .tiho-site #studio .studio-layout{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:720px auto}
  .tiho-site #studio .studio-scene{height:720px;min-height:0}
- .tiho-site #studio .studio-controls{height:710px;padding:22px 18px;grid-template-rows:90px minmax(0,1fr) 58px;border-top:1px solid #d4ddbf3b}
- .tiho-site #studio .studio-panel{padding-top:22px}
+ .tiho-site #studio .studio-controls{height:auto;min-height:710px;padding:22px 18px;grid-template-rows:90px minmax(min-content,1fr) 58px;border-top:1px solid #d4ddbf3b}
+ .tiho-site #studio .studio-steps{grid-area:1/1}
+ .tiho-site #studio .studio-navigation{grid-area:3/1}
+ /* All steps reserve the tallest content height; only the option list scrolls. */
+ .tiho-site #studio .studio-panel{grid-area:2/1;padding-top:22px;overflow:visible;overscroll-behavior:auto}
+ .tiho-site #studio .studio-panel[aria-hidden=true]{display:block;visibility:hidden;pointer-events:none;animation:none}
+ .tiho-site #studio .studio-options-window{overscroll-behavior-y:auto}
+ .tiho-site #studio .studio-search input{font-size:16px}
  .tiho-site #studio .studio-panel h3{font-size:28px}
  .tiho-site #studio .studio-panel>p:not(.eyebrow):not(.recipe-note):not(.builder-status){font-size:13px}
  .tiho-site #studio .workshop-aroma-copy{top:25px;left:22px;width:calc(100% - 44px);height:310px}

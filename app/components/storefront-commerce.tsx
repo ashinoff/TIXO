@@ -10,6 +10,7 @@ import { Modal } from "./modal";
 import { CandlePreview } from "./candle-preview";
 import { ScentPortrait } from "./scent-portrait";
 import { ArrowIcon, CheckIcon } from "./ui-icon";
+import { useProductSwipe } from "../../lib/use-product-swipe";
 
 const STORAGE_KEY = "tixo.atelier.cart.v1";
 const REQUEST_KEY = "tixo.atelier.request.v1";
@@ -20,7 +21,8 @@ type Line = StandardLine | CustomLine;
 type DisplayLine = CandleVisualData & { formName?: string; key: string; name: string; scentName: string; quantity: number; image: string | null; price: number | null; available: number; customRecipe?: Recipe };
 type OrderPayload = { requestKey: string; customerName: string; phone: string; email: string; address: string; delivery: string; comment: string; items: ({ productId: number; variantId: number | null; scentId: number; colorId: number; quantity: number } | { customRecipe: Recipe; quantity: number })[] };
 type Receipt = { orderNumber: string; total: number; quotePending: boolean };
-type Selection = { productId: number; scentId?: number; colorId?: number };
+type CandleSelection = { productId: number; scentId?: number; colorId?: number };
+type Selection = CandleSelection & { catalog: CandleSelection[] };
 type Shop = {
   forms: CandleForm[]; formsLoading: boolean; formsError: string; loadForms: () => Promise<void>;
   products: Product[]; scents: Scent[]; colors: CandleColor[]; loading: boolean; catalogError: string; loadCatalog: () => Promise<void>;
@@ -28,7 +30,7 @@ type Shop = {
   cart: Line[]; items: DisplayLine[]; count: number; total: number; hasCustom: boolean; locked: boolean;
   addProduct: (product: Product, scent: Scent, color: CandleColor, quantity?: number) => boolean; addCustom: (recipe: Recipe) => boolean;
   changeQuantity: (key: string, delta: number) => void; remove: (key: string) => void;
-  cartOpen: boolean; setCartOpen: (open: boolean) => void; detail: Selection | null; openProduct: (productId: number, scentId?: number, colorId?: number) => void; closeProduct: () => void;
+  cartOpen: boolean; setCartOpen: (open: boolean) => void; detail: Selection | null; openProduct: (productId: number, scentId?: number, colorId?: number, catalog?: CandleSelection[]) => void; closeProduct: () => void; moveProduct: (offset: number) => void;
   submitOrder: (event: FormEvent<HTMLFormElement>) => void; retryOrder: () => void; pending: OrderPayload | null; submitting: boolean; orderError: string; receipt: Receipt | null;
   toast: string; dismissToast: () => void;
 };
@@ -210,7 +212,13 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
     void sendOrder(payload);
   };
   const setCartOpen = (open: boolean) => { if (!open && busy.current) return; setCartOpenState(open); if (open) setDetail(null); };
-  const value: Shop = { forms, formsLoading, formsError, loadForms, products, scents, colors, loading, catalogError, loadCatalog, activeScent, setActiveScent, selectedScent: scents.find(scent => scent.id === activeScent), cart, items, count: cart.reduce((sum, line) => sum + line.quantity, 0), total: items.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0), hasCustom: items.some(item => item.customRecipe), locked: submitting || Boolean(pending), addProduct, addCustom, changeQuantity, remove, cartOpen, setCartOpen, detail, openProduct: (productId, scentId, colorId) => setDetail({ productId, scentId, colorId }), closeProduct: () => setDetail(null), submitOrder, retryOrder: () => { if (pendingRef.current) void sendOrder(pendingRef.current); }, pending, submitting, orderError, receipt, toast, dismissToast: () => setToast("") };
+  const moveProduct = (offset: number) => setDetail(current => {
+    if (!current) return null;
+    const index = current.catalog.findIndex(item => sameCandle(item, current));
+    const next = current.catalog[index + offset];
+    return next ? { ...next, catalog: current.catalog } : current;
+  });
+  const value: Shop = { forms, formsLoading, formsError, loadForms, products, scents, colors, loading, catalogError, loadCatalog, activeScent, setActiveScent, selectedScent: scents.find(scent => scent.id === activeScent), cart, items, count: cart.reduce((sum, line) => sum + line.quantity, 0), total: items.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0), hasCustom: items.some(item => item.customRecipe), locked: submitting || Boolean(pending), addProduct, addCustom, changeQuantity, remove, cartOpen, setCartOpen, detail, openProduct: (productId, scentId, colorId, catalog = []) => setDetail({ productId, scentId, colorId, catalog }), closeProduct: () => setDetail(null), moveProduct, submitOrder, retryOrder: () => { if (pendingRef.current) void sendOrder(pendingRef.current); }, pending, submitting, orderError, receipt, toast, dismissToast: () => setToast("") };
   return <ShoppingContext.Provider value={value}>{children}</ShoppingContext.Provider>;
 }
 
@@ -225,7 +233,7 @@ function CatalogFilter({ id, label, value, preview, open, onToggle, onClose, chi
   useEffect(() => { close.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return;
-    ref.current?.querySelector<HTMLElement>('[data-selected="true"]')?.focus();
+    ref.current?.querySelector<HTMLElement>('[data-selected="true"]')?.focus({ preventScroll: true });
     const outside = (event: globalThis.PointerEvent) => { if (!ref.current?.contains(event.target as Node)) close.current(); };
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
@@ -250,18 +258,19 @@ export function ScentDiscovery({ number = "01" }: { number?: string }) {
     const rank = (name: string) => { const index = aromaPortraits.findIndex(portrait => portrait.name === name.toUpperCase()); return index < 0 ? aromaPortraits.length : index; };
     return rank(a.name) - rank(b.name);
   }), [shop.scents]);
-  const choice = choices.find(scent => scent.id === (shop.activeScent ?? previewId)) ?? choices[0];
+  const choice = choices.find(scent => scent.id === (previewId ?? shop.activeScent)) ?? choices[0];
   const index = choices.findIndex(scent => scent.id === choice?.id);
   const note = chapterSelection.scentId === choice?.id ? chapterSelection.note : 0;
   const chapter = scentChapters[note];
   const stage = (choice?.profile ?? emptyAromaProfile())[chapter.key];
-  const choose = (scent: Scent) => { setPreviewId(scent.id); shop.setActiveScent(scent.id); };
+  // Browsing portraits must not resize the catalog above this section on phones.
+  const choose = (scent: Scent) => setPreviewId(scent.id);
   const move = (offset: number) => { const next = choices[(index + offset + choices.length) % choices.length]; if (next) choose(next); };
   return <section className="scent-discovery pad" id="aromas" aria-labelledby="scent-discovery-title">
     <div className="scent-discovery-heading"><p className="eyebrow">{number} / ИСКУССТВО АРОМАТА</p><h2 id="scent-discovery-title">Форма притягивает взгляд.<br /><span>Аромат остаётся в памяти.</span></h2><p>Начните с ощущения. Выберите аромат для своего вечера.</p></div>
     {shop.loading ? <p role="status" className="scent-discovery-message">Открываем библиотеку ароматов…</p> : shop.catalogError ? <div role="alert" className="scent-discovery-message">Не удалось загрузить ароматы.<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Попробовать снова <ArrowIcon /></button></div> : !choice ? <p className="scent-discovery-message">Мастерская готовит новую коллекцию ароматов.</p> : <div className="scent-discovery-layout">
       <div className="scent-portrait" {...inspection}><ScentPortrait src={choice.image} name={choice.name} counter={`${String(index + 1).padStart(2,"0")} / ${String(choices.length).padStart(2,"0")}`} description={choice.description} chapterLabel={`0${note + 1} / ${chapter.label}`} chapterDescription={stage.description} /><div className="scent-portrait-navigation-shell"><div className="scent-portrait-navigation"><button type="button" aria-label="Предыдущий аромат" disabled={choices.length < 2} onClick={() => move(-1)}><ArrowIcon direction="left" /></button><button type="button" aria-label="Следующий аромат" disabled={choices.length < 2} onClick={() => move(1)}><ArrowIcon direction="right" /></button></div></div></div>
-      <div className="scent-library"><div className="scent-library-top"><span className="eyebrow">НАЙДИТЕ СВОЁ ЗВУЧАНИЕ</span><span>{choices.length} ароматов</span></div><div className="scent-name-list" role="group" aria-label="Библиотека ароматов">{choices.map((scent,i) => <button type="button" key={scent.id} aria-pressed={choice.id === scent.id} aria-label={`Познакомиться с ароматом ${scent.name}`} onClick={() => choose(scent)}><span>{String(i + 1).padStart(2,"0")}</span><span className="scent-name-label">{scent.name}</span><i aria-hidden="true"><ArrowIcon /></i></button>)}</div><ScentChapters key={choice.id} scent={choice} note={note} onSelect={note => setChapterSelection({ scentId: choice.id, note })} /><button type="button" className="button button-light" onClick={() => { choose(choice); scrollToSection("collection", reducedMotion() ? "instant" : "smooth"); }}>Свечи с этим ароматом <span aria-hidden="true"><ArrowIcon /></span></button></div>
+      <div className="scent-library"><div className="scent-library-top"><span className="eyebrow">НАЙДИТЕ СВОЁ ЗВУЧАНИЕ</span><span>{choices.length} ароматов</span></div><div className="scent-name-list" role="group" aria-label="Библиотека ароматов">{choices.map((scent,i) => <button type="button" key={scent.id} aria-pressed={choice.id === scent.id} aria-label={`Познакомиться с ароматом ${scent.name}`} onClick={() => choose(scent)}><span>{String(i + 1).padStart(2,"0")}</span><span className="scent-name-label">{scent.name}</span><i aria-hidden="true"><ArrowIcon /></i></button>)}</div><ScentChapters key={choice.id} scent={choice} note={note} onSelect={note => setChapterSelection({ scentId: choice.id, note })} /><button type="button" className="button button-light" onClick={() => { shop.setActiveScent(choice.id); scrollToSection("collection", reducedMotion() ? "instant" : "smooth"); }}>Свечи с этим ароматом <span aria-hidden="true"><ArrowIcon /></span></button></div>
     </div>}
   </section>;
 }
@@ -273,7 +282,7 @@ export function Catalog({ number = "02" }: { number?: string }) {
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const palette = shop.colors.find(color => color.id === colorId);
   const selectedForm = shop.forms.find(form => form.id === formId);
-  const choose = (kind: string, action: () => void) => { action(); setOpenFilter(null); document.getElementById(`filter-${kind}`)?.focus(); };
+  const choose = (kind: string, action: () => void) => { action(); setOpenFilter(null); document.getElementById(`filter-${kind}`)?.focus({ preventScroll: true }); };
   const reset = () => { setColorId(null); setFormId(null); shop.setActiveScent(null); setOpenFilter(null); };
   const cards = shop.products.flatMap(product => shop.colors.flatMap(color => {
     if (formId !== null && product.formId !== formId) return [];
@@ -284,6 +293,7 @@ export function Catalog({ number = "02" }: { number?: string }) {
     const scent = shop.activeScent === null ? candidates[0] : candidates.find(s => s.id === shop.activeScent);
     return scent ? [{ product, color, scent, photo: photograph(product, color, scent) }] : [];
   }));
+  const catalog = cards.map(({ product, color }) => ({ productId: product.id, scentId: product.scentId ?? shop.activeScent ?? undefined, colorId: color.id }));
   return <section className="collection pad" id="collection" aria-labelledby="collection-title">
     <div className="section-heading"><div><p className="eyebrow">{number} / КОЛЛЕКЦИЯ</p><h2 id="collection-title">У тишины<br />ваша форма.</h2></div><p className="section-description">Любимый цвет. Любимый аромат.<br />Сочетание выбираете вы.</p></div>
     <div className="catalog-filter-bar">
@@ -306,9 +316,9 @@ export function Catalog({ number = "02" }: { number?: string }) {
     <div className="product-grid" id="product-grid">{cards.map(({ product, color, scent, photo }, index) => {
       const stock = stockFor(product, scent, color);
       return <article className="product-card" key={`${product.id}:${color.id}`} data-product-id={product.id} data-color-id={color.id} data-scent-id={shop.activeScent ?? undefined}>
-        <button type="button" className={`product-image${photo.src?.endsWith("hero.png") ? " black-image" : ""}`} aria-label={`Подробнее о свече ${product.name}, ${color.name}`} onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id)} {...inspection}><CandleVisual src={photo.src} {...visualData(product, color)} label={`${product.name} · ${color.name}`} /><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span><span className="image-detail">Выбрать свечу <span aria-hidden="true"><ArrowIcon /></span></span>{photo.preview && <span className="photo-preview-label">Силуэт формы</span>}</button>
-        <div className="product-category">{color.name}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id)}>{product.name}</button><span>{money(product.price)}</span></div><p>{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
-        <button className="quick-add" type="button" disabled={shop.locked || ((shop.activeScent !== null || !!product.scentId) && !stock)} aria-label={`Выбрать ${product.name}, ${color.name}`} onClick={() => shop.activeScent === null ? shop.openProduct(product.id, product.scentId ?? undefined, color.id) : shop.addProduct(product, scent, color)}>+</button>{(shop.activeScent !== null || !!product.scentId) && !stock && <span className="product-unavailable">Нет в наличии</span>}
+        <button type="button" className={`product-image${photo.src?.endsWith("hero.png") ? " black-image" : ""}`} aria-label={`Подробнее о свече ${product.name}, ${color.name}`} onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)} {...inspection}><CandleVisual src={photo.src} {...visualData(product, color)} label={`${product.name} · ${color.name}`} /><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span><span className="image-detail">Выбрать свечу <span aria-hidden="true"><ArrowIcon /></span></span>{photo.preview && <span className="photo-preview-label">Силуэт формы</span>}</button>
+        <div className="product-category">{color.name}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)}>{product.name}</button><span>{money(product.price)}</span></div><p>{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
+        <button className="quick-add" type="button" disabled={shop.locked || ((shop.activeScent !== null || !!product.scentId) && !stock)} aria-label={`Выбрать ${product.name}, ${color.name}`} onClick={() => shop.activeScent === null ? shop.openProduct(product.id, product.scentId ?? undefined, color.id, catalog) : shop.addProduct(product, scent, color)}>+</button>{(shop.activeScent !== null || !!product.scentId) && !stock && <span className="product-unavailable">Нет в наличии</span>}
       </article>;
     })}</div>
   </section>;
@@ -334,24 +344,47 @@ function ScentChapters({ scent, note, onSelect }: { scent: Scent; note: number; 
   </div>;
 }
 
+function sameCandle(a: CandleSelection, b: CandleSelection) {
+  return a.productId === b.productId && a.colorId === b.colorId && a.scentId === b.scentId;
+}
+
 function ProductDetails() {
-  const shop = useShopping(); const product = shop.products.find(product => product.id === shop.detail?.productId);
+  const shop = useShopping();
+  const detail = shop.detail;
+  const product = shop.products.find(product => product.id === detail?.productId);
+  if (!product || !detail) return null;
+  const index = detail.catalog.findIndex(item => sameCandle(item, detail));
+  return <Modal className="product-dialog" label={`${product.name} — карточка свечи`} onClose={shop.closeProduct}>
+    <div className="detail-toolbar">
+      <div className="detail-product-navigation" aria-label="Свечи в выбранном каталоге">
+        <button type="button" aria-label="Предыдущая свеча" disabled={index <= 0} onClick={() => shop.moveProduct(-1)}><ArrowIcon direction="left" /></button>
+        <span role="status" aria-live="polite">{index + 1} / {detail.catalog.length}</span>
+        <button type="button" aria-label="Следующая свеча" disabled={index < 0 || index >= detail.catalog.length - 1} onClick={() => shop.moveProduct(1)}><ArrowIcon direction="right" /></button>
+      </div>
+      <button type="button" className="icon-button detail-close" aria-label="Закрыть карточку свечи" onClick={shop.closeProduct}>×</button>
+    </div>
+    <ProductDetailContent key={`${detail.productId}:${detail.scentId}:${detail.colorId}`} product={product} />
+  </Modal>;
+}
+
+function ProductDetailContent({ product }: { product: Product }) {
+  const shop = useShopping();
   const [scentId, setScentId] = useState(shop.detail?.scentId); const [colorId, setColorId] = useState(shop.detail?.colorId); const [quantity, setQuantity] = useState(1); const [photoChoice, setPhotoChoice] = useState<string | null>(null);
-  if (!product) return null;
   const profiles = product.hasVariants ? shop.scents.filter(s => availableVariants(product).some(v => v.scentId === s.id)) : shop.scents.filter(scent => !product.scentId || scent.id === product.scentId);
   const palette = product.hasVariants ? shop.colors.filter(c => availableVariants(product).some(v => v.colorId === c.id)) : shop.colors.filter(color => !product.colorId || color.id === product.colorId);
-  const scent = profiles.find(s => s.id === (scentId ?? product.scentId)); const color = palette.find(c => c.id === (colorId ?? product.colorId));
+  const scent = profiles.find(s => s.id === (product.scentId ?? scentId)); const color = palette.find(c => c.id === (product.colorId ?? colorId));
   const variant = scent && color ? variantFor(product, scent, color) : undefined;
   const inCart = shop.cart.reduce((sum, line) => sum + (!isCustom(line) && line.productId === product.id && line.variantId === (variant?.id ?? null) ? line.quantity : 0), 0);
   const available = scent && color ? Math.max(0, stockFor(product, scent, color) - inCart) : 0; const photo = photograph(product, color, scent);
   const photos = [...new Set([photo.src, ...productImages(product)].filter((src): src is string => !!src))];
   const photoIndex = Math.max(0, photos.indexOf(photoChoice ?? ""));
   const selectedPhoto = photos[photoIndex] ?? null;
-  const changePhoto = (offset: number) => setPhotoChoice(photos[(photoIndex + offset + photos.length) % photos.length]);
-  return <Modal className="product-dialog" label={`${product.name} — выбор свечи`} onClose={shop.closeProduct}><button type="button" className="icon-button detail-close" aria-label="Закрыть карточку свечи" onClick={shop.closeProduct}>×</button><div className="detail-gallery" role="region" aria-label="Фотографии свечи" onKeyDown={event => { if (photos.length > 1 && (event.key === "ArrowLeft" || event.key === "ArrowRight")) { event.preventDefault(); changePhoto(event.key === "ArrowLeft" ? -1 : 1); } }}><div className={`detail-photo${selectedPhoto?.endsWith("hero.png") ? " black" : ""}`}><CandleVisual src={selectedPhoto} {...visualData(product, color)} label={`${product.name}${color ? ` · ${color.name}` : ""}${photos.length > 1 ? ` · фото ${photoIndex + 1}` : ""}`} />{photos.length > 1 && <div className="photo-navigation"><button type="button" aria-label="Предыдущее фото" onClick={() => changePhoto(-1)}><ArrowIcon direction="left" /></button><span role="status" aria-live="polite">{photoIndex + 1} / {photos.length}</span><button type="button" aria-label="Следующее фото" onClick={() => changePhoto(1)}><ArrowIcon direction="right" /></button></div>}</div>{photos.length > 1 && <div className="photo-thumbnails">{photos.map((src, index) => <button key={src} type="button" aria-label={`Фото ${index + 1}`} aria-pressed={index === photoIndex} onClick={() => setPhotoChoice(src)}><img src={src} alt="" width="70" height="82" loading="lazy" /></button>)}</div>}</div><div className="detail-content"><div className="detail-kicker"><span className="eyebrow">СВЕЧА РУЧНОЙ РАБОТЫ</span><span className="eyebrow">ТИХО</span></div><h2>{product.name}</h2><p>{product.notes}</p>
-    <fieldset className="detail-colors"><legend>Цвет</legend>{palette.map(c => <button key={c.id} type="button" className="color-filter-option" aria-label={`Выбрать цвет: ${c.name}`} aria-pressed={color?.id === c.id} onClick={() => { setColorId(c.id); setQuantity(1); }}><i style={{ background: c.hex }} /><span>{c.name}</span></button>)}</fieldset>
-    <label className="detail-scent-label" htmlFor="detail-scent">Аромат</label><select id="detail-scent" value={scent?.id ?? ""} onChange={event => { setScentId(Number(event.target.value)); setQuantity(1); }}><option value="" disabled>Выберите аромат</option>{profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
-    <dl className="detail-specs"><div><dt>Ноты</dt><dd>{scent?.notes.join(" · ") || "Выберите аромат"}</dd></div><div><dt>Цвет</dt><dd>{color?.name ?? "Выберите цвет"}</dd></div><div><dt>Форма</dt><dd>{product.form?.name ?? candleShapes[productShape(product)]}</dd></div><div><dt>Доступно</dt><dd>{!scent || !color ? "Выберите цвет и аромат" : available ? `${available} шт.` : "Это сочетание пока недоступно"}</dd></div></dl><div className="detail-footer"><span>{money(product.price)}</span><div className="qty-picker" aria-label="Количество свечей"><button type="button" aria-label="Уменьшить количество" disabled={quantity <= 1} onClick={() => setQuantity(value => value - 1)}>−</button><output aria-live="polite">{quantity}</output><button type="button" aria-label="Увеличить количество" disabled={quantity >= Math.min(99, available)} onClick={() => setQuantity(value => value + 1)}>+</button></div></div><button type="button" className="button button-dark" disabled={!scent || !color || quantity > available || shop.locked} onClick={() => { if (scent && color && shop.addProduct(product, scent, color, quantity)) shop.closeProduct(); }}>Добавить в корзину <span aria-hidden="true">+</span></button>{photo.preview && <p className="detail-notice">Показан силуэт формы в выбранном цвете. Фотографию готовой свечи можно уточнить у мастерской.</p>}<p className="detail-notice">После оформления мастерская подтвердит заказ и согласует доставку.</p></div></Modal>;
+  const changePhoto = (offset: number) => { if (photos.length > 1) setPhotoChoice(photos[(photoIndex + offset + photos.length) % photos.length]); };
+  const swipeRef = useProductSwipe({ onPhoto: changePhoto, onProduct: shop.moveProduct, onClose: shop.closeProduct });
+  return <div ref={swipeRef} className="product-detail-body" data-product-id={product.id}><div className="detail-gallery" role="region" aria-label="Фотографии свечи" onKeyDown={event => { if (photos.length > 1 && (event.key === "ArrowLeft" || event.key === "ArrowRight")) { event.preventDefault(); changePhoto(event.key === "ArrowLeft" ? -1 : 1); } }}><div className={`detail-photo${selectedPhoto?.endsWith("hero.png") ? " black" : ""}`}><CandleVisual src={selectedPhoto} {...visualData(product, color)} label={`${product.name}${color ? ` · ${color.name}` : ""}${photos.length > 1 ? ` · фото ${photoIndex + 1}` : ""}`} />{photos.length > 1 && <div className="photo-navigation"><button type="button" aria-label="Предыдущее фото" onClick={() => changePhoto(-1)}><ArrowIcon direction="left" /></button><span role="status" aria-live="polite">{photoIndex + 1} / {photos.length}</span><button type="button" aria-label="Следующее фото" onClick={() => changePhoto(1)}><ArrowIcon direction="right" /></button></div>}</div>{photos.length > 1 && <div className="photo-thumbnails">{photos.map((src, index) => <button key={src} type="button" aria-label={`Фото ${index + 1}`} aria-pressed={index === photoIndex} onClick={() => setPhotoChoice(src)}><img src={src} alt="" width="70" height="82" loading="lazy" /></button>)}</div>}</div><div className="detail-content"><div className="detail-kicker"><span className="eyebrow">СВЕЧА РУЧНОЙ РАБОТЫ</span><span className="eyebrow">ТИХО</span></div><h2>{product.name}</h2><p>{product.notes}</p>
+    {!product.colorId && <fieldset className="detail-colors"><legend>Цвет</legend>{palette.map(c => <button key={c.id} type="button" className="color-filter-option" aria-label={`Выбрать цвет: ${c.name}`} aria-pressed={color?.id === c.id} onClick={() => { setColorId(c.id); setQuantity(1); }}><i style={{ background: c.hex }} /><span>{c.name}</span></button>)}</fieldset>}
+    {!product.scentId && <><label className="detail-scent-label" htmlFor="detail-scent">Аромат</label><select id="detail-scent" value={scent?.id ?? ""} onChange={event => { setScentId(Number(event.target.value)); setQuantity(1); }}><option value="" disabled>Выберите аромат</option>{profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></>}
+    <dl className="detail-specs"><div><dt>Аромат</dt><dd>{scent?.name ?? "Выберите аромат"}</dd></div><div><dt>Ноты</dt><dd>{scent?.notes.join(" · ") || "Выберите аромат"}</dd></div><div><dt>Цвет</dt><dd>{color?.name ?? "Выберите цвет"}</dd></div><div><dt>Форма</dt><dd>{product.form?.name ?? candleShapes[productShape(product)]}</dd></div><div><dt>Доступно</dt><dd>{!scent || !color ? "Выберите цвет и аромат" : available ? `${available} шт.` : "Это сочетание пока недоступно"}</dd></div></dl><div className="detail-footer"><span>{money(product.price)}</span><div className="qty-picker" aria-label="Количество свечей"><button type="button" aria-label="Уменьшить количество" disabled={quantity <= 1} onClick={() => setQuantity(value => value - 1)}>−</button><output aria-live="polite">{quantity}</output><button type="button" aria-label="Увеличить количество" disabled={quantity >= Math.min(99, available)} onClick={() => setQuantity(value => value + 1)}>+</button></div></div><button type="button" className="button button-dark" disabled={!scent || !color || quantity > available || shop.locked} onClick={() => { if (scent && color && shop.addProduct(product, scent, color, quantity)) shop.closeProduct(); }}>Добавить в корзину <span aria-hidden="true">+</span></button>{photo.preview && <p className="detail-notice">Показан силуэт формы в выбранном цвете. Фотографию готовой свечи можно уточнить у мастерской.</p>}<p className="detail-notice">После оформления мастерская подтвердит заказ и согласует доставку.</p></div></div>;
 }
 
 function CustomPreview({ recipe, silhouette, shape, formName }: CandleVisualData & { recipe: Recipe; formName?: string }) {
@@ -363,7 +396,7 @@ export function CartOverlay() {
   const shop = useShopping(); const [delivery, setDelivery] = useState("pickup");
   const unavailable = shop.items.some(item => item.quantity > item.available);
   const hasFormRecipes = shop.items.some(item => item.customRecipe?.formId !== undefined);
-  return <>{shop.detail && <ProductDetails key={`${shop.detail.productId}:${shop.detail.scentId}:${shop.detail.colorId}`} />}
+  return <>{shop.detail && <ProductDetails />}
     {shop.cartOpen && <Modal className="cart-dialog" label="Ваша корзина" onClose={() => shop.setCartOpen(false)}><div className="dialog-inner"><header className="dialog-header"><div><span className="eyebrow">ВАШ ВЕЧЕР НАЧИНАЕТСЯ ЗДЕСЬ</span><h2>Ваша корзина</h2></div><button className="icon-button close-cart" type="button" aria-label="Закрыть корзину" disabled={shop.submitting} onClick={() => shop.setCartOpen(false)}>×</button></header>
       {shop.receipt ? <div className="order-success" role="status"><span className="empty-mark">тихо</span><h3>Ваш вечер уже ближе.</h3><p>Заказ <strong>{shop.receipt.orderNumber}</strong> передан в мастерскую.</p><p>{shop.receipt.quotePending ? `Стоимость индивидуальных свечей мастер согласует с вами.${shop.receipt.total ? ` Свечи из коллекции: ${money(shop.receipt.total)}.` : ""}` : `Свечи в заказе: ${money(shop.receipt.total)}.`} Доставка рассчитывается отдельно.</p><p>Мы свяжемся с вами по указанным контактам, чтобы подтвердить детали и способ оплаты.</p><button className="button button-dark" onClick={() => shop.setCartOpen(false)}>Продолжить знакомство <span aria-hidden="true"><ArrowIcon /></span></button></div> : !shop.items.length && !shop.pending ? <div className="empty-cart"><span className="empty-mark">тихо</span><p>Здесь пока ТИХО</p><span>Выберите аромат, который хочется взять с собой.</span><button type="button" className="button button-dark" onClick={() => { shop.setCartOpen(false); scrollToSection("collection", reducedMotion() ? "instant" : "smooth"); }}>К коллекции <span aria-hidden="true"><ArrowIcon /></span></button></div> : <>
         <div className="cart-items" id="cart-items">{shop.items.map(item => <article className={`cart-item${item.customRecipe ? " custom" : ""}`} key={item.key}>{item.customRecipe ? <CustomPreview recipe={item.customRecipe} formName={item.formName} silhouette={item.silhouette} shape={item.shape} /> : <div className="cart-candle-visual"><CandleVisual src={item.image} silhouette={item.silhouette} shape={item.shape} color={item.color} label={item.name} /></div>}<div><h3>{item.name}</h3><p className="cart-recipe">{item.scentName}</p><span className="cart-item-price">{item.price === null ? "Стоимость по запросу" : money(item.price * item.quantity)}</span><div className="quantity-row"><button type="button" aria-label={`Уменьшить количество ${item.name}`} disabled={shop.locked} onClick={() => shop.changeQuantity(item.key, -1)}>−</button><span aria-label="Количество">{item.quantity}</span><button type="button" aria-label={`Увеличить количество ${item.name}`} disabled={shop.locked || item.quantity >= Math.min(99, item.available)} onClick={() => shop.changeQuantity(item.key, 1)}>+</button><button className="remove-item" type="button" aria-label={`Удалить ${item.name}`} disabled={shop.locked} onClick={() => shop.remove(item.key)}>Удалить</button></div>{!shop.loading && !shop.catalogError && !shop.pending && !(item.customRecipe?.formId !== undefined && (shop.formsLoading || shop.formsError)) && item.quantity > item.available && <p className="stock-error">{item.available ? `Доступно ${item.available} шт. Уменьшите количество.` : item.customRecipe ? item.customRecipe.scentId !== undefined ? "Форма или аромат больше недоступны. Удалите эту свечу и выберите новое сочетание в мастерской." : "Форма больше недоступна. Удалите эту свечу и выберите другую форму в мастерской." : "Вариант больше недоступен. Удалите его из корзины."}</p>}</div></article>)}</div>

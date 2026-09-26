@@ -17,12 +17,13 @@ window.matchMedia=query=>({matches:query.includes("prefers-reduced-motion: reduc
 // Decode downloaded portrait replacements before React starts their transition.
 window.Image=class { set src(value){this.url=value;queueMicrotask(()=>this.onload?.());} decode(){return Promise.resolve();} };
 window.HTMLCanvasElement.prototype.getContext=()=>null;
+window.scrollTo=()=>{};
 const {createRoot}=await import('react-dom/client');
 const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/mobile-section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/mobile-section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -232,9 +233,10 @@ test('configured candles show one real combination and the merged aroma block us
     assert.equal(document.querySelectorAll('.product-card').length,1);
     assert.match(document.querySelector('.product-category').textContent,/Сандал и дым/);
     await click(document.querySelector('.product-image'));
-    assert.equal(document.querySelector('#detail-scent').value,'2');
-    assert.equal(document.querySelectorAll('.detail-colors button').length,1);
-    assert.equal(document.querySelectorAll('#detail-scent option').length,2);
+    assert.equal(document.querySelector('#detail-scent'),null);
+    assert.equal(document.querySelector('.detail-colors'),null);
+    assert.match(document.querySelector('.detail-specs').textContent,/Сандал и дым/);
+    assert.match(document.querySelector('.detail-specs').textContent,/Красный/);
     await click(document.querySelector('[aria-label="Закрыть карточку свечи"]'));
     assert.equal(document.querySelector('#ritual'),null);
     assert.equal(document.querySelectorAll('.scent-name-list button').length,4);
@@ -504,7 +506,7 @@ test('inventory groups exact form-color-scent combinations and exposes SVG edit/
   }finally{await act(async()=>root.unmount());globalThis.confirm=previousConfirm;}
 });
 
-test('portrait library follows the hero, changes images and synchronizes the three catalog filters',async()=>{
+test('portrait browsing preserves the catalog until explicitly applying its aroma filter',async()=>{
   window.localStorage.clear();const portraits=require('./lib/aroma-portraits.js').aromaPortraits;
   const aromas=portraits.map((portrait,index)=>({...scents[0],id:index+10,name:portrait.name,image:portrait.image,description:`Описание ${portrait.name}`}));
   const candles=[{...products[0],id:1,formId:1,form:forms[0],colorId:1,color:colors[0],scentId:10,scent:aromas[0]},{...products[1],id:2,formId:2,form:forms[1],colorId:2,color:colors[1],scentId:11,scent:aromas[1]},{...products[0],id:3,formId:1,form:forms[0],colorId:2,color:colors[1],scentId:11,scent:aromas[1]}];
@@ -517,14 +519,16 @@ test('portrait library follows the hero, changes images and synchronizes the thr
     assert.equal(document.querySelectorAll('.scent-name-list button').length,26);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/cherry.webp');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
-    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'01 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
+    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.equal(document.querySelectorAll('.product-card').length,3);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'01 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
+    await click(document.querySelector('.scent-library>.button'));
+    assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);
     await click(document.querySelector('#filter-form'));assert.ok(document.querySelector('.filter-form-preview .wax-stage'));await click(document.querySelector('[aria-label="Форма: Спираль"]'));
     assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.product-card').dataset.productId,'3');assert.equal(document.activeElement.id,'filter-form');
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Красный"]'));assert.equal(document.querySelectorAll('.product-card').length,0);
     await click(document.querySelector('.catalog-reset'));assert.equal(document.querySelectorAll('.product-card').length,3);
     await click(document.querySelector('#filter-scent'));assert.equal(document.querySelectorAll('.filter-aroma-list button').length,27);
-    await click([...document.querySelectorAll('.filter-aroma-list button')].find(node=>node.textContent.includes('CHERRY')));assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'CHERRY');
-    await click(document.querySelector('[aria-label="Следующий аромат"]'));assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');await click(document.querySelector('.scent-library>.button'));assert.match(document.querySelector('#filter-scent').textContent,/WINE/);
+    await click([...document.querySelectorAll('.filter-aroma-list button')].find(node=>node.textContent.includes('CHERRY')));assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');
+    await click(document.querySelector('[aria-label="Следующий аромат"]'));assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'BLACK HONEY');await click(document.querySelector('[aria-label="Предыдущий аромат"]'));await click(document.querySelector('.scent-library>.button'));assert.match(document.querySelector('#filter-scent').textContent,/WINE/);
     await click(document.querySelector('#filter-color'));assert.equal(document.querySelectorAll('.catalog-filter-panel').length,1);
     await act(async()=>document.activeElement.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));assert.equal(document.querySelector('.catalog-filter-panel'),null);assert.equal(document.activeElement.id,'filter-color');
     await click(document.querySelector('#filter-form'));await act(async()=>document.querySelector('#hero-title').dispatchEvent(new Event('pointerdown',{bubbles:true})));assert.equal(document.querySelector('.catalog-filter-panel'),null);
@@ -807,7 +811,7 @@ test('mobile section order and navigation numbers change together without losing
     assert.deepEqual(order().slice(0,3),['home','aromas','collection']);
     assert.deepEqual(nav().slice(0,3),[['#home',''],['#aromas','01'],['#collection','02']]);
     assert.equal(document.querySelector('#collection'),catalog);assert.equal(document.querySelector('#aromas'),aromas);
-    assert.match(document.querySelector('#filter-color').textContent,/Чёрный/);assert.match(document.querySelector('#filter-scent').textContent,/Сандал и дым/);
+    assert.match(document.querySelector('#filter-color').textContent,/Чёрный/);assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.match(document.querySelector('.scent-portrait-caption h3').textContent,/Сандал и дым/);
     await resize(true);
     assert.deepEqual(order().slice(0,3),['home','collection','aromas']);assert.equal(document.querySelector('#collection'),catalog);
     await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelector('.empty-cart>p').textContent,'Здесь пока ТИХО');
@@ -841,4 +845,55 @@ test('touch hold freezes transitions, swipes on captions work both ways, and ver
     await tick(2000);assert.equal(scene(),3,'Autoplay resumes after the browser starts vertical scrolling');
     await pointer('pointerdown');await pointer('lostpointercapture');assert.equal(carousel().dataset.playing,'true');
   }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
+});
+
+test('product swipes follow the filtered catalog, separate photo gestures and preserve modal lifetime',async()=>{
+  window.localStorage.clear();
+  const candles=[1,2,3].map((id,i)=>({...products[i%2],id,name:`Свеча ${id}`,formId:i%2+1,form:forms[i%2],colorId:1,color:colors[0],scentId:i===1?2:1,scent:scents[i===1?1:0],image:`/${id}-a.png`,images:i===0?[`/${id}-a.png`,`/${id}-b.png`]:[`/${id}-a.png`]}));
+  globalThis.fetch=async url=>url==='/api/products'?response(candles):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  const root=createRoot(document.getElementById('root'));
+  const oldScroll=window.scrollTo;const restored=[];window.scrollTo=value=>restored.push(value);
+  const touch=async(type,target,x,y,{id=1,more=false}={})=>{
+    const event=new Event(type,{bubbles:true,cancelable:true});
+    const point={identifier:id,clientX:x,clientY:y};
+    Object.defineProperties(event,{touches:{value:type==='touchend'||type==='touchcancel'?[]:more?[point,{identifier:2,clientX:250,clientY:300}]:[point]},changedTouches:{value:[point]}});
+    await act(async()=>target.dispatchEvent(event));
+    return event;
+  };
+  const swipe=async(selector,dx,dy=0)=>{
+    const target=document.querySelector(selector);assert.ok(target);
+    await touch('touchstart',target,220,300);const event=await touch('touchmove',target,220+dx,300+dy);await touch('touchend',target,220+dx,300+dy);return event;
+  };
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('#filter-scent'));await click([...document.querySelectorAll('.filter-aroma-list button')].find(n=>n.textContent.includes(scents[0].name)));
+    assert.deepEqual([...document.querySelectorAll('.product-card')].map(n=>n.dataset.productId),['1','3']);
+    const trigger=document.querySelector('.product-image');trigger.focus();await click(trigger);
+    const modal=document.querySelector('.product-dialog');
+    assert.equal(document.querySelector('#detail-scent'),null);assert.equal(document.querySelector('.detail-colors'),null);
+    assert.equal(document.body.style.position,'fixed');
+    const src=()=>document.querySelector('.detail-photo img').getAttribute('src');
+    const current=()=>document.querySelector('.product-detail-body').dataset.productId;
+    await swipe('.detail-photo',-95);assert.equal(src(),'/1-b.png');assert.equal(current(),'1');
+    await swipe('.detail-photo',95);assert.equal(src(),'/1-a.png');
+    await click(document.querySelector('[aria-label="Увеличить количество"]'));
+    await swipe('.detail-content h2',-110);assert.equal(current(),'3');assert.equal(document.querySelector('.qty-picker output').textContent,'1');
+    assert.equal(document.querySelector('.product-dialog'),modal);assert.equal(restored.length,0,'Do not unlock and refocus the page between products');
+    await swipe('.detail-photo',-100);assert.equal(current(),'3','A single photo must not switch the product');
+    await swipe('.detail-content h2',-100);assert.equal(current(),'3','Catalog navigation stops at the filtered end');
+    await swipe('.detail-content h2',100);assert.equal(current(),'1');assert.equal(src(),'/1-a.png');
+    await swipe('.detail-content h2',100);assert.equal(current(),'1','Catalog navigation stops at the first candle');
+    await swipe('.detail-content h2',25);assert.equal(current(),'1','Small drags are not navigation');
+    const target=document.querySelector('.detail-content h2');
+    await touch('touchstart',target,220,300);await touch('touchmove',target,100,300,{more:true});await touch('touchend',target,100,300);assert.equal(current(),'1','Ignore multi-touch');
+    await touch('touchstart',target,220,300);await touch('touchmove',target,100,300);await touch('touchcancel',target,100,300);assert.equal(current(),'1','Cancellation never navigates');
+    modal.scrollTop=180;
+    assert.equal((await swipe('.detail-content h2',0,120)).defaultPrevented,false,'Scrolling down from the middle stays native');assert.ok(document.querySelector('.product-dialog'));
+    modal.scrollTop=0;await swipe('.detail-content h2',0,120);
+    assert.equal(document.querySelector('.product-dialog'),null);assert.equal(document.body.style.position,'');assert.equal(document.activeElement,trigger);assert.equal(restored.length,1);
+    assert.match(document.querySelector('#filter-scent').textContent,new RegExp(scents[0].name));
+    await click(trigger);await click(document.querySelector('[aria-label="Следующая свеча"]'));
+    await click(button('Добавить в корзину'));await click(document.querySelector('.cart-trigger'));
+    assert.match(document.querySelector('.cart-item').textContent,/Свеча 3/);assert.match(document.querySelector('.cart-item').textContent,new RegExp(scents[0].name));
+  }finally{await act(async()=>root.unmount());window.scrollTo=oldScroll;window.localStorage.clear();}
 });
