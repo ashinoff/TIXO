@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-type Actions = { onPhoto: (offset: number) => void; onProduct: (offset: number) => void; onClose: () => void };
+type Actions = { onPhotoDrag?: (distance: number) => void; onPhotoCancel?: () => void; onPhoto: (offset: number) => void; onProduct: (offset: number) => void; onClose: () => void };
 type Gesture = { id: number; x: number; y: number; photo: boolean; atTop: boolean; axis: "x" | "y" | "scroll" | null; dx: number; dy: number };
 
 /** Keep vertical reading native; only a downward pull at the top dismisses the sheet. */
@@ -39,6 +39,7 @@ export function useProductSwipe(actions: Actions) {
     const reset = () => {
       if (closing) return;
       clearTimeout(settling);
+      latest.current.onPhotoCancel?.();
       paint(0, true);
       settling = setTimeout(() => { dialog.style.removeProperty("transition"); dialog.style.removeProperty("transform"); }, reduced() ? 0 : 280);
     };
@@ -74,6 +75,7 @@ export function useProductSwipe(actions: Actions) {
       if (gesture.axis === "x" || gesture.axis === "y") {
         if (event.cancelable) event.preventDefault();
         suppressClickUntil = Date.now() + 500;
+        if (gesture.axis === "x" && gesture.photo) latest.current.onPhotoDrag?.(gesture.dx);
         if (gesture.axis === "y") paint(Math.max(0, gesture.dy) * 0.9);
       }
     };
@@ -88,6 +90,7 @@ export function useProductSwipe(actions: Actions) {
         if (event.cancelable) event.preventDefault();
         dismiss();
       } else if (completed.axis === "y") reset();
+      else if (completed.axis === "x" && completed.photo) latest.current.onPhotoCancel?.();
     };
     const cancel = () => { gesture = null; reset(); };
     const click = (event: MouseEvent) => {
