@@ -22,7 +22,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
+for(const file of ['lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/editors.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -515,7 +515,7 @@ test('portrait library follows the hero, changes images and synchronizes the thr
     assert.equal(document.querySelectorAll('.scent-name-list button').length,26);assert.equal(document.querySelectorAll('.catalog-filter-trigger').length,3);assert.equal(document.querySelector('.color-filter'),null);assert.equal(document.querySelector('.aroma-filters'),null);assert.equal(document.querySelectorAll('.product-card').length,3);
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/cherry.webp');
     await click(document.querySelector('[aria-label="Познакомиться с ароматом WINE"]'));
-    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'02 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
+    assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'01 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
     await click(document.querySelector('#filter-form'));assert.ok(document.querySelector('.filter-form-preview .wax-stage'));await click(document.querySelector('[aria-label="Форма: Спираль"]'));
     assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.product-card').dataset.productId,'3');assert.equal(document.activeElement.id,'filter-form');
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Красный"]'));assert.equal(document.querySelectorAll('.product-card').length,0);
@@ -656,4 +656,56 @@ test('workshop atmosphere waits for the selected photo and ignores stale downloa
     await act(async()=>current.dispatchEvent(new Event('animationend',{bubbles:true})));assert.equal(document.querySelectorAll('.workshop-atmosphere-layer').length,1);
     await act(async()=>current.querySelector('img').dispatchEvent(new Event('error')));assert.equal(document.querySelector('.workshop-background img'),null);assert.match(current.textContent,/COAL/);
   }finally{await act(async()=>root.unmount());window.Image=originalImage;window.matchMedia=originalMedia;}
+});
+
+test('hero keeps the burning photograph without controls and section numbers follow the page',async()=>{
+  globalThis.fetch=async url=>url==='/api/forms'?response(forms):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/products'?response([]):response({});
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(document.querySelector('#evening-light'),null);assert.equal(document.querySelector('#flame-toggle'),null);assert.equal(document.querySelector('.night-layer'),null);
+    assert.equal(document.querySelector('#hero-image img').getAttribute('src'),'/assets/hero.png');assert.ok(document.querySelector('#home .button-glass'));
+    assert.equal(document.querySelector('.wordmark').textContent,'тихо');assert.equal(document.querySelector('.footer-wordmark').textContent,'тихо');assert.equal(document.querySelector('#care details'),null);
+    const labels=['.scent-discovery-heading .eyebrow','#collection .section-heading .eyebrow','#workshop .section-heading .eyebrow','#studio .studio-heading .eyebrow','#care .ritual-story-heading .eyebrow'].map(selector=>document.querySelector(selector).textContent.slice(0,2));
+    assert.deepEqual(labels,['01','02','03','04','05']);assert.equal(document.querySelectorAll('.ritual-story-chapters button').length,5);
+  }finally{await act(async()=>root.unmount());}
+});
+
+test('five-scene ritual supports chapter buttons, keyboard, mouse swipes and touch cancellation',async()=>{
+  const {EveningRitual}=require('./app/components/evening-ritual.js');const root=createRoot(document.getElementById('root'));
+  const pointer=async(type,x,y=200)=>{const event=new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0});Object.defineProperty(event,'pointerId',{value:7});await act(async()=>document.querySelector('.ritual-story').dispatchEvent(event));};
+  try{
+    await act(async()=>root.render(React.createElement(EveningRitual)));
+    const scene=()=>Number(document.querySelector('.ritual-story').dataset.scene);
+    await click(document.querySelector('[aria-label="Предыдущая сцена ритуала"]'));assert.equal(scene(),4);assert.match(document.querySelector('.ritual-story-care').textContent,/полностью остынет/);
+    await click(document.querySelector('[aria-label="Следующая сцена ритуала"]'));assert.equal(scene(),0);
+    await click(document.querySelector('[aria-label="3. Мгновение"]'));assert.equal(scene(),2);assert.match(document.querySelector('.ritual-story-frame img').getAttribute('src'),/03-stay/);
+    await act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true})));assert.equal(scene(),3);
+    await pointer('pointerdown',200);await pointer('pointerup',100);assert.equal(scene(),4);
+    await pointer('pointerdown',100);await pointer('pointerup',200);assert.equal(scene(),3);
+    await pointer('pointerdown',200);await pointer('pointerup',195,400);assert.equal(scene(),3,'Vertical scrolling must not change the scene');
+    await pointer('pointerdown',200);await pointer('pointercancel',80);assert.equal(scene(),3);
+    await act(async()=>document.querySelector('.ritual-story').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Home',bubbles:true,cancelable:true})));assert.equal(scene(),0);
+    assert.equal(document.querySelector('.ritual-play').hidden,true,'Reduced motion disables autoplay');assert.equal(document.querySelectorAll('.ritual-story-frame').length,1);
+  }finally{await act(async()=>root.unmount());}
+});
+
+test('ritual autoplay pauses for reading, background tabs and the explicit pause control',async t=>{
+  const {EveningRitual}=require('./app/components/evening-ritual.js');
+  const oldMedia=window.matchMedia,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});Object.defineProperty(document,'hidden',{configurable:true,value:false});
+  t.mock.timers.enable({apis:['setTimeout']});const root=createRoot(document.getElementById('root'));
+  const tick=async ms=>act(async()=>t.mock.timers.tick(ms));
+  const hover=async type=>{const event=new MouseEvent(type,{bubbles:true,relatedTarget:document.body});Object.defineProperty(event,'pointerType',{value:'mouse'});await act(async()=>document.querySelector('.ritual-story').dispatchEvent(event));};
+  try{
+    await act(async()=>root.render(React.createElement(EveningRitual)));
+    await act(async()=>document.querySelector('.ritual-story-frame img').dispatchEvent(new Event('load')));
+    const scene=()=>Number(document.querySelector('.ritual-story').dataset.scene);
+    assert.equal(document.querySelector('.ritual-story').dataset.playing,'true');await tick(11999);assert.equal(scene(),0);await tick(1);assert.equal(scene(),1);
+    await hover('pointerover');await tick(24000);assert.equal(scene(),1);assert.equal(document.querySelector('.ritual-story').dataset.playing,'false');
+    await hover('pointerout');await tick(12000);assert.equal(scene(),2);
+    await click(document.querySelector('.ritual-play'));await tick(24000);assert.equal(scene(),2);
+    await click(document.querySelector('.ritual-play'));await tick(12000);assert.equal(scene(),3);
+    Object.defineProperty(document,'hidden',{configurable:true,value:true});await act(async()=>document.dispatchEvent(new Event('visibilitychange')));await tick(24000);assert.equal(scene(),3);
+  }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
 });

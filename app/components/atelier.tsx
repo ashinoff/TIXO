@@ -82,7 +82,7 @@ export function Atelier() {
   return (
     <section className="studio pad" id="studio" aria-labelledby="studio-title" data-step={step}>
       <div className="studio-heading">
-        <div><p className="eyebrow">СДЕЛАЙ САМ / В СВОЁМ РИТМЕ</p><h2 id="studio-title">Твоя <span>мастерская.</span></h2></div>
+        <div><p className="eyebrow">04 / СДЕЛАЙ САМ · В СВОЁМ РИТМЕ</p><h2 id="studio-title">Твоя <span>мастерская.</span></h2></div>
         <p>Сначала ощущение. Затем форма и цвет.<br /> Собери свечу, в которой всё — по-твоему.</p>
       </div>
       <div className="studio-layout">

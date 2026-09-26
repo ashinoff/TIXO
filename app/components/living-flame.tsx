@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 
 /** Animate the flame already present in the photograph, keeping its wick fixed. */
 export function LivingFlame() {
-  const [ready, setReady] = useState(false);
-  const [enabled, setEnabled] = useState(false);
-  const toggleRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const container = document.getElementById("hero-image");
@@ -100,8 +97,6 @@ export function LivingFlame() {
       loaded = true;
       draw(0);
       canvas.classList.add("ready");
-      setReady(true);
-      setEnabled(active);
       sync();
     };
 
@@ -110,22 +105,14 @@ export function LivingFlame() {
       loaded = false;
       cancelFrame();
       canvas.classList.remove("ready");
-      setReady(false);
     };
 
     const onMotionChange = () => {
       active = !motion.matches;
-      setEnabled(active);
       sync();
     };
     const onPageHide = () => { pageVisible = false; cancelFrame(); };
     const onPageShow = () => { pageVisible = true; sync(); };
-
-    toggleRef.current = () => {
-      active = !active;
-      setEnabled(active);
-      sync();
-    };
 
     photo.addEventListener("load", load);
     photo.addEventListener("error", fail);
@@ -148,7 +135,6 @@ export function LivingFlame() {
     return () => {
       disposed = true;
       cancelFrame();
-      toggleRef.current = null;
       observer?.disconnect();
       photo.removeEventListener("load", load);
       photo.removeEventListener("error", fail);
@@ -160,18 +146,5 @@ export function LivingFlame() {
     };
   }, []);
 
-  return (
-    <button
-      type="button"
-      id="flame-toggle"
-      className="flame-toggle"
-      hidden={!ready}
-      aria-pressed={enabled}
-      aria-label={enabled ? "Остановить анимацию пламени" : "Включить анимацию пламени"}
-      onClick={() => toggleRef.current?.()}
-    >
-      <span aria-hidden="true">{enabled ? "Ⅱ" : "▷"}</span>
-      <span>{enabled ? "Живое пламя" : "Оживить пламя"}</span>
-    </button>
-  );
+  return null;
 }
