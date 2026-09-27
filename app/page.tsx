@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { ShoppingProvider, Catalog, ScentDiscovery, CartOverlay, CartTrigger } from "./components/storefront-commerce";
 import { LivingFlame } from "./components/living-flame";
 import { EveningRitual } from "./components/evening-ritual";
+import { WorkshopStory } from "./components/workshop-story";
 import { SectionNavigation } from "./components/section-navigation";
 import { ArrowIcon } from "./components/ui-icon";
 import { SectionStack, SectionAnchor } from "./components/section-stack";
@@ -12,6 +13,7 @@ import "./components/section-navigation.css";
 import "./storefront.css";
 import "./components/commerce.css";
 import "./components/section-stack.css";
+import "./components/workshop-story.css";
 
 type Content = Record<string, {value:string;kind:string}>;
 export default function Home() {
@@ -55,7 +57,7 @@ export default function Home() {
 <SectionAnchor section="intro" />
 <section className="introduction pad" id="intro" aria-labelledby="intro-quote"><div className="intro-meta reveal"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ</span><span className="eyebrow">БОЛЬШЕ, ЧЕМ СВЕТ</span></div><h2 className="reveal" id="intro-title">Есть вещи, которые<br />возвращают <span>к себе</span></h2><div className="intro-bottom reveal"><p><span className="intro-sensations">Тёплый свет на стене. Знакомый аромат.<br /></span><span id="intro-quote">Свеча, которую выбирают не по случаю —<br />а по ощущению</span></p><a className="text-link" href="#collection">С этого начинается ТИХО <span aria-hidden="true"><ArrowIcon direction="down-right" /></span></a></div></section>
 <SectionAnchor section="workshop" />
-<section className="workshop pad" id="workshop" aria-labelledby="workshop-title"><div className="section-heading reveal"><p className="eyebrow">03 / МАСТЕРСКАЯ ТИХО</p><span className="eyebrow">СДЕЛАНО РУКАМИ / ВЫБРАНО СЕРДЦЕМ</span></div><div className="workshop-grid"><div className="workshop-photo reveal"><img src={c("image.about", "/assets/workshop-real-candle.webp")} alt="Ручная заливка свечи: тёплый воск, фитиль и руки мастера" width="1024" height="1536" loading="lazy" /><span>Всё начинается с прикосновения.</span></div><div className="workshop-copy"><h2 className="reveal" id="workshop-title">У тепла<br />есть <span>автор</span></h2><p className="reveal">{c("about.lead", "ТИХО — мастерская свечей ручной работы. Нам близки простые формы, выразительные ароматы и вещи, рядом с которыми хочется задержаться.")}</p><p className="reveal">{c("about.text", "Мы создаём свечи для обычных вечеров, которые однажды становятся любимыми воспоминаниями.")}</p><div className="craft-list"><div className="reveal"><span>01</span><h3>Форма</h3><p>Создаётся из специального гипса вручную. Используется натуральный соевый воск, который не выделяет вредных веществ при горении.</p></div><div className="reveal"><span>02</span><h3>Аромат</h3><p>В составе парфюма для свечи — натуральные эфирные масла. В составе отдушек отсутствуют канцерогены, мутагены, токсины, фталаты. Все ароматы соответствуют стандартам безопасности и чистоты RIFM и IFRA.</p></div><div className="reveal"><span>03</span><h3>Прикосновение</h3><p>Ручная работа, которая оставляет каждой свече её индивидуальность.</p></div></div></div></div></section>
+<section className="workshop pad" id="workshop" aria-labelledby="workshop-title"><div className="section-heading reveal"><p className="eyebrow">03 / МАСТЕРСКАЯ ТИХО</p><span className="eyebrow">СДЕЛАНО РУКАМИ / ВЫБРАНО СЕРДЦЕМ</span></div><div className="workshop-grid"><WorkshopStory pouringImage={c("image.about", "/assets/workshop-real-candle.webp")} /><div className="workshop-copy"><h2 className="reveal" id="workshop-title">У тепла<br />есть <span>автор</span></h2><p className="reveal">{c("about.lead", "ТИХО — мастерская свечей ручной работы. Нам близки простые формы, выразительные ароматы и вещи, рядом с которыми хочется задержаться.")}</p><p className="reveal">{c("about.text", "Мы создаём свечи для обычных вечеров, которые однажды становятся любимыми воспоминаниями.")}</p><div className="craft-list"><div className="reveal"><span>01</span><h3>Форма</h3><p>Создаётся из специального гипса вручную. Используется натуральный соевый воск, который не выделяет вредных веществ при горении.</p></div><div className="reveal"><span>02</span><h3>Аромат</h3><p>В составе парфюма для свечи — натуральные эфирные масла. В составе отдушек отсутствуют канцерогены, мутагены, токсины, фталаты. Все ароматы соответствуют стандартам безопасности и чистоты RIFM и IFRA.</p></div><div className="reveal"><span>03</span><h3>Прикосновение</h3><p>Ручная работа, которая оставляет каждой свече её индивидуальность.</p></div></div></div></div></section>
 <SectionAnchor section="care" />
 <EveningRitual />
 </main>

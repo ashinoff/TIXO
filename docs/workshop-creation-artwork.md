@@ -1,0 +1,64 @@
+# Workshop creation story — 27 September 2026
+
+Five new editorial photographs based on the owner's real plaster-casting process and white ribbed cylindrical vessel. The sixth story frame (stage 05, pouring wax) reuses the previously approved `public/assets/workshop-real-candle.webp`; its prompt is in `docs/real-candle-artwork.md`. The existing admin field `atelier.image.about` continues to override this pouring frame.
+
+All generated assets use the built-in image-generation tool, opaque portrait 1024 × 1536. WebP quality 84, effort 6 is only a format conversion; no compositing or generative edits were done with code. Original references and existing assets are preserved.
+
+Reference roles: `workshop-real-candle.webp` locks lighting, oak table, linen clothes and human continuity; `image-27-09-26-01-19.jpeg` locks the real vessel geometry. Uploaded process photographs inform the mixing, silicone casting and demolding stages. Frames are illustrative reconstructions, not documentary photographs of the actual workshop.
+
+Story order: mix → cast → release → wick → pour → finished. The finished frame shows the owner's vessel design filled with set soy wax and an unlit cotton wick.
+
+## 01-mix.webp
+
+- Asset: `public/assets/workshop/creation/01-mix.webp`
+- Inputs, in order: `workshop-real-candle.webp`, `image-27-09-26-01-19.jpeg`, `05-IMG_3179.jpeg`.
+- Mode: built-in ImageGen, generation with photographic references.
+
+### Exact prompt
+
+Create a single premium editorial PHOTOGRAPH for the TIHO handmade candle workshop website, portrait 2:3, 1024x1536. This is one frame in a cohesive six-stage photographic story. Use reference 1 as the exact atmosphere, camera, color and human continuity reference: warm rustic oak worktable, artisan in an off-white linen shirt with rolled sleeves, natural hands without jewelry, softly blurred neutral workshop, daylight from the left. Bright detailed white material, natural warm color, exquisite tactile texture, physically believable craft. Subject and hands sharply resolved, background softly out of focus. Keep all essential action within middle 75% of image for responsive cropping. No text, letters, logo, borders or collage. No unrelated decoration. Reference 2 is the ACTUAL PRODUCT SHAPE: matte chalk-white gypsum candle vessel, straight cylindrical walls, many narrow vertical rounded ribs, subtle scalloped rim and rounded lower edge; height close to outer diameter, roughly 10cm. Preserve this exact silhouette and dense rib pattern wherever the vessel is visible. Never turn it into a round pumpkin, bowl, vase, ceramic gloss or generic smooth candle jar.
+STAGE 1 — PREPARING GYPSUM. Reference 3 shows the user's real process and tools; translate it into the art direction of reference 1 rather than copying the clutter. Close medium view of the artisan's two hands mixing smooth ivory gypsum slurry with a simple wooden spatula in a low muted peach flexible mixing bowl, resting on a small neutral digital scale (no visible lettering or numbers). A little measured white plaster powder in a plain bowl at the lower left, a translucent cylindrical silicone mold farther right. Focus on the creamy texture and hands stirring; no finished candle is needed in this first frame. Natural human anatomy, one stirring hand and one steadying hand. A restrained working trace of powder, not a dust cloud.
+
+## 02-cast.webp
+
+- Asset: `public/assets/workshop/creation/02-cast.webp`
+- Inputs, in order: `workshop-real-candle.webp`, `image-27-09-26-01-19.jpeg`, `11-IMG_3173.jpeg`.
+- Mode: built-in ImageGen, generation with photographic references.
+
+### Exact prompt
+
+Create a single premium editorial PHOTOGRAPH for the TIHO handmade candle workshop website, portrait 2:3, 1024x1536. This is one frame in a cohesive six-stage photographic story. Use reference 1 as the exact atmosphere, camera, color and human continuity reference: warm rustic oak worktable, artisan in an off-white linen shirt with rolled sleeves, natural hands without jewelry, softly blurred neutral workshop, daylight from the left. Bright detailed white material, natural warm color, exquisite tactile texture, physically believable craft. Subject and hands sharply resolved, background softly out of focus. Keep all essential action within middle 75% of image for responsive cropping. No text, letters, logo, borders or collage. No unrelated decoration. Reference 2 is the ACTUAL PRODUCT SHAPE: matte chalk-white gypsum candle vessel, straight cylindrical walls, many narrow vertical rounded ribs, subtle scalloped rim and rounded lower edge; height close to outer diameter, roughly 10cm. Preserve this exact silhouette and dense rib pattern wherever the vessel is visible. Never turn it into a round pumpkin, bowl, vase, ceramic gloss or generic smooth candle jar.
+STAGE 2 — POURING THE VESSEL MOLD. Reference 3 is the user's REAL silicone casting process. On the warm oak table, the artisan pours a narrow creamy white gypsum stream from the same muted peach flexible mixing bowl into one cylindrical translucent off-white silicone casting mold at center. IMPORTANT physical process: the candle vessel is cast INVERTED around a hidden inner silicone core; the visible top of the filled mold becomes the eventual solid flat base of the pot. Show the mold almost filled, a smooth full circular plaster surface at its top with the pouring stream landing slightly off center; no open candle cup, wick or wax at this stage, no finished ribbed plaster vessel used as a mold. The translucent mold has simple straight cylinder exterior and shallow flange at its base, matching the center cylinder in reference 3. One hand tips bowl at upper left, the other steadies the mold at right. Clean balanced composition, detailed believable viscous stream and silicone surface.
+
+## 03-release.webp
+
+- Asset: `public/assets/workshop/creation/03-release.webp`
+- Inputs, in order: `workshop-real-candle.webp`, `image-27-09-26-01-19.jpeg`, `02-IMG_3182.jpeg`.
+- Mode: built-in ImageGen, generation with photographic references.
+
+### Exact prompt
+
+Create a single premium editorial PHOTOGRAPH for the TIHO handmade candle workshop website, portrait 2:3, 1024x1536. This is one frame in a cohesive six-stage photographic story. Use reference 1 as the exact atmosphere, camera, color and human continuity reference: warm rustic oak worktable, artisan in an off-white linen shirt with rolled sleeves, natural hands without jewelry, softly blurred neutral workshop, daylight from the left. Bright detailed white material, natural warm color, exquisite tactile texture, physically believable craft. Subject and hands sharply resolved, background softly out of focus. Keep all essential action within middle 75% of image for responsive cropping. No text, letters, logo, borders or collage. No unrelated decoration. Reference 2 is the ACTUAL PRODUCT SHAPE: matte chalk-white gypsum candle vessel, straight cylindrical walls, many narrow vertical rounded ribs, subtle scalloped rim and rounded lower edge; height close to outer diameter, roughly 10cm. Preserve this exact silhouette and dense rib pattern wherever the vessel is visible. Never turn it into a round pumpkin, bowl, vase, ceramic gloss or generic smooth candle jar.
+STAGE 3 — REVEALING THE GYPSUM VESSEL. The artisan has just demolded the exact white ribbed cylindrical vessel in reference 2. A close medium view of hands cradling the newly cast EMPTY white vessel upright above the oak worktable, its open smooth interior and delicate scalloped rim clearly visible. One natural hand supports its side, the other carefully pulls a flexible translucent off-white silicone mold down and away from the lower quarter. The pliable silicone is folded back and physically separate from the white rigid plaster. Most of the vessel is revealed in the center. Match the product's dense narrow vertical rounded ribs, cylinder proportions and softly rounded bottom precisely. No wax, wick, flame, pouring jug or extra pots. Finely textured matte plaster with a few almost imperceptible natural pores, not glossy plastic.
+
+## 04-wick.webp
+
+- Asset: `public/assets/workshop/creation/04-wick.webp`
+- Inputs, in order: `workshop-real-candle.webp`, `image-27-09-26-01-19.jpeg`.
+- Mode: built-in ImageGen, generation with photographic references.
+
+### Exact prompt
+
+Create a single premium editorial PHOTOGRAPH for the TIHO handmade candle workshop website, portrait 2:3, 1024x1536. This is one frame in a cohesive six-stage photographic story. Use reference 1 as the exact atmosphere, camera, color and human continuity reference: warm rustic oak worktable, artisan in an off-white linen shirt with rolled sleeves, natural hands without jewelry, softly blurred neutral workshop, daylight from the left. Bright detailed white material, natural warm color, exquisite tactile texture, physically believable craft. Subject and hands sharply resolved, background softly out of focus. Keep all essential action within middle 75% of image for responsive cropping. No text, letters, logo, borders or collage. No unrelated decoration. Reference 2 is the ACTUAL PRODUCT SHAPE: matte chalk-white gypsum candle vessel, straight cylindrical walls, many narrow vertical rounded ribs, subtle scalloped rim and rounded lower edge; height close to outer diameter, roughly 10cm. Preserve this exact silhouette and dense rib pattern wherever the vessel is visible. Never turn it into a round pumpkin, bowl, vase, ceramic gloss or generic smooth candle jar.
+STAGE 4 — PREPARING THE WICK. Close medium view at a slightly higher angle, still same table and artisan. Centered EMPTY exact white ribbed cylindrical vessel from reference 2 on the oak table; visible smooth white interior. Artisan carefully centers one thin cream COTTON candle wick, secured to a small round metal sustainer glued at the inside bottom; the wick rises straight from that metal base. A simple slender wooden centering bar lies horizontally across the open rim to hold the wick upright, with the wick passing through its center. One hand adjusts the center bar gently, other steadies the vessel at right. No wax yet, no flame, no wooden wick. Nearby unobtrusive scissors at the lower edge and a few soy wax flakes in a neutral bowl at right. Show physically correct wick geometry, natural fingers and calm concentrated craftsmanship.
+
+## 06-finished.webp
+
+- Asset: `public/assets/workshop/creation/06-finished.webp`
+- Inputs, in order: `workshop-real-candle.webp`, `image-27-09-26-01-19.jpeg`.
+- Mode: built-in ImageGen, generation with photographic references.
+
+### Exact prompt
+
+Create a single premium editorial PHOTOGRAPH for the TIHO handmade candle workshop website, portrait 2:3, 1024x1536. This is one frame in a cohesive six-stage photographic story. Use reference 1 as the exact atmosphere, camera, color and human continuity reference: warm rustic oak worktable, artisan in an off-white linen shirt with rolled sleeves, natural hands without jewelry, softly blurred neutral workshop, daylight from the left. Bright detailed white material, natural warm color, exquisite tactile texture, physically believable craft. Subject and hands sharply resolved, background softly out of focus. Keep all essential action within middle 75% of image for responsive cropping. No text, letters, logo, borders or collage. No unrelated decoration. Reference 2 is the ACTUAL PRODUCT SHAPE: matte chalk-white gypsum candle vessel, straight cylindrical walls, many narrow vertical rounded ribs, subtle scalloped rim and rounded lower edge; height close to outer diameter, roughly 10cm. Preserve this exact silhouette and dense rib pattern wherever the vessel is visible. Never turn it into a round pumpkin, bowl, vase, ceramic gloss or generic smooth candle jar.
+STAGE 6 — THE FINISHED WHITE CANDLE. Hero product portrait of the EXACT real ribbed white gypsum candle vessel in reference 2, now filled with smoothly set opaque ivory soy wax ending about 8mm below the rim, with one short centered unlit cotton wick. Same warm oak table and side daylight from reference 1, clean quiet workshop background, the artisan's off-white linen torso softly blurred at upper right but hands out of frame. Vessel at center in lower-middle of portrait, about 45% of image height; show the entire vessel and its shadow with breathing room. Three-quarter slightly elevated angle to show wax surface and the faithful scalloped circular rim. Straight vertical cylindrical walls, narrow dense fine ribs, rounded bottom and matte chalk-white plaster exactly as reference 2. A small folded natural linen cloth at left edge and understated bowl of soy flakes near right edge link to the other workshop scenes. No flame, lid, label, markings or tools covering the finished product. Bright elegant reassuring final moment, real physical object, not CGI.

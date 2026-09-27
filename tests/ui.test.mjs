@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -687,6 +687,52 @@ test('hero keeps the burning photograph without controls and section numbers fol
     assert.deepEqual(labels,['02','01','03','04']);assert.equal(document.querySelectorAll('.ritual-story button').length,0);
     const links=[...document.querySelectorAll('.section-navigation a')];assert.deepEqual(links.map(link=>link.getAttribute('href')),['#home','#collection','#aromas','#workshop','#care']);assert.ok(links.every(link=>document.querySelector(link.getAttribute('href')) && link.getAttribute('aria-label')));
   }finally{await act(async()=>root.unmount());}
+});
+
+test('workshop and ritual share the two-second rhythm but keep holds, pause and scene counts independent',async t=>{
+  const {WorkshopStory}=require('./app/components/workshop-story.js');
+  const {EveningRitual}=require('./app/components/evening-ritual.js');
+  const oldMedia=window.matchMedia,hiddenDescriptor=Object.getOwnPropertyDescriptor(document,'hidden');
+  window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});Object.defineProperty(document,'hidden',{configurable:true,value:false});
+  t.mock.timers.enable({apis:['setTimeout']});const root=createRoot(document.getElementById('root'));
+  const workshop=()=>document.querySelector('.workshop-story'),ritual=()=>document.querySelector('.ritual-story');
+  const tick=async ms=>act(async()=>t.mock.timers.tick(ms));
+  const key=async value=>act(async()=>workshop().dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true})));
+  const pointer=async(type,target=workshop())=>{const event=new MouseEvent(type,{bubbles:true,button:0,clientX:150,clientY:200});Object.defineProperties(event,{pointerId:{value:81},pointerType:{value:'touch'}});await act(async()=>target.dispatchEvent(event));};
+  try{
+    await act(async()=>root.render(React.createElement(React.Fragment,null,React.createElement(WorkshopStory),React.createElement(EveningRitual))));
+    await tick(1999);assert.equal(workshop().dataset.scene,'0');assert.equal(ritual().dataset.scene,'0');
+    await tick(1);assert.equal(workshop().dataset.scene,'1');assert.equal(ritual().dataset.scene,'1');
+    await pointer('pointerdown');await tick(2000);assert.equal(workshop().dataset.scene,'1');assert.equal(ritual().dataset.scene,'2');
+    assert.equal(document.querySelectorAll('.workshop-story-frame').length,2,'Holding preserves the crossfade layers');
+    await pointer('pointerup',document.body);await tick(2000);assert.equal(workshop().dataset.scene,'2');assert.equal(ritual().dataset.scene,'3');
+    await key('End');assert.equal(workshop().dataset.scene,'5');assert.match(document.querySelector('.workshop-story-frame:not(.is-leaving) img').src,/06-finished/);assert.equal(document.querySelector('.workshop-story-count').getAttribute('aria-label'),'6 из 6');
+    await tick(2000);assert.equal(workshop().dataset.scene,'0');assert.equal(ritual().dataset.scene,'4');
+    await key(' ');await tick(2000);assert.equal(workshop().dataset.scene,'0');assert.equal(ritual().dataset.scene,'0');
+    await key(' ');await act(async()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+    await tick(8000);assert.equal(workshop().dataset.scene,'0');assert.equal(ritual().dataset.scene,'0');
+  }finally{await act(async()=>root.unmount());t.mock.timers.reset();window.matchMedia=oldMedia;if(hiddenDescriptor)Object.defineProperty(document,'hidden',hiddenDescriptor);else delete document.hidden;}
+});
+
+test('workshop preserves the admin pouring image and can continue past a failed photo with reduced motion',async()=>{
+  const {WorkshopStory}=require('./app/components/workshop-story.js');
+  const oldImage=window.Image;
+  window.Image=class {set src(value){queueMicrotask(()=>value.includes('02-cast')?this.onerror?.():this.onload?.());}decode(){return Promise.resolve();}};
+  const root=createRoot(document.getElementById('root'));
+  const carousel=()=>document.querySelector('.workshop-story');
+  const key=async value=>act(async()=>carousel().dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true})));
+  try{
+    await act(async()=>root.render(React.createElement(WorkshopStory,{pouringImage:'/api/uploads/own-pouring.webp'})));
+    assert.equal(carousel().dataset.playing,'false');assert.equal(document.querySelector('.workshop-story button'),null);
+    await key('ArrowRight');assert.equal(carousel().dataset.scene,'1');assert.equal(document.querySelector('.workshop-story-frame img'),null);assert.match(document.querySelector('.workshop-story-unavailable').textContent,/Фотография пока недоступна/);
+    await key('ArrowRight');assert.equal(carousel().dataset.scene,'2');assert.match(document.querySelector('.workshop-story-frame img').src,/03-release/);
+    await key('End');await key('ArrowLeft');assert.equal(document.querySelector('.workshop-story-frame img').getAttribute('src'),'/api/uploads/own-pouring.webp');
+    await act(async()=>root.render(React.createElement(WorkshopStory,{pouringImage:'/api/uploads/new-pouring.webp'})));assert.equal(document.querySelector('.workshop-story-frame img').getAttribute('src'),'/api/uploads/new-pouring.webp');
+    const before=carousel().dataset.scene;
+    for(const [type,x,y] of [['pointerdown',180,200],['pointercancel',175,360]]){const event=new MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0});Object.defineProperties(event,{pointerId:{value:91},pointerType:{value:'touch'}});await act(async()=>carousel().dispatchEvent(event));}
+    assert.equal(carousel().dataset.scene,before);assert.ok(!carousel().classList.contains('is-held'));
+    await key('Home');await key('ArrowLeft');assert.equal(carousel().dataset.scene,'5');assert.equal(document.querySelectorAll('.workshop-story-frame').length,1);
+  }finally{await act(async()=>root.unmount());window.Image=oldImage;}
 });
 
 test('button-free ritual supports keyboard, horizontal wheel, mouse swipes and touch cancellation',async t=>{
