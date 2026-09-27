@@ -20,7 +20,7 @@ const emptyForm: CandleForm = { id:0, name:"", shape:null, silhouette:null, acti
 const emptyColor: CandleColor = { id:0, name:"", hex:"#e8ddca", active:true };
 const fields: Field[] = [
   { key: "atelier.hero.title", label: "Первый экран — заголовок", kind: "text", fallback: "Пусть мир" },
-  { key: "atelier.hero.emphasis", label: "Первый экран — акцент", kind: "text", fallback: "подождёт." },
+  { key: "atelier.hero.emphasis", label: "Первый экран — акцент", kind: "text", fallback: "подождёт" },
   { key: "atelier.hero.description", label: "Первый экран — описание", kind: "text", fallback: "Один огонь. Любимый аромат.\nИ вечер, который снова принадлежит вам." },
   { key: "atelier.about.lead", label: "Мастерская — вводный текст", kind: "text", fallback: "ТИХО — мастерская свечей ручной работы. Нам близки простые формы, выразительные ароматы и вещи, рядом с которыми хочется задержаться." },
   { key: "atelier.about.text", label: "Мастерская — основной текст", kind: "text", fallback: "Мы создаём свечи для обычных вечеров, которые однажды становятся любимыми воспоминаниями." },
