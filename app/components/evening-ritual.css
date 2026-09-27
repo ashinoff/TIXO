@@ -3,7 +3,8 @@
 .tiho-site .button.button-glass:hover{background:#d9c39d1c;border-color:#e6d1aba6;box-shadow:inset 0 0 30px #d5b78008}
 .tiho-site #home .hero-bottom{display:flex;flex-direction:row;justify-content:flex-start;flex-wrap:nowrap}
 .tiho-site #home .scroll-cue{align-self:auto;min-height:40px}
-.tiho-site #home .hero-image{filter:brightness(.98)}
+.tiho-site #home .hero-image{filter:brightness(1.12) contrast(1.03)}
+.tiho-site #home .hero-shade{background:linear-gradient(90deg,#0b0c0a8c,#0b0c0a1a 43%,transparent 65%),linear-gradient(0deg,#0b0c0aa6,transparent 24%)}
 
 .tiho-site #care{padding-top:83px;padding-bottom:0;background:#131610;color:#ecebe0}
 .tiho-site #care .ritual-story-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-bottom:38px}
@@ -17,10 +18,10 @@
 .tiho-site #care .ritual-story-frame{background:radial-gradient(ellipse at 75% 30%,#544330,#100e0b 78%);overflow:hidden}
 .tiho-site #care .ritual-story-frame.is-revealing{animation:ritual-scene-in 1.6s ease both}
 .tiho-site #care .ritual-story-frame.is-leaving{pointer-events:none}
-.tiho-site #care .ritual-story-frame img{width:100%;height:100%;object-fit:cover;object-position:68% center;animation:ritual-scene-drift 18s ease-out both;pointer-events:none}
+.tiho-site #care .ritual-story-frame img{width:100%;height:100%;object-fit:cover;object-position:68% center;filter:brightness(1.12) contrast(1.03);animation:ritual-scene-drift 18s ease-out both;pointer-events:none}
 .tiho-site #care .ritual-story-frame.is-leaving img{animation-play-state:paused}
 .tiho-site #care .ritual-story.is-held .ritual-story-frame,.tiho-site #care .ritual-story.is-held .ritual-story-frame img{animation-play-state:paused}
-.tiho-site #care .ritual-story-shade{background:linear-gradient(90deg,#080907d9,#0809078c 35%,#0809071a 70%),linear-gradient(0deg,#080907eb,transparent 40%,#08090726);pointer-events:none}
+.tiho-site #care .ritual-story-shade{background:linear-gradient(90deg,#080907d9,#08090773 35%,transparent 66%),linear-gradient(0deg,#080907d9,transparent 24%,#0809070d);pointer-events:none}
 .tiho-site #care .ritual-story-top{position:absolute;top:30px;left:34px;right:34px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:10px;letter-spacing:.14em;color:#d7cfbb;pointer-events:none}
 .tiho-site #care .ritual-story-top>span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:14px;letter-spacing:.09em}
 .tiho-site #care .ritual-story-top i{font-style:normal;color:#b0ae9f;font-size:11px}
@@ -56,6 +57,7 @@
  .tiho-site #care .ritual-story-heading>p{max-width:250px}
 }
 @media(max-width:760px){
+ .tiho-site #home .hero-shade{background:linear-gradient(90deg,#080c0733,transparent 65%),linear-gradient(0deg,#0c110b99,transparent 27%)}
  .tiho-site #home .hero-bottom{bottom:23px}
  .tiho-site #home .scroll-cue{grid-column:auto;grid-row:auto;align-self:auto}
  .tiho-site #home .button-glass{width:250px}
@@ -68,7 +70,7 @@
  .tiho-site #care .ritual-story-top{top:22px;left:22px;right:22px;gap:15px;font-size:8px;line-height:1.7}
  .tiho-site #care .ritual-story-top>span:first-child{max-width:190px}
  .tiho-site #care .ritual-story-frame img{object-position:69% center}
- .tiho-site #care .ritual-story-shade{background:linear-gradient(180deg,#08090766,transparent 22%,#08090785 39%,#080907ed 77%,#080907f5),linear-gradient(90deg,#08090755,transparent)}
+ .tiho-site #care .ritual-story-shade{background:linear-gradient(180deg,#08090726,transparent 28%,#08090726 45%,#080907c9 78%,#080907eb),linear-gradient(90deg,#0809071a,transparent 65%)}
  .tiho-site #care .ritual-story-copy{top:auto;left:22px;right:22px;width:auto;bottom:94px;max-width:none;min-height:298px;justify-content:flex-end}
  .tiho-site #care .ritual-story-copy>.eyebrow{font-size:9px;margin-bottom:16px}
  .tiho-site #care .ritual-story-copy h3{font-size:39px;line-height:1.12}

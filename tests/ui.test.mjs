@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -1300,4 +1300,58 @@ test('mobile filters close after selection or downward dismissal without losing 
     assert.equal(document.activeElement.id,'filter-color');
     assert.notEqual(document.body.style.overflow,'hidden');
   }finally{await act(async()=>root.unmount());window.matchMedia=oldMedia;}
+});
+
+test('catalog photos swipe without opening the product, keep vertical scrolling and preserve the cover in the cart',async()=>{
+  window.localStorage.clear();
+  const candles=[{...products[0],formId:1,form:forms[0],colorId:1,color:colors[0],scentId:1,scent:scents[0],image:'/cover.png',images:['/cover.png','/side.png','/detail.png']},{...products[1],formId:2,form:forms[1],colorId:1,color:colors[0],scentId:1,scent:scents[0],image:'/single.png',images:['/single.png']}];
+  globalThis.fetch=async url=>url==='/api/products'?response(candles):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  const root=createRoot(document.getElementById('root'));
+  const touch=async(target,type,x,y,more=false)=>{
+    const e=new Event(type,{bubbles:true,cancelable:true}),point={identifier:1,clientX:x,clientY:y};
+    Object.defineProperties(e,{touches:{value:type==='touchend'||type==='touchcancel'?[]:more?[point,{identifier:2,clientX:250,clientY:250}]:[point]},changedTouches:{value:[point]}});
+    await act(async()=>target.dispatchEvent(e));return e;
+  };
+  const swipe=async(target,dx,dy=0)=>{await touch(target,'touchstart',210,220);const e=await touch(target,'touchmove',210+dx,220+dy);await touch(target,'touchend',210+dx,220+dy);return e;};
+  try{
+    await act(async()=>root.render(React.createElement(ShoppingProvider,null,React.createElement('div',{className:'tiho-site'},React.createElement(Catalog),React.createElement(CartOverlay),React.createElement(CartTrigger)))));
+    const card=document.querySelector('.product-card'),photo=card.querySelector('.product-image'),src=()=>card.querySelector('.catalog-photo-current').getAttribute('src');
+    assert.equal(src(),'/cover.png');await swipe(photo,-100);assert.equal(src(),'/side.png');
+    await act(async()=>photo.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:1})));
+    assert.equal(document.querySelector('.product-dialog'),null,'The synthesized tap must not open a modal');
+    assert.equal((await swipe(photo,4,130)).defaultPrevented,false,'Vertical scrolling remains native');assert.equal(src(),'/side.png');
+    await swipe(photo,24);assert.equal(src(),'/side.png','Short drags settle without changing photos');
+    await touch(photo,'touchstart',210,220);await touch(photo,'touchmove',100,220);await touch(photo,'touchcancel',100,220);assert.equal(src(),'/side.png');
+    await touch(photo,'touchstart',210,220);await touch(photo,'touchmove',100,220,true);await touch(photo,'touchend',100,220);assert.equal(src(),'/side.png');
+    await click(card.querySelector('[aria-label="Следующее фото в каталоге"]'));assert.equal(src(),'/detail.png');
+    await act(async()=>photo.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true})));assert.equal(src(),'/cover.png');
+    const single=document.querySelectorAll('.product-card')[1];assert.equal(single.querySelector('.catalog-photo-navigation'),null);await swipe(single.querySelector('.product-image'),-100);assert.equal(document.querySelector('.product-dialog'),null);
+    await click(card.querySelector('[aria-label="Следующее фото в каталоге"]'));await click(card.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelector('.cart-candle-visual img').getAttribute('src'),'/cover.png');
+    await click(document.querySelector('[aria-label="Закрыть корзину"]'));await click(photo);assert.ok(document.querySelector('.product-dialog'),'A normal activation still opens details');
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('catalog filters reappear on upward scrolling and leave with the catalog even when its section is sticky',async()=>{
+  const {CatalogFilterDock}=require('./app/components/catalog-filter-dock.js');
+  const oldY=Object.getOwnPropertyDescriptor(window,'scrollY'),oldRAF=window.requestAnimationFrame,oldCAF=window.cancelAnimationFrame;
+  window.requestAnimationFrame=fn=>setTimeout(()=>fn(0),0);window.cancelAnimationFrame=clearTimeout;
+  Object.defineProperty(window,'scrollY',{configurable:true,writable:true,value:0});
+  const root=createRoot(document.getElementById('root'));let left=0;
+  const render=open=>React.createElement('main',null,React.createElement('section',{id:'collection'},React.createElement(CatalogFilterDock,{open,onLeave:()=>left++},React.createElement('button',null,'Фильтры'))),React.createElement('div',{'data-section-anchor':'aromas'}));
+  const scroll=async y=>{await act(async()=>{window.scrollY=y;window.dispatchEvent(new Event('scroll'));await new Promise(resolve=>setTimeout(resolve,15));});};
+  try{
+    await act(async()=>root.render(render(false)));
+    const panel=document.querySelector('.catalog-filter-bar');
+    panel.getBoundingClientRect=()=>({height:100});
+    document.querySelector('.catalog-filter-slot').getBoundingClientRect=()=>({top:500-window.scrollY});
+    document.querySelector('#collection').getBoundingClientRect=()=>({top:Math.min(0,300-window.scrollY),bottom:844});
+    document.querySelector('[data-section-anchor="aromas"]').getBoundingClientRect=()=>({top:2400-window.scrollY});
+    await scroll(950);assert.ok(panel.classList.contains('is-floating'));assert.ok(panel.hasAttribute('inert'));
+    await scroll(920);assert.ok(panel.classList.contains('is-visible'));assert.equal(panel.hasAttribute('inert'),false);
+    await scroll(921);assert.ok(panel.classList.contains('is-visible'),'Small scroll jitter does not hide controls');
+    await scroll(960);assert.equal(panel.classList.contains('is-visible'),false);
+    await scroll(900);await act(async()=>root.render(render(true)));await scroll(950);assert.ok(panel.classList.contains('is-visible'),'Keep an open filter available');
+    await scroll(2450);assert.equal(panel.classList.contains('is-floating'),false);assert.equal(left,1,'Leaving the catalog closes its menu');
+    await act(async()=>root.render(render(false)));await scroll(400);assert.equal(panel.classList.contains('is-floating'),false);
+  }finally{await act(async()=>root.unmount());Object.defineProperty(window,'scrollY',oldY);window.requestAnimationFrame=oldRAF;window.cancelAnimationFrame=oldCAF;}
 });

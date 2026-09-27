@@ -6,15 +6,14 @@ import { ArrowIcon } from "./ui-icon";
 export type PhotoCarouselHandle = { move: (offset: number) => void; drag: (distance: number) => void; cancel: () => void };
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-/** One moving strip: the current photo and its neighbours follow the same finger. */
-export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]; label: string; controlsRef: Ref<PhotoCarouselHandle> }) {
+/** Shared motion keeps the catalog and detail gallery on the same moving strip. */
+export function usePhotoCarousel<T extends HTMLElement = HTMLDivElement>(count: number) {
   const [index, setIndex] = useState(0);
   const [motion, setMotion] = useState<{ target: number; direction: number } | null>(null);
-  const track = useRef<HTMLDivElement>(null);
+  const track = useRef<T>(null);
   const busy = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const frame = useRef<number | undefined>(undefined);
-  const count = photos.length;
   const paint = (distance: number, duration = 0) => {
     if (!track.current) return;
     track.current.style.transition = duration ? `transform ${duration}ms cubic-bezier(.22,.7,.25,1)` : "none";
@@ -32,15 +31,11 @@ export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]
     clearTimeout(timer.current);
     paint(0, reducedMotion() ? 0 : 240);
   };
-  useImperativeHandle(controlsRef, () => ({
-    move: offset => navigate((index + offset + count) % count, offset < 0 ? -1 : 1),
-    drag: distance => {
-      if (busy.current || count < 2 || reducedMotion()) return;
-      const width = track.current?.clientWidth ?? 0;
-      paint(Math.max(-width * 0.95, Math.min(width * 0.95, distance)));
-    },
-    cancel,
-  }));
+  const drag = (distance: number) => {
+    if (busy.current || count < 2 || reducedMotion()) return;
+    const width = track.current?.clientWidth ?? 0;
+    paint(Math.max(-width * 0.95, Math.min(width * 0.95, distance)));
+  };
   useLayoutEffect(() => {
     if (!track.current) return;
     if (!motion) { paint(0); return; }
@@ -63,6 +58,14 @@ export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]
   const previous = motion?.direction === -1 ? motion.target : (index + count - 1) % count;
   const next = motion?.direction === 1 ? motion.target : (index + 1) % count;
   const move = (offset: number) => navigate((index + offset + count) % count, offset < 0 ? -1 : 1);
+  return { index, motion, track, previous, next, move, navigate, drag, cancel };
+}
+
+/** One moving strip: the current photo and its neighbours follow the same finger. */
+export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]; label: string; controlsRef: Ref<PhotoCarouselHandle> }) {
+  const count = photos.length;
+  const { index, motion, track, previous, next, move, navigate, drag, cancel } = usePhotoCarousel(count);
+  useImperativeHandle(controlsRef, () => ({ move, drag, cancel }));
   return <div className="detail-gallery" role="region" aria-label="Фотографии свечи" onKeyDown={event => {
     if (count > 1 && (event.key === "ArrowLeft" || event.key === "ArrowRight")) { event.preventDefault(); move(event.key === "ArrowLeft" ? -1 : 1); }
   }}>

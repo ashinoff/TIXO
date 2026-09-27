@@ -7,6 +7,8 @@ import { sortByName, availableVariants, productImages, emptyAromaProfile, candle
 import { atelierColors, atelierColorHex, recipeFormName, copyRecipe, isRecipe as validRecipe, recipeKey, recipeSummary, type Recipe } from "@/lib/atelier";
 import { Modal } from "./modal";
 import { CatalogFilter } from "./catalog-filter";
+import { CatalogFilterDock } from "./catalog-filter-dock";
+import { CatalogPhotoGallery } from "./catalog-photo-gallery";
 import { CandlePreview } from "./candle-preview";
 import { FormMiniature } from "./form-miniature";
 import { isLegacyFormPlaceholder } from "@/lib/form-portraits";
@@ -320,8 +322,17 @@ export function Catalog({ number = "01" }: { number?: string }) {
   const palette = shop.colors.find(color => color.id === colorId);
   const selectedForm = shop.forms.find(form => form.id === formId);
   const filterForms = shop.forms.filter(form => !isLegacyFormPlaceholder(form) || shop.products.some(product => product.formId === form.id));
-  const choose = (kind: string, action: () => void) => { action(); setOpenFilter(null); document.getElementById(`filter-${kind}`)?.focus({ preventScroll: true }); };
-  const reset = () => { setColorId(null); setFormId(null); shop.setActiveScent(null); setOpenFilter(null); };
+  const choose = (kind: string, action: () => void) => {
+    const trigger = document.getElementById(`filter-${kind}`);
+    const docked = trigger?.closest(".catalog-filter-bar.is-floating");
+    const catalog = trigger?.closest("#collection"), slot = trigger?.closest(".catalog-filter-slot");
+    const anchor = document.querySelector('[data-section-anchor="collection"]');
+    // A shorter filtered list should show its results, not leave the visitor in the next section.
+    const resultsTop = docked && catalog && slot && anchor ? anchor.getBoundingClientRect().top + window.scrollY + slot.getBoundingClientRect().top - catalog.getBoundingClientRect().top - 16 : null;
+    action(); setOpenFilter(null); trigger?.focus({ preventScroll: true });
+    if (resultsTop !== null) window.requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, resultsTop), behavior: "instant" }));
+  };
+  const reset = () => choose("color", () => { setColorId(null); setFormId(null); shop.setActiveScent(null); });
   const cards = shop.products.flatMap(product => shop.colors.flatMap(color => {
     if (formId !== null && product.formId !== formId) return [];
     if ((colorId !== null && color.id !== colorId && product.accentColorId !== colorId) || (product.colorId && product.colorId !== color.id)) return [];
@@ -334,7 +345,7 @@ export function Catalog({ number = "01" }: { number?: string }) {
   const catalog = cards.map(({ product, color }) => ({ productId: product.id, scentId: product.scentId ?? shop.activeScent ?? undefined, colorId: color.id }));
   return <section className="collection pad" id="collection" aria-labelledby="collection-title">
     <div className="section-heading"><div><p className="eyebrow">{number} / КОЛЛЕКЦИЯ</p><h2 id="collection-title">У тишины<br />ваша форма</h2></div><p className="section-description">Любимый цвет. Любимый аромат.<br />Сочетание выбираете вы.</p></div>
-    <div className="catalog-filter-bar">
+    <CatalogFilterDock open={openFilter !== null} onLeave={() => setOpenFilter(null)}>
       <div className="catalog-dropdowns">
         <CatalogFilter id="color" label="Цвет" value={palette?.name ?? "Все цвета"} preview={palette && <i className="filter-selected-color" style={{ background: palette.hex }} />} open={openFilter === "color"} onToggle={() => setOpenFilter(openFilter === "color" ? null : "color")} onClose={() => setOpenFilter(null)}>
           <div className="filter-option-list filter-color-palette"><button type="button" data-selected={colorId === null} aria-pressed={colorId === null} onClick={() => choose("color", () => setColorId(null))}><span className="filter-option-visual"><i className="all-color-swatch" /></span><span className="filter-option-name">Все цвета</span><span className="filter-option-check">{colorId === null && <CheckIcon />}</span></button>{shop.colors.map(color => <button type="button" key={color.id} aria-label={`Цвет: ${color.name}`} aria-pressed={colorId === color.id} data-selected={colorId === color.id} onClick={() => choose("color", () => setColorId(color.id))}><span className="filter-option-visual"><i style={{ background: color.hex }} /></span><span className="filter-option-name">{color.name}</span><span className="filter-option-check">{colorId === color.id && <CheckIcon />}</span></button>)}</div>
@@ -347,14 +358,16 @@ export function Catalog({ number = "01" }: { number?: string }) {
         </CatalogFilter>
       </div>
       <div className="catalog-filter-summary"><span className="catalog-note" aria-live="polite">{cards.length} вариантов · ручная работа</span>{(colorId !== null || formId !== null || shop.activeScent !== null) && <button type="button" className="catalog-reset" onClick={reset}>Сбросить фильтры ×</button>}</div>
-    </div>
+    </CatalogFilterDock>
     {shop.loading && <p className="catalog-message" role="status">Готовим вашу коллекцию…</p>}
     {shop.catalogError && <div className="catalog-message" role="alert">{shop.catalogError}<button className="text-link" onClick={() => void shop.loadCatalog()}>Попробовать ещё раз <ArrowIcon /></button></div>}
     {!shop.loading && !shop.catalogError && !cards.length && <div className="catalog-message" role="status"><p>В этом сочетании свечей пока нет.</p><button className="text-link" onClick={reset}>Показать всю коллекцию <ArrowIcon /></button></div>}
     <div className="product-grid" id="product-grid">{cards.map(({ product, color, scent, photo }, index) => {
       const readyToAdd = shop.activeScent !== null || !!product.scentId;
+      const photos = [...new Set([photo.src, ...productImages(product)].filter((src): src is string => !!src))];
+      const openProduct = () => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog);
       return <article className="product-card" key={`${product.id}:${color.id}`} data-product-id={product.id} data-color-id={color.id} data-scent-id={shop.activeScent ?? undefined}>
-        <button type="button" className={`product-image${photo.src?.endsWith("hero.png") ? " black-image" : ""}`} aria-label={`Подробнее о свече ${product.name}, ${color.name}`} onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)} {...inspection}><CandleVisual src={photo.src} {...visualData(product, color)} label={`${product.name} · ${color.name}`} /><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span><span className="image-detail">Выбрать свечу <span aria-hidden="true"><ArrowIcon /></span></span>{photo.preview && <span className="photo-preview-label">Силуэт формы</span>}</button>
+        {photos.length ? <CatalogPhotoGallery key={JSON.stringify(photos)} photos={photos} label={`${product.name}, ${color.name}`} onOpen={openProduct} inspection={inspection}><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span></CatalogPhotoGallery> : <button type="button" className="product-image" aria-label={`Подробнее о свече ${product.name}, ${color.name}`} onClick={openProduct} {...inspection}><CandleVisual {...visualData(product, color)} label={`${product.name} · ${color.name}`} /><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span><span className="image-detail">Выбрать свечу <span aria-hidden="true"><ArrowIcon /></span></span><span className="photo-preview-label">Силуэт формы</span></button>}
         <div className="product-category">{color.name}{product.accentColor ? ` / ${product.accentColor.name}` : ""}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}{product.volumeMl != null && <> · <span className="product-volume">{product.volumeMl} мл</span></>}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)}>{product.name}</button><span>{money(product.price)}</span></div><p className="product-description">{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
         <CatalogPurchase product={product} scent={scent} color={color} ready={readyToAdd} onChoose={() => shop.openProduct(product.id, undefined, color.id, catalog)} />
       </article>;
