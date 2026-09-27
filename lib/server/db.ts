@@ -157,6 +157,8 @@ export async function ensureSchema() {
     }
     // Null marks legacy single-photo rows; an explicit empty list means silhouette only.
     await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB");
+    // Null positions keep the existing ID order and append newly created candles.
+    await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS catalog_position BIGINT");
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS volume_ml INTEGER CHECK (volume_ml > 0 AND volume_ml <= ${MAX_PRODUCT_VOLUME_ML})`);
     await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS image TEXT");
     const portraits = await db.query("INSERT INTO app_migrations(key) VALUES('aroma-portraits-v1') ON CONFLICT DO NOTHING RETURNING key");
@@ -222,6 +224,6 @@ export async function listProducts(admin = false, id?: number): Promise<Product[
     FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN candle_forms f ON f.id=p.form_id
     LEFT JOIN colors cl ON cl.id=p.color_id LEFT JOIN colors ac ON ac.id=p.accent_color_id LEFT JOIN scents s ON s.id=p.scent_id
     WHERE NOT p.archived AND ($1::boolean OR (p.published AND COALESCE(f.active,TRUE) AND COALESCE(cl.active,TRUE) AND COALESCE(ac.active,TRUE) AND COALESCE(s.active,TRUE)))
-      AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.id`, [admin, id ?? null]);
+      AND ($2::bigint IS NULL OR p.id=$2) ORDER BY p.catalog_position NULLS LAST,p.id`, [admin, id ?? null]);
   return result.rows.map(mapProduct);
 }

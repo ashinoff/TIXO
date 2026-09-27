@@ -7,7 +7,6 @@ const sections = [
   { id: "collection", label: "Коллекция" },
   { id: "aromas", label: "Искусство аромата" },
   { id: "workshop", label: "Мастерская ТИХО" },
-  { id: "studio", label: "Твоя мастерская" },
   { id: "care", label: "Простой ритуал" },
 ] as const;
 

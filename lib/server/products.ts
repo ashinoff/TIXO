@@ -94,3 +94,33 @@ export async function updateStock(id: number, body: Record<string, unknown>) {
   if (!result.rowCount) throw new InputError("Остаток уже изменился или свеча удалена. Закройте окно и обновите данные.", 409);
   return (await listProducts(true, id))[0];
 }
+
+/** Reorder complete catalog snapshots; reject stale tabs rather than overwrite another edit. */
+export async function reorderProducts(body: unknown) {
+  const input = body as { ids?: unknown; expectedIds?: unknown } | null;
+  const validIds = (value: unknown): value is number[] => Array.isArray(value) && value.length <= 10000
+    && value.every(id => typeof id === "number" && Number.isSafeInteger(id) && id > 0)
+    && new Set(value).size === value.length;
+  if (!input || !validIds(input.ids) || !validIds(input.expectedIds)) {
+    throw new InputError("Проверьте порядок свечей");
+  }
+  const { ids, expectedIds } = input;
+  const expected = new Set(expectedIds);
+  if (ids.length !== expectedIds.length || ids.some(id => !expected.has(id))) throw new InputError("Проверьте порядок свечей");
+  await ensureSchema();
+  const db = await getPool().connect();
+  try {
+    await db.query("BEGIN");
+    // Also serialize creation/archive with the snapshot check. Stock and orders are untouched.
+    await db.query("LOCK TABLE products IN SHARE ROW EXCLUSIVE MODE");
+    const current = (await db.query("SELECT id FROM products WHERE NOT archived ORDER BY catalog_position NULLS LAST,id")).rows.map(row => Number(row.id));
+    if (current.length !== expectedIds.length || current.some((id, index) => id !== expectedIds[index])) {
+      throw new InputError("Каталог уже изменился. Обновите список и повторите перестановку.", 409);
+    }
+    await db.query(`UPDATE products p SET catalog_position=ordered.position
+      FROM unnest($1::bigint[]) WITH ORDINALITY AS ordered(id,position) WHERE p.id=ordered.id`, [ids]);
+    await db.query("COMMIT");
+  } catch (error) { await db.query("ROLLBACK"); throw error; }
+  finally { db.release(); }
+  return listProducts(true);
+}

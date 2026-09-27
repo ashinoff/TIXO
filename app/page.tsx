@@ -2,7 +2,6 @@
 /* eslint-disable @next/next/no-img-element -- preserve the composition of candle photographs */
 import { Fragment, useEffect, useState } from "react";
 import { ShoppingProvider, Catalog, ScentDiscovery, CartOverlay, CartTrigger } from "./components/storefront-commerce";
-import { Atelier } from "./components/atelier";
 import { LivingFlame } from "./components/living-flame";
 import { EveningRitual } from "./components/evening-ritual";
 import { SectionNavigation } from "./components/section-navigation";
@@ -57,14 +56,12 @@ export default function Home() {
 <section className="introduction pad" id="intro" aria-labelledby="intro-quote"><div className="intro-meta reveal"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ</span><span className="eyebrow">БОЛЬШЕ, ЧЕМ СВЕТ</span></div><h2 className="reveal" id="intro-title">Есть вещи, которые<br />возвращают <span>к себе.</span></h2><div className="intro-bottom reveal"><p><span className="intro-sensations">Тёплый свет на стене. Знакомый аромат.<br /></span><span id="intro-quote">Свеча, которую выбирают не по случаю —<br />а по ощущению.</span></p><a className="text-link" href="#collection">С этого начинается ТИХО <span aria-hidden="true"><ArrowIcon direction="down-right" /></span></a></div></section>
 <SectionAnchor section="workshop" />
 <section className="workshop pad" id="workshop" aria-labelledby="workshop-title"><div className="section-heading reveal"><p className="eyebrow">03 / МАСТЕРСКАЯ ТИХО</p><span className="eyebrow">СДЕЛАНО РУКАМИ. ВЫБРАНО СЕРДЦЕМ.</span></div><div className="workshop-grid"><div className="workshop-photo reveal"><img src={c("image.about", "/assets/workshop.webp")} alt="Ручная заливка свечи: тёплый воск, фитиль и руки мастера" width="1024" height="1536" loading="lazy" /><span>Всё начинается с прикосновения.</span></div><div className="workshop-copy"><h2 className="reveal" id="workshop-title">У тепла<br />есть <span>автор.</span></h2><p className="reveal">{c("about.lead", "ТИХО — мастерская свечей ручной работы. Нам близки простые формы, выразительные ароматы и вещи, рядом с которыми хочется задержаться.")}</p><p className="reveal">{c("about.text", "Мы создаём свечи для обычных вечеров, которые однажды становятся любимыми воспоминаниями.")}</p><div className="craft-list"><div className="reveal"><span>01</span><h3>Форма</h3><p>Рельеф, который хочется рассматривать. Свет, меняющий каждую грань.</p></div><div className="reveal"><span>02</span><h3>Аромат</h3><p>Композиция с характером — от первой ноты до мягкого шлейфа.</p></div><div className="reveal"><span>03</span><h3>Прикосновение</h3><p>Ручная работа, которая оставляет каждой свече её индивидуальность.</p></div></div></div></div></section>
-<SectionAnchor section="studio" />
-<Atelier />
 <SectionAnchor section="care" />
 <EveningRitual />
 </main>
 <footer className="footer footer-ritual pad">
   <div className="footer-top"><span>Аромат. Свет. Тишина.</span><a href="#home">Вернуться к началу <span aria-hidden="true"><ArrowIcon direction="up" /></span></a></div>
-  <div className="footer-signature"><a className="footer-wordmark" href="#home" aria-label="ТИХО — наверх">тихо</a><div><p>Для вечеров,<br />которые хочется повторить.</p><nav aria-label="Навигация в конце страницы"><a href="#collection">Коллекция <ArrowIcon /></a><a href="#studio">Твоя мастерская <ArrowIcon /></a></nav></div></div>
+  <div className="footer-signature"><a className="footer-wordmark" href="#home" aria-label="ТИХО — наверх">тихо</a><div><p>Для вечеров,<br />которые хочется повторить.</p><nav aria-label="Навигация в конце страницы"><a href="#collection">Коллекция <ArrowIcon /></a><a href="#care">Простой ритуал <ArrowIcon /></a></nav></div></div>
   <div className="footer-bottom"><span>© ТИХО / TIXO, {new Date().getFullYear()}</span><a href="#workshop">Мастерская свечей ручной работы</a><span>Создано для ваших вечеров</span></div>
 </footer>
 <CartOverlay />

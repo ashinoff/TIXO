@@ -71,6 +71,10 @@ export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]
         <img className="photo-current" src={photos[index]} alt={`${label}${count > 1 ? ` · фото ${index + 1}` : ""}`} decoding="async" draggable={false} />
         {count > 1 && <><img className="photo-adjacent photo-previous" src={photos[previous]} alt="" aria-hidden="true" decoding="async" draggable={false} /><img className="photo-adjacent photo-next" src={photos[next]} alt="" aria-hidden="true" decoding="async" draggable={false} /></>}
       </div>
+      {count > 1 && <div className="photo-tap-zones">
+        <button type="button" className="photo-tap-target" aria-label="Предыдущее фото — левая половина" disabled={motion !== null} onClick={() => move(-1)} />
+        <button type="button" className="photo-tap-target" aria-label="Следующее фото — правая половина" disabled={motion !== null} onClick={() => move(1)} />
+      </div>}
       {count > 1 && <div className="photo-navigation"><button type="button" aria-label="Предыдущее фото" disabled={motion !== null} onClick={() => move(-1)}><ArrowIcon direction="left" /></button><span role="status" aria-live="polite">{index + 1} / {count}</span><button type="button" aria-label="Следующее фото" disabled={motion !== null} onClick={() => move(1)}><ArrowIcon direction="right" /></button></div>}
     </div>
     {count > 1 && <div className="photo-thumbnails">{photos.map((src, target) => <button key={src} type="button" aria-label={`Фото ${target + 1}`} aria-pressed={target === index} disabled={motion !== null} onClick={() => navigate(target, target < index ? -1 : 1)}><img src={src} alt="" width="70" height="82" loading="lazy" /></button>)}</div>}

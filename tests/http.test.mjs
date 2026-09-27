@@ -31,6 +31,7 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const call=(path, options={})=>fetch(base+path,options);
   const json=body=>({headers:{'content-type':'application/json'},body:JSON.stringify(body)});
   assert.equal((await call('/api/products?admin=1')).status,401);
+  assert.equal((await call('/api/products/order',{method:'PATCH',...json({ids:[],expectedIds:[]})})).status,401);
   assert.equal((await call('/api/scents?admin=1')).status,401);
   assert.equal((await call('/api/colors?admin=1')).status,401);
   assert.equal((await call('/api/colors',{method:'POST',...json({name:'Без входа',hex:'#123456',active:true})})).status,401);
@@ -49,6 +50,15 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const cookie=login.headers.get('set-cookie').split(';')[0];
   const admin=(path,options={})=>call(path,{...options,headers:{...options.headers,cookie}});
   assert.deepEqual(await (await admin('/api/admin/session')).json(),{authenticated:true});
+  const orderedBefore=await (await admin('/api/products?admin=1')).json();
+  const visibleIds=new Set((await (await call('/api/products')).json()).map(p=>p.id));
+  const expectedIds=orderedBefore.map(p=>p.id), ids=[...expectedIds].reverse();
+  const reordered=await admin('/api/products/order',{method:'PATCH',...json({ids,expectedIds})});
+  assert.equal(reordered.status,200);assert.deepEqual((await reordered.json()).map(p=>p.id),ids);
+  assert.deepEqual((await (await call('/api/products')).json()).map(p=>p.id),ids.filter(id=>visibleIds.has(id)));
+  assert.equal((await admin('/api/products/order',{method:'PATCH',...json({ids:expectedIds,expectedIds})})).status,409);
+  assert.equal((await admin('/api/products/order',{method:'PATCH',...json({ids:[0],expectedIds:[0]})})).status,400);
+  assert.equal((await admin('/api/products/order',{method:'PATCH',...json({ids:expectedIds,expectedIds:ids})})).status,200);
   const scents=await (await admin('/api/scents?admin=1')).json();
   assert.equal(scents.length,30);assert.equal(scents.filter(scent=>scent.image?.startsWith("/assets/aromas/")).length,26);
   const colors=await (await call('/api/colors')).json();

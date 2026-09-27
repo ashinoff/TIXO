@@ -1,7 +1,7 @@
 "use client";
 import { ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 
-export function Modal({ children, onClose, label, className }: { children: ReactNode; onClose: () => void; label: string; className: string }) {
+export function Modal({ children, onClose, label, className, navigation }: { children: ReactNode; onClose: () => void; label: string; className: string; navigation?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   useEffect(() => { close.current = onClose; }, [onClose]);
@@ -43,5 +43,5 @@ export function Modal({ children, onClose, label, className }: { children: React
       window.scrollTo({ left, top, behavior: "instant" });
     };
   }, []);
-  return <div className="modal-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose(); }}><div ref={ref} className={className} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</div></div>;
+  return <div className="modal-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose(); }}><div ref={ref} className={navigation ? "product-modal-frame" : className} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{navigation ? <><div className={className}>{children}</div>{navigation}</> : children}</div></div>;
 }

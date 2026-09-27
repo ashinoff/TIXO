@@ -23,12 +23,13 @@ export function useProductSwipe(actions: Actions) {
     let suppressClickUntil = 0;
     let settling: ReturnType<typeof setTimeout> | undefined;
     let closing = false;
-    const backdrop = dialog.parentElement;
+    const surface = dialog.closest<HTMLElement>(".product-modal-frame") ?? dialog;
+    const backdrop = dialog.closest<HTMLElement>(".modal-backdrop");
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const paint = (distance: number, animate = false) => {
-      dialog.style.animation = "none";
-      dialog.style.transition = animate && !reduced() ? "transform 280ms cubic-bezier(.22,.7,.25,1)" : "none";
-      dialog.style.transform = `translate3d(0,${distance}px,0)`;
+      surface.style.animation = "none";
+      surface.style.transition = animate && !reduced() ? "transform 280ms cubic-bezier(.22,.7,.25,1)" : "none";
+      surface.style.transform = `translate3d(0,${distance}px,0)`;
       if (backdrop) {
         backdrop.style.transition = animate && !reduced() ? "background-color 280ms ease, backdrop-filter 280ms ease" : "none";
         const progress = Math.min(1, distance / Math.max(1, window.innerHeight));
@@ -41,7 +42,7 @@ export function useProductSwipe(actions: Actions) {
       clearTimeout(settling);
       latest.current.onPhotoCancel?.();
       paint(0, true);
-      settling = setTimeout(() => { dialog.style.removeProperty("transition"); dialog.style.removeProperty("transform"); }, reduced() ? 0 : 280);
+      settling = setTimeout(() => { surface.style.removeProperty("transition"); surface.style.removeProperty("transform"); }, reduced() ? 0 : 280);
     };
     const dismiss = () => {
       if (closing) return;
@@ -104,7 +105,7 @@ export function useProductSwipe(actions: Actions) {
     dialog.addEventListener("click", click, true);
     return () => {
       clearTimeout(settling);
-      dialog.style.removeProperty("transform"); dialog.style.removeProperty("transition");
+      surface.style.removeProperty("transform"); surface.style.removeProperty("transition");
       backdrop?.style.removeProperty("background-color"); backdrop?.style.removeProperty("backdrop-filter");
       dialog.removeEventListener("touchstart", start);
       dialog.removeEventListener("touchmove", move);

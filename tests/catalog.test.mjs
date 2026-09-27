@@ -27,7 +27,7 @@ const { parseOrder, parseScent, parseColor, parseForm, parseAromaProfile } = req
 const { cartKey, selectVariant, availableVariants } = require('./lib/catalog');
 const { isRecipe, recipeKey } = require('./lib/atelier');
 const domain = require('./lib/server/db');
-const { saveProduct, updateStock } = require('./lib/server/products');
+const { saveProduct, updateStock, reorderProducts } = require('./lib/server/products');
 const { saveForm } = require('./lib/server/forms');
 const { saveScent } = require('./lib/server/scents');
 const { aromaPortraits } = require('./lib/aroma-portraits');
@@ -546,6 +546,29 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     const saved=domain.mapOrder((await pool.query('SELECT * FROM orders WHERE id=$1',[custom.id])).rows[0]);assert.equal(saved.items[0].accentColorName,'Наше серебро');
     await deleteOrder(ready.id);assert.equal((await domain.listProducts(true,candle.id))[0].stock,3);
     await deleteOrder(custom.id);
+  });
+
+  await t.test('catalog ordering preserves data, rejects stale snapshots and appends new candles', async () => {
+    const before = await domain.listProducts(true);
+    const original = before.map(item => item.id);
+    const ids = [...original].reverse();
+    const stocks = before.map(({id,stock,images,volumeMl,published}) => ({id,stock,images,volumeMl,published})).sort((a,b)=>a.id-b.id);
+    const result = await reorderProducts({ids,expectedIds:original});
+    assert.deepEqual(result.map(p=>p.id),ids);
+    assert.deepEqual(result.map(({id,stock,images,volumeMl,published})=>({id,stock,images,volumeMl,published})).sort((a,b)=>a.id-b.id),stocks);
+    const visible = new Set((await domain.listProducts()).map(p=>p.id));
+    assert.deepEqual((await domain.listProducts()).map(p=>p.id),ids.filter(id=>visible.has(id)));
+    globalThis.tihoSchemaReady=undefined; await domain.ensureSchema();
+    assert.deepEqual((await domain.listProducts(true)).map(p=>p.id),ids,'Schema initialization must preserve manual order');
+    await assert.rejects(reorderProducts({ids:original,expectedIds:original}),e=>e.status===409);
+    for (const invalid of [null,[],{}, {ids:[ids[0],ids[0]],expectedIds:ids}, {ids:['1'],expectedIds:[1]}, {ids:ids.slice(1),expectedIds:ids}, {ids:[...ids.slice(1),999999],expectedIds:ids}]) await assert.rejects(reorderProducts(invalid),e=>e.status===400);
+    const added=Number((await pool.query("INSERT INTO products(name,category,notes,price,stock,published) VALUES('Новая','','',100,2,TRUE) RETURNING id")).rows[0].id);
+    assert.equal((await domain.listProducts(true)).at(-1).id,added);
+    await assert.rejects(reorderProducts({ids:original,expectedIds:ids}),e=>e.status===409);
+    const withNew=[...ids,added]; await reorderProducts({ids:[added,...ids],expectedIds:withNew});
+    await pool.query('UPDATE products SET archived=TRUE WHERE id=$1',[added]);
+    await assert.rejects(reorderProducts({ids:withNew,expectedIds:[added,...ids]}),e=>e.status===409);
+    await reorderProducts({ids:original,expectedIds:ids});
   });
 
 });

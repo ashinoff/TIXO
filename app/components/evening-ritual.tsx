@@ -178,7 +178,7 @@ export function EveningRitual() {
   const layers = [frames.previous, frames.current].filter((frame): frame is Frame => frame !== null);
 
   return <section className="evening-ritual pad" id="care" aria-labelledby="care-title">
-    <header className="ritual-story-heading"><div><p className="eyebrow">05 / ПРОСТОЙ РИТУАЛ</p><h2 id="care-title">Чтобы свет<br /><span>радовал дольше.</span></h2></div><p>Пять мгновений одного вечера.<br />От первого огня до следующей встречи.</p></header>
+    <header className="ritual-story-heading"><div><p className="eyebrow">04 / ПРОСТОЙ РИТУАЛ</p><h2 id="care-title">Чтобы свет<br /><span>радовал дольше.</span></h2></div><p>Пять мгновений одного вечера.<br />От первого огня до следующей встречи.</p></header>
     <div ref={root} className={`ritual-story${dragging ? " is-dragging" : ""}${holding ? " is-held" : ""}`} role="region" aria-roledescription="карусель" aria-label="Пять мгновений тихого вечера" tabIndex={0} aria-describedby="ritual-gesture-help" aria-keyshortcuts="ArrowLeft ArrowRight Home End Space" data-scene={currentIndex} data-playing={!paused} aria-busy={busy}
       onKeyDown={onKey} onPointerDown={onPointerDown} onPointerUp={event => finishGesture(event)} onPointerCancel={event => finishGesture(event, true)} onLostPointerCapture={event => releasePointer(event.pointerId)}>
       <div className="ritual-story-layers" aria-live={paused ? "polite" : "off"}>

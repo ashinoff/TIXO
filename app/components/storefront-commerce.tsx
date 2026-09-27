@@ -360,13 +360,14 @@ function ProductDetails() {
   const product = shop.products.find(product => product.id === detail?.productId);
   if (!product || !detail) return null;
   const index = detail.catalog.findIndex(item => sameCandle(item, detail));
-  return <Modal className="product-dialog" label={`${product.name} — карточка свечи`} onClose={shop.closeProduct}>
+  const navigation = (mobile = false) => <nav className={`detail-product-navigation${mobile ? " mobile-product-navigation" : " outside-product-navigation"}`} aria-label="Свечи в выбранном каталоге">
+    <button className="product-previous" type="button" aria-label="Предыдущая свеча" disabled={index <= 0} onClick={() => shop.moveProduct(-1)}><ArrowIcon direction="left" /></button>
+    <span role="status" aria-live="polite">{index + 1} / {detail.catalog.length}</span>
+    <button className="product-next" type="button" aria-label="Следующая свеча" disabled={index < 0 || index >= detail.catalog.length - 1} onClick={() => shop.moveProduct(1)}><ArrowIcon direction="right" /></button>
+  </nav>;
+  return <Modal className="product-dialog" label={`${product.name} — карточка свечи`} onClose={shop.closeProduct} navigation={navigation()}>
     <div className="detail-toolbar">
-      <div className="detail-product-navigation" aria-label="Свечи в выбранном каталоге">
-        <button type="button" aria-label="Предыдущая свеча" disabled={index <= 0} onClick={() => shop.moveProduct(-1)}><ArrowIcon direction="left" /></button>
-        <span role="status" aria-live="polite">{index + 1} / {detail.catalog.length}</span>
-        <button type="button" aria-label="Следующая свеча" disabled={index < 0 || index >= detail.catalog.length - 1} onClick={() => shop.moveProduct(1)}><ArrowIcon direction="right" /></button>
-      </div>
+      {navigation(true)}
       <button type="button" className="icon-button detail-close" aria-label="Закрыть карточку свечи" onClick={shop.closeProduct}>×</button>
     </div>
     <ProductDetailContent key={`${detail.productId}:${detail.scentId}:${detail.colorId}`} product={product} />

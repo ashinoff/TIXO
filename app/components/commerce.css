@@ -172,7 +172,7 @@
 .tiho-site .detail-information>p{margin-top:18px;color:#6b755f;line-height:1.7}
 @media(max-width:760px){.tiho-site .detail-information>p{font-size:15px}}
 @media(min-width:761px){
- .tiho-site .modal-backdrop:has(>.product-dialog){align-items:center;justify-content:center;padding:20px}
+ .tiho-site .modal-backdrop:has(.product-dialog){align-items:center;justify-content:center;padding:20px}
  .tiho-site .product-dialog{--product-dialog-height:min(700px,calc(100dvh - 40px));position:relative;inset:auto;width:min(1040px,100%);height:var(--product-dialog-height);max-height:var(--product-dialog-height);display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);grid-template-rows:58px auto minmax(0,1fr);overflow:hidden;box-shadow:0 24px 90px #0005;animation:product-dialog-arrive .35s cubic-bezier(.22,1,.36,1)}
  .tiho-site .detail-toolbar{grid-area:1/2;position:relative;min-width:0;height:58px}
  .tiho-site .product-detail-body,.tiho-site .detail-gallery{display:contents}
@@ -209,3 +209,31 @@
 @media(max-width:760px){.tiho-site .product-card .product-category{font-size:13px;letter-spacing:0}}
 
 .tiho-site .product-card .product-volume{white-space:nowrap}
+
+/* Photo taps and product navigation are separate controls. */
+.tiho-site .photo-tap-zones{position:absolute;inset:0;display:flex}
+.tiho-site .photo-tap-target{width:50%;height:100%;border:0;background:transparent;padding:0;cursor:pointer}
+.tiho-site .photo-tap-target:focus-visible{outline:2px solid #fff;outline-offset:-5px}
+.tiho-site .detail-toolbar{justify-content:flex-end}
+.tiho-site .product-modal-frame{position:relative;min-width:0;outline:none}
+.tiho-site .outside-product-navigation{position:absolute;inset:0;pointer-events:none}
+.tiho-site .outside-product-navigation button{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;pointer-events:auto;color:#f2efe8;background:#151b14b8;border-color:#f2efe855;border-radius:50%;transition:background .2s}
+.tiho-site .outside-product-navigation button:hover:not(:disabled){background:#536247}
+.tiho-site .outside-product-navigation button:focus-visible{outline:2px solid #f2efe8;outline-offset:3px}
+.tiho-site .outside-product-navigation .product-previous{right:calc(100% + 12px)}
+.tiho-site .outside-product-navigation .product-next{left:calc(100% + 12px)}
+.tiho-site .outside-product-navigation span{position:absolute;top:calc(100% + 9px);left:0;right:0;color:#f2efe8}
+@media(min-width:761px){
+ .tiho-site .modal-backdrop:has(.product-dialog){padding:32px 68px}
+ .tiho-site .product-modal-frame{width:min(1040px,100%);height:min(700px,calc(100dvh - 64px));animation:product-dialog-arrive .35s cubic-bezier(.22,1,.36,1)}
+ .tiho-site .product-modal-frame .product-dialog{width:100%;height:100%;max-height:100%;animation:none}
+}
+@media(min-width:761px){.tiho-site .mobile-product-navigation{display:none}}
+@media(max-width:760px){
+ .tiho-site .modal-backdrop:has(.product-dialog){display:block}
+ .tiho-site .product-modal-frame{width:100%;height:100dvh}
+ .tiho-site .product-modal-frame .product-dialog{width:100%;height:100%;max-height:100%}
+ .tiho-site .outside-product-navigation{display:none}
+ .tiho-site .detail-toolbar{justify-content:space-between}
+}
+@media(prefers-reduced-motion:reduce){.tiho-site .product-modal-frame{animation:none!important;transition:none!important}}
