@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -1122,4 +1122,62 @@ test('messenger failure retains full copyable order and does not claim Instagram
     globalThis.fetch=()=>response({whatsapp:'',telegram:'',instagram:'tixo.example'});await click(button('Попробовать снова'));
     assert.equal(document.querySelectorAll('.messenger-link').length,1);assert.equal(document.querySelector('.messenger-link').href,'https://ig.me/m/tixo.example');assert.match(document.querySelector('.messenger-option').textContent,/Сначала скопируйте/);
   }finally{await act(async()=>root.unmount());globalThis.requestAnimationFrame=oldRaf;if(previousClipboard)Object.defineProperty(navigator,'clipboard',previousClipboard);else delete navigator.clipboard;}
+});
+
+test('catalog plus adds the configured candle immediately and the floating basket follows cart contents',async()=>{
+  window.localStorage.clear();
+  const candle={...products[0],formId:1,form:forms[0],scentId:2,scent:scents[1],colorId:1,color:colors[0],stock:2};
+  globalThis.fetch=async url=>url==='/api/products'?response([candle]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('.floating-cart'),null);
+    await click(document.querySelector('.quick-add'));assert.equal(document.querySelector('.modal-backdrop'),null);
+    assert.equal(document.querySelector('.floating-cart-count').textContent,'1');
+    await click(document.querySelector('.quick-add'));await click(document.querySelector('.quick-add'));
+    assert.equal(document.querySelector('.floating-cart-count').textContent,'2','The stock limit still applies');
+    await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+    await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('.floating-cart-count').textContent,'2');
+    await click(document.querySelector('.floating-cart'));
+    assert.equal(document.querySelector('#checkout-form h3').textContent,'Давайте познакомимся');
+    assert.match(document.querySelector('.cart-recipe').textContent,/Сандал и дым · Красный/);
+    assert.equal(document.querySelector('.floating-cart').getAttribute('aria-hidden'),'true');
+    await click(document.querySelector('.close-cart'));assert.equal(document.querySelector('.floating-cart').getAttribute('aria-hidden'),'false');
+    await click(document.querySelector('.product-image'));assert.ok(document.querySelector('.product-dialog'));
+    await click(document.querySelector('.detail-close'));await click(document.querySelector('.floating-cart'));await click(document.querySelector('.remove-item'));
+    assert.equal(document.querySelector('.floating-cart'),null);
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('section flights take time, follow layout growth, can be interrupted, and respect reduced motion',()=>{
+  const {scrollToSection,cancelSectionScroll,isSectionScrollActive}=require('./lib/section-scroll.js');
+  const old={raf:window.requestAnimationFrame,caf:window.cancelAnimationFrame,scroll:window.scrollTo,media:window.matchMedia,y:window.scrollY,height:Object.getOwnPropertyDescriptor(document.documentElement,'scrollHeight')};
+  const root=document.getElementById('root');root.innerHTML='<main class="stack-ready"><div data-section-anchor="flight"></div><section id="flight"></section></main>';
+  let y=0,target=1800,id=0;const frames=new Map();
+  Object.defineProperty(window,'scrollY',{configurable:true,get:()=>y});Object.defineProperty(document.documentElement,'scrollHeight',{configurable:true,value:10000});
+  document.querySelector('[data-section-anchor]').getBoundingClientRect=()=>({top:target-y});
+  window.matchMedia=()=>({matches:false});window.scrollTo=({top})=>{y=top;};window.requestAnimationFrame=callback=>{frames.set(++id,callback);return id;};window.cancelAnimationFrame=id=>frames.delete(id);
+  const step=ms=>{const pending=[...frames.values()];frames.clear();pending.forEach(callback=>callback(performance.now()+ms));};
+  try{
+    scrollToSection('flight');assert.equal(y,0);assert.equal(isSectionScrollActive(),true);
+    step(600);assert.ok(y>0&&y<target);target=2200;step(1000);assert.ok(y<target,'Navigation must not jump to the end before one second');
+    step(2500);assert.equal(y,target);assert.equal(isSectionScrollActive(),false);
+    y=0;scrollToSection('flight');step(300);const stopped=y;window.dispatchEvent(new Event('touchstart'));step(3000);assert.equal(y,stopped);assert.equal(isSectionScrollActive(),false);
+    y=0;scrollToSection('flight');window.dispatchEvent(new Event('wheel'));assert.equal(frames.size,0);
+    scrollToSection('flight');window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'PageDown'}));assert.equal(frames.size,0);
+    scrollToSection('flight');scrollToSection('flight','instant');assert.equal(y,target);assert.equal(frames.size,0);
+    y=0;window.matchMedia=()=>({matches:true});scrollToSection('flight');assert.equal(y,target);assert.equal(frames.size,0);
+  }finally{cancelSectionScroll();window.requestAnimationFrame=old.raf;window.cancelAnimationFrame=old.caf;window.scrollTo=old.scroll;window.matchMedia=old.media;Object.defineProperty(window,'scrollY',{configurable:true,writable:true,value:old.y});if(old.height)Object.defineProperty(document.documentElement,'scrollHeight',old.height);else delete document.documentElement.scrollHeight;root.innerHTML='';}
+});
+
+test('messenger handoffs retry after a network failure and admin distinguishes links from sent messages',async()=>{
+  const {recordMessengerHandoff,flushMessengerHandoffs}=require('./lib/messenger-handoff.js');
+  const key='4d3dc47e-3dcd-42e2-b513-57fdf9c2f001';let failed=true;const sent=[];
+  globalThis.fetch=async(url,init)=>{assert.equal(url,'/api/orders/messenger');assert.equal(init.keepalive,true);sent.push(JSON.parse(init.body));if(failed)throw new Error('offline');return new Response(null,{status:204});};
+  recordMessengerHandoff(key,'telegram');await new Promise(resolve=>setImmediate(resolve));assert.equal(JSON.parse(window.sessionStorage.getItem('tixo.atelier.handoffs.v1')).length,1);
+  failed=false;await flushMessengerHandoffs();assert.equal(JSON.parse(window.sessionStorage.getItem('tixo.atelier.handoffs.v1')).length,0);assert.equal(sent.length,2);
+  const order={id:1,orderNumber:'T-CHANNEL',customerName:'Анна',phone:'+79990000000',email:'a@example.com',address:'Сочи',delivery:'pickup',comment:'',items:[],total:0,status:'new',createdAt:new Date().toISOString(),stockReserved:false};
+  globalThis.fetch=async url=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/orders'?response([order,{...order,id:2,orderNumber:'T-MULTI',messengerChannels:['whatsapp','telegram']} ]):url==='/api/content'?response({}):response([]);
+  const root=createRoot(document.getElementById('root'));
+  try{await act(async()=>root.render(React.createElement(Admin)));await click(button('Заказы'));const cards=document.querySelectorAll('.order-card');assert.match(cards[0].textContent,/Только сайт/);assert.match(cards[1].textContent,/Переход в WhatsApp/);assert.match(cards[1].textContent,/Переход в Telegram/);assert.match(cards[1].textContent,/Отправку сообщения нужно проверить/);}
+  finally{await act(async()=>root.unmount());}
 });

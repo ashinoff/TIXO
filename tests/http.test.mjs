@@ -117,6 +117,17 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal(repeated.message,placedReceipt.message);
   const orders=await (await admin('/api/orders')).json();
   const order=orders.find(item=>item.items.some(line=>line.productId===product.id));
+  assert.deepEqual(order.messengerChannels,[]);
+  const handoff=body=>call('/api/orders/messenger',{method:'POST',...json(body)});
+  assert.equal((await handoff({orderNumber:order.orderNumber,channel:'telegram'})).status,400);
+  assert.equal((await handoff({requestKey:placedRequest.requestKey,channel:'__proto__'})).status,400);
+  assert.equal((await handoff({requestKey:randomUUID(),channel:'telegram'})).status,204);
+  assert.deepEqual((await (await admin('/api/orders')).json()).find(item=>item.id===order.id).messengerChannels,[]);
+  const handoffs=await Promise.all(['whatsapp','telegram','instagram','telegram'].map(channel=>handoff({requestKey:placedRequest.requestKey,channel})));
+  assert.ok(handoffs.every(response=>response.status===204));
+  const tracked=(await (await admin('/api/orders')).json()).find(item=>item.id===order.id);
+  assert.deepEqual([...tracked.messengerChannels].sort(),['instagram','telegram','whatsapp']);
+  assert.deepEqual({...tracked,messengerChannels:[]},order,'Handoffs cannot change the order, its prices or stock reservation');
   assert.equal(order.items.length,1); assert.equal(order.total,1800);assert.equal(order.items[0].colorName,colors[0].name);assert.equal(order.items[0].silhouette,shape.silhouette);
   assert.equal((await admin(`/api/products/${product.id}/stock`,{method:'PATCH',...json({stock:9,expectedStock:3})})).status,409);
   const stock=await admin(`/api/products/${product.id}/stock`,{method:'PATCH',...json({stock:5,expectedStock:2})});

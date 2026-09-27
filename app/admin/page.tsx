@@ -8,9 +8,10 @@ import { ImagePreview, ProductEditor, ScentEditor, ColorEditor, FormEditor, Stoc
 import { CandlePreview } from "../components/candle-preview";
 import { CatalogOrder } from "./catalog-order";
 import { MessengerSettings } from "./messenger-settings";
+import { messengerNames, type Messenger } from "../../lib/order-messaging";
 import "./admin.css";
 
-type Order = { id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
+type Order = { messengerChannels?: Messenger[]; id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
 type Field = { key:string; label:string; kind:"text"|"image"; fallback:string };
 type Tab = "products" | "forms" | "colors" | "scents" | "aroma" | "orders" | "content";
 const empty: Product = { id:0, name:"", category:"", categoryId:null, categorySlug:null, notes:"", price:0, stock:0, published:false, image:null, hasVariants:false, variants:[] };
@@ -162,6 +163,7 @@ export default function Admin() {
         </div>
         <div className="orders-list">{orders.length === 0 ? <div className="empty-admin">Заказов пока нет</div> : orders.map(order => <article className="order-card" key={order.id}>
           <header><div><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleString("ru-RU")}</span></div><strong>{orderAmount(order)}</strong></header>
+          <div className="order-channels"><span className="admin-kicker">Связь по заказу</span><div>{order.messengerChannels?.length ? order.messengerChannels.map(channel => <span className="order-channel" key={channel}>Переход в {messengerNames[channel]}</span>) : <span className="order-channel">Только сайт</span>}</div><small>{order.messengerChannels?.length ? "Покупатель открыл ссылку на чат. Отправку сообщения нужно проверить в мессенджере." : "Переходы в мессенджеры не зафиксированы."}</small></div>
           {needsQuote(order) && <p className="order-quote-note">{order.total > 0 ? "В сумме учтены свечи из каталога. Стоимость индивидуальных свечей нужно согласовать с покупателем." : "Индивидуальные свечи: стоимость нужно согласовать с покупателем."}</p>}
           <div className="order-grid">
             <div><b>{order.customerName}</b><a href={`tel:${order.phone}`}>{order.phone}</a><a href={`mailto:${order.email}`}>{order.email}</a><p>{order.address}</p><small>{order.delivery}{order.comment ? ` · ${order.comment}` : ""}</small></div>

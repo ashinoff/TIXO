@@ -13,7 +13,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const temp = mkdtempSync(path.join(tmpdir(), 'tixo-domain-'));
 writeFileSync(path.join(temp, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(root, 'node_modules'), path.join(temp, 'node_modules'), 'dir');
-for (const file of ['aroma-portraits', 'atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/forms', 'server/scents', 'server/orders', 'server/uploads']) {
+for (const file of ['order-messaging', 'aroma-portraits', 'atelier', 'catalog', 'server/db', 'server/validation', 'server/products', 'server/forms', 'server/scents', 'server/orders', 'server/uploads']) {
   const target = path.join(temp, 'lib', `${file}.js`);
   mkdirSync(path.dirname(target), { recursive: true });
   const output = ts.transpileModule(readFileSync(path.join(root, 'lib', `${file}.ts`), 'utf8'), {
@@ -188,6 +188,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     assert.equal((await pool.query("SELECT value FROM site_content WHERE key='hero.title'")).rows[0].value, 'Сохранённый заголовок');
     originalOrder = domain.mapOrder((await pool.query("SELECT * FROM orders WHERE order_number='OLD-01'")).rows[0]);
     assert.equal(originalOrder.stockReserved, false);
+    assert.deepEqual(originalOrder.messengerChannels, []);
     assert.equal(originalOrder.items[0].name, 'Старое название');
     const migrated = (await domain.listProducts(true)).find(p => p.id !== 1);
     migratedId=migrated.id;

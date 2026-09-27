@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { emptyMessengerContacts, messengerKeys, messengerLink, messengerNames, normalizeMessengerContact, type Messenger, type MessengerContacts } from "../../lib/order-messaging";
 import { ArrowIcon } from "./ui-icon";
+import { recordMessengerHandoff } from "../../lib/messenger-handoff";
 
-export function OrderMessengers({ message }: { message: string }) {
+export function OrderMessengers({ message, requestKey }: { message: string; requestKey?: string }) {
   const [contacts, setContacts] = useState<MessengerContacts>(emptyMessengerContacts);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -50,8 +51,8 @@ export function OrderMessengers({ message }: { message: string }) {
     {loading && <p role="status">Загружаем способы связи…</p>}
     {error && <p>Не удалось загрузить способы связи. Заказ сохранён.<button type="button" className="text-link" onClick={() => { setLoading(true); setError(false); void load(); }}>Попробовать снова</button></p>}
     <div className="messenger-options">{channels.map(channel => <div className="messenger-option" key={channel.kind}>
-      <a className="messenger-link" href={channel.href} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{messengerNames[channel.kind]} <ArrowIcon /></a>
-      <small>{channel.prefilled ? "Чат откроется с готовым текстом заказа." : channel.kind === "instagram" ? "Сначала скопируйте заказ ниже, затем откройте Direct и вставьте текст." : "Заказ длинный: скопируйте его ниже и вставьте в открывшийся чат."}</small>
+      <a className="messenger-link" href={channel.href} onClick={() => recordMessengerHandoff(requestKey, channel.kind)} onAuxClick={event => { if (event.button === 1) recordMessengerHandoff(requestKey, channel.kind); }} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{messengerNames[channel.kind]} <ArrowIcon /></a>
+      <small>{channel.prefilled ? "Чат откроется с готовым текстом заказа." : channel.kind === "instagram" ? "Сначала скопируйте текст заказа кнопкой ниже. Instagram не подставляет его автоматически: откройте Direct, вставьте текст и нажмите «Отправить»." : "Заказ длинный: скопируйте его ниже и вставьте в открывшийся чат."}</small>
     </div>)}</div>
     <button type="button" className="copy-order" onClick={() => void copy()}>{copied ? "Скопировать ещё раз" : "Скопировать текст заказа"}</button>
     {copyStatus && <p className="copy-order-status" role="status">{copyStatus}</p>}

@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import { aromaPortraits } from "../aroma-portraits";
 import type { Product, OrderItem, Scent, Variant, CandleColor, CandleForm } from "../catalog";
 import { candleShapes, emptyAromaProfile, productShape, MAX_PRODUCT_VOLUME_ML, type CandleShape } from "../catalog";
+import { messengerKeys, type Messenger } from "../order-messaging";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
@@ -11,6 +12,7 @@ export type StoredCategory={id:number;name:string;slug:string;mood:string;descri
 export type StoredOrder = {
   id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string;
   delivery:string; comment:string; items:OrderItem[]; stockReserved:boolean;
+  messengerChannels: Messenger[];
   total:number; status:"new"|"in_progress"|"completed"; createdAt:string;
 };
 
@@ -126,6 +128,7 @@ export async function ensureSchema() {
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS product_variants_combination_unique ON product_variants(product_id,scent_id,color_id)");
     await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE");
     await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT");
+    await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS messenger_channels TEXT[] NOT NULL DEFAULT '{}'::text[]");
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key_unique ON orders (request_key) WHERE request_key IS NOT NULL");
     await db.query(`CREATE TABLE IF NOT EXISTS candle_forms (
       id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, shape TEXT NOT NULL DEFAULT 'ribbed', active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -193,7 +196,7 @@ export function mapProduct(row: Record<string, unknown>): StoredProduct {
 export function mapCategory(row:Record<string,unknown>):StoredCategory{return{id:Number(row.id),name:String(row.name),slug:String(row.slug),mood:String(row.mood),description:String(row.description),notes:Array.isArray(row.notes)?row.notes.map(String):[],paper:String(row.paper),ink:String(row.ink),accent:String(row.accent),soft:String(row.soft)}}
 
 export function mapOrder(row: Record<string, unknown>): StoredOrder {
-  return { id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
+  return { messengerChannels: Array.isArray(row.messenger_channels) ? row.messenger_channels.filter((value): value is Messenger => typeof value === "string" && Object.hasOwn(messengerKeys, value)) : [], id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
 }
 
 export function mapScent(row: Record<string, unknown>): Scent {

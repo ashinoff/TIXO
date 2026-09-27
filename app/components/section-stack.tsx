@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { scrollToSection } from "../../lib/section-scroll";
+import { cancelSectionScroll, isSectionScrollActive, scrollToSection } from "../../lib/section-scroll";
 
 export function SectionAnchor({ section }: { section: string }) {
   return <div className="section-anchor" data-section-anchor={section} aria-hidden="true" />;
@@ -30,7 +30,7 @@ export function SectionStack() {
         }
         // The catalog above a deep link can grow after its API request finishes.
         // Keep the chosen section aligned until the visitor takes over scrolling.
-        if (following) scrollToSection(following, "instant");
+        if (following && !isSectionScrollActive()) scrollToSection(following, "instant");
       };
       const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure); };
       panels.forEach((panel, index) => panel.style.setProperty("--stack-order", String(index + 1)));
@@ -69,18 +69,21 @@ export function SectionStack() {
       const stopFollowing = () => { following = null; };
       document.addEventListener("click", click);
       document.addEventListener("pointerdown", stopFollowing, { passive: true });
+      document.addEventListener("touchstart", stopFollowing, { passive: true });
       document.addEventListener("keydown", stopFollowing);
       window.addEventListener("wheel", stopFollowing, { passive: true });
       window.addEventListener("hashchange", followHash);
       followHash();
 
       stop = () => {
+        cancelSectionScroll();
         observer.disconnect();
         window.cancelAnimationFrame(frame);
         window.cancelAnimationFrame(navigationFrame);
         window.removeEventListener("resize", schedule);
         document.removeEventListener("click", click);
         document.removeEventListener("pointerdown", stopFollowing);
+        document.removeEventListener("touchstart", stopFollowing);
         document.removeEventListener("keydown", stopFollowing);
         window.removeEventListener("wheel", stopFollowing);
         window.removeEventListener("hashchange", followHash);

@@ -256,3 +256,18 @@
 .tiho-site .order-text-toggle{margin-top:18px;min-height:40px;font-size:13px}
 .tiho-site .order-message-text{display:block;width:100%;max-width:100%;min-height:180px;margin-top:12px;padding:14px;border:1px solid #b3bea5;background:#faf8f1;color:#283821;font:inherit;font-size:14px;line-height:1.6;resize:vertical;border-radius:0}
 .tiho-site .order-messengers .text-link{white-space:normal}
+
+/* Keep the filled basket within reach without covering section controls. */
+.tiho-site .quick-add.choose-variant{width:auto;min-width:48px;padding-inline:12px;font-size:13px}
+.tiho-site .floating-cart{position:fixed;z-index:40;left:max(16px,env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:10px;min-width:78px;height:48px;padding:0 16px;border:1px solid #e4ddca66;border-radius:28px;background:#1c2518d1;color:#f4f0e5;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 4px 20px #0002;transition:background .3s,opacity .25s;animation:commerce-fade .35s ease}
+.tiho-site .floating-cart:hover,.tiho-site .floating-cart:focus-visible{background:#34412bd9}
+.tiho-site .floating-cart svg{width:20px;height:23px;stroke:currentColor;stroke-width:1.3}
+.tiho-site .floating-cart-label{font-size:13px}
+.tiho-site .floating-cart-count{font-size:13px;font-variant-numeric:tabular-nums;min-width:16px;text-align:center}
+.tiho-site .floating-cart[aria-hidden=true]{opacity:0;pointer-events:none}
+@media(max-width:760px){
+ .tiho-site .floating-cart{left:max(12px,env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));height:44px;min-width:76px;padding:0 12px;gap:8px}
+ .tiho-site .floating-cart-label{display:none}
+ .tiho-site:has(.floating-cart) .toast{bottom:calc(68px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){.tiho-site .floating-cart{animation:none;transition:none}}

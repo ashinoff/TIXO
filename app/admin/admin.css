@@ -84,3 +84,5 @@
 .messenger-settings input{width:100%;min-width:0;min-height:46px;padding:12px;border:1px solid #46503d;background:#ffffff05;color:inherit;font:inherit;border-radius:0}
 .messenger-settings small{font-size:12px;line-height:1.5;color:#8b9581}
 .messenger-settings fieldset>button{justify-self:start}
+
+.order-channels{padding:16px 0;border-bottom:1px solid #dedfd5;margin:0 22px 18px}.order-channels>div{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0}.order-channel{font-size:12px;line-height:1.5;padding:6px 10px;background:#e7ecdf;color:#3d5130;border:1px solid #cbd5c0;border-radius:14px}.order-channels>small{display:block;font-size:12px;line-height:1.6;color:#737a6a}
