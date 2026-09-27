@@ -237,3 +237,22 @@
  .tiho-site .detail-toolbar{justify-content:space-between}
 }
 @media(prefers-reduced-motion:reduce){.tiho-site .product-modal-frame{animation:none!important;transition:none!important}}
+
+/* Confirmed order: messenger handoff never submits another order. */
+.tiho-site .order-success:has(.order-messengers){padding:8px 0}
+.tiho-site .order-success:has(.order-messengers)>.empty-mark{font-size:42px;line-height:1;margin-bottom:14px}
+.tiho-site .order-success:has(.order-messengers)>h3{font-size:28px;margin:12px 0}
+.tiho-site .order-success:has(.order-messengers)>p{font-size:14px;line-height:1.6;margin:10px 0}
+.tiho-site .order-messengers{margin:28px 0;padding:25px 0;border-block:1px solid #c0cab3;text-align:left}
+.tiho-site .order-messengers h4{font-size:24px;font-weight:500;letter-spacing:-.025em}
+.tiho-site .order-messengers p{font-size:14px;line-height:1.65;margin:12px 0}
+.tiho-site .messenger-options{display:grid;gap:14px;margin:20px 0}
+.tiho-site .messenger-link{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:50px;padding:13px 17px;border:1px solid #a8b398;background:#e4e8dc55;color:#304127;font-size:17px;transition:background .2s}
+.tiho-site .messenger-link:hover,.tiho-site .messenger-link:focus-visible{background:#dce2d0}
+.tiho-site .messenger-link svg{width:20px;height:20px;flex-shrink:0}
+.tiho-site .messenger-option small{display:block;margin-top:6px;color:#657259;font-size:12px;line-height:1.5}
+.tiho-site .copy-order{display:block;width:100%;min-height:46px;border:1px solid #9eac8c;padding:12px 14px;font-size:14px;color:#304127}
+.tiho-site .copy-order:hover{background:#e4e8dc}
+.tiho-site .order-text-toggle{margin-top:18px;min-height:40px;font-size:13px}
+.tiho-site .order-message-text{display:block;width:100%;max-width:100%;min-height:180px;margin-top:12px;padding:14px;border:1px solid #b3bea5;background:#faf8f1;color:#283821;font:inherit;font-size:14px;line-height:1.6;resize:vertical;border-radius:0}
+.tiho-site .order-messengers .text-link{white-space:normal}

@@ -11,16 +11,18 @@ import { ScentPortrait } from "./scent-portrait";
 import { ArrowIcon, CheckIcon } from "./ui-icon";
 import { PhotoCarousel, type PhotoCarouselHandle } from "./photo-carousel";
 import { useProductSwipe } from "../../lib/use-product-swipe";
+import { OrderMessengers } from "./order-messengers";
 
 const STORAGE_KEY = "tixo.atelier.cart.v1";
 const REQUEST_KEY = "tixo.atelier.request.v1";
+const RECEIPT_KEY = "tixo.atelier.receipt.v1";
 type CandleVisualData = { twoTone?: boolean; accentColor?: string; accentColorName?: string; colorName?: string; silhouette?: string | null; shape?: CandleShape | null; color?: string };
 type StandardLine = CandleVisualData & { key: string; productId: number; variantId: number | null; scentId: number; colorId: number; accentColorId?: number | null; quantity: number; name: string; scentName: string; colorName: string; image: string | null; price: number };
 type CustomLine = CandleVisualData & { scentName?: string; formName?: string; key: string; customRecipe: Recipe; quantity: number };
 type Line = StandardLine | CustomLine;
 type DisplayLine = CandleVisualData & { formName?: string; key: string; name: string; scentName: string; quantity: number; image: string | null; price: number | null; available: number; customRecipe?: Recipe };
 type OrderPayload = { requestKey: string; customerName: string; phone: string; email: string; address: string; delivery: string; comment: string; items: ({ productId: number; variantId: number | null; scentId: number; colorId: number; accentColorId?: number | null; quantity: number } | { customRecipe: Recipe; quantity: number })[] };
-type Receipt = { orderNumber: string; total: number; quotePending: boolean };
+type Receipt = { orderNumber: string; total: number; quotePending: boolean; message?: string };
 type CandleSelection = { productId: number; scentId?: number; colorId?: number };
 type Selection = CandleSelection & { catalog: CandleSelection[] };
 type Shop = {
@@ -105,7 +107,14 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [pending, setPendingState] = useState<OrderPayload | null>(null); const pendingRef = useRef<OrderPayload | null>(null);
   const [submitting, setSubmitting] = useState(false); const busy = useRef(false);
-  const [orderError, setOrderError] = useState(""); const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [orderError, setOrderError] = useState(""); const [receipt, setReceiptState] = useState<Receipt | null>(null);
+  const setReceipt = useCallback((next: Receipt | null) => {
+    setReceiptState(next);
+    try {
+      if (next) window.sessionStorage.setItem(RECEIPT_KEY, JSON.stringify({ receipt: next, expires: Date.now() + 24 * 60 * 60 * 1000 }));
+      else window.sessionStorage.removeItem(RECEIPT_KEY);
+    } catch { /* The confirmation remains available in memory. */ }
+  }, []);
   const loadCatalog = useCallback(async () => {
     try {
       const responses = await Promise.all([fetch("/api/products", { cache: "no-store" }), fetch("/api/scents", { cache: "no-store" }), fetch("/api/colors", { cache: "no-store" })]);
@@ -132,8 +141,18 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     ready.current = true;
     // Browser storage is unavailable during server rendering; hydrate it once after mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    try { setCart(restoreCart(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]"))); const saved = restoreRequest(JSON.parse(window.localStorage.getItem(REQUEST_KEY) ?? "null")); if (saved) { setPending(saved); setCartOpenState(true); } } catch { /* Ignore stale browser storage. */ }
+    try {
+      const restored = restoreCart(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]"));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate browser storage after SSR
+      setCart(restored);
+      const saved = restoreRequest(JSON.parse(window.localStorage.getItem(REQUEST_KEY) ?? "null"));
+      if (saved) { setPending(saved); setCartOpenState(true); }
+      else if (!restored.length) {
+        const confirmation = JSON.parse(window.sessionStorage.getItem(RECEIPT_KEY) ?? "null");
+        if (confirmation?.expires > Date.now() && typeof confirmation.receipt?.orderNumber === "string" && Number.isFinite(confirmation.receipt.total) && typeof confirmation.receipt.message === "string") setReceiptState(confirmation.receipt);
+        else window.sessionStorage.removeItem(RECEIPT_KEY);
+      }
+    } catch { /* Ignore stale browser storage. */ }
     void loadCatalog(); void loadForms();
     return () => clearTimeout(toastTimer.current);
   }, [loadCatalog, loadForms, setCart, setPending]);
@@ -207,7 +226,7 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (typeof data.orderNumber !== "string" || typeof data.total !== "number") throw new Error("Unknown order result");
-      setReceipt({ orderNumber: data.orderNumber, total: data.total, quotePending: Boolean(data.quotePending) || payload.items.some(item => "customRecipe" in item) });
+      setReceipt({ orderNumber: data.orderNumber, total: data.total, quotePending: Boolean(data.quotePending) || payload.items.some(item => "customRecipe" in item), message: typeof data.message === "string" ? data.message : undefined });
       setCart([]); setPending(null); await loadCatalog();
     } catch { setOrderError("Связь прервалась. Повторите отправку: номер запроса сохранён, второй заказ не создастся."); }
     finally { clearTimeout(timeout); busy.current = false; setSubmitting(false); }
@@ -403,7 +422,7 @@ export function CartOverlay() {
   const hasFormRecipes = shop.items.some(item => item.customRecipe?.formId !== undefined);
   return <>{shop.detail && <ProductDetails />}
     {shop.cartOpen && <Modal className="cart-dialog" label="Ваша корзина" onClose={() => shop.setCartOpen(false)}><div className="dialog-inner"><header className="dialog-header"><div><span className="eyebrow">ВАШ ВЕЧЕР НАЧИНАЕТСЯ ЗДЕСЬ</span><h2>Ваша корзина</h2></div><button className="icon-button close-cart" type="button" aria-label="Закрыть корзину" disabled={shop.submitting} onClick={() => shop.setCartOpen(false)}>×</button></header>
-      {shop.receipt ? <div className="order-success" role="status"><span className="empty-mark">тихо</span><h3>Ваш вечер уже ближе.</h3><p>Заказ <strong>{shop.receipt.orderNumber}</strong> передан в мастерскую.</p><p>{shop.receipt.quotePending ? `Стоимость индивидуальных свечей мастер согласует с вами.${shop.receipt.total ? ` Свечи из коллекции: ${money(shop.receipt.total)}.` : ""}` : `Свечи в заказе: ${money(shop.receipt.total)}.`} Доставка рассчитывается отдельно.</p><p>Мы свяжемся с вами по указанным контактам, чтобы подтвердить детали и способ оплаты.</p><button className="button button-dark" onClick={() => shop.setCartOpen(false)}>Продолжить знакомство <span aria-hidden="true"><ArrowIcon /></span></button></div> : !shop.items.length && !shop.pending ? <div className="empty-cart"><span className="empty-mark">тихо</span><p>Здесь пока ТИХО</p><span>Выберите аромат, который хочется взять с собой.</span><button type="button" className="button button-dark" onClick={() => { shop.setCartOpen(false); scrollToSection("collection", reducedMotion() ? "instant" : "smooth"); }}>К коллекции <span aria-hidden="true"><ArrowIcon /></span></button></div> : <>
+      {shop.receipt ? <div className="order-success"><span className="empty-mark">тихо</span><h3>Ваш вечер уже ближе.</h3><p role="status">Заказ <strong>{shop.receipt.orderNumber}</strong> сохранён и передан в мастерскую.</p><p>{shop.receipt.quotePending ? `Стоимость индивидуальных свечей мастер согласует с вами.${shop.receipt.total ? ` Свечи из коллекции: ${money(shop.receipt.total)}.` : ""}` : `Свечи в заказе: ${money(shop.receipt.total)}.`} Доставка рассчитывается отдельно.</p>{shop.receipt.message && <OrderMessengers key={shop.receipt.orderNumber} message={shop.receipt.message} />}<p>Мы свяжемся с вами по указанным контактам, чтобы подтвердить детали и способ оплаты.</p><button className="button button-dark" onClick={() => shop.setCartOpen(false)}>Продолжить знакомство <span aria-hidden="true"><ArrowIcon /></span></button></div> : !shop.items.length && !shop.pending ? <div className="empty-cart"><span className="empty-mark">тихо</span><p>Здесь пока ТИХО</p><span>Выберите аромат, который хочется взять с собой.</span><button type="button" className="button button-dark" onClick={() => { shop.setCartOpen(false); scrollToSection("collection", reducedMotion() ? "instant" : "smooth"); }}>К коллекции <span aria-hidden="true"><ArrowIcon /></span></button></div> : <>
         <div className="cart-items" id="cart-items">{shop.items.map(item => <article className={`cart-item${item.customRecipe ? " custom" : ""}`} key={item.key}>{item.customRecipe ? <CustomPreview recipe={item.customRecipe} formName={item.formName} silhouette={item.silhouette} shape={item.shape} color={item.color} colorName={item.colorName} twoTone={item.twoTone} accentColor={item.accentColor} /> : <div className="cart-candle-visual"><CandleVisual src={item.image} silhouette={item.silhouette} shape={item.shape} color={item.color} twoTone={item.twoTone} accentColor={item.accentColor} label={item.name} /></div>}<div><h3>{item.name}</h3><p className="cart-recipe">{item.scentName}</p><span className="cart-item-price">{item.price === null ? "Стоимость по запросу" : money(item.price * item.quantity)}</span><div className="quantity-row"><button type="button" aria-label={`Уменьшить количество ${item.name}`} disabled={shop.locked} onClick={() => shop.changeQuantity(item.key, -1)}>−</button><span aria-label="Количество">{item.quantity}</span><button type="button" aria-label={`Увеличить количество ${item.name}`} disabled={shop.locked || item.quantity >= Math.min(99, item.available)} onClick={() => shop.changeQuantity(item.key, 1)}>+</button><button className="remove-item" type="button" aria-label={`Удалить ${item.name}`} disabled={shop.locked} onClick={() => shop.remove(item.key)}>Удалить</button></div>{!shop.loading && !shop.catalogError && !shop.pending && !(item.customRecipe?.formId !== undefined && (shop.formsLoading || shop.formsError)) && item.quantity > item.available && <p className="stock-error">{item.available ? `Доступно ${item.available} шт. Уменьшите количество.` : item.customRecipe ? item.customRecipe.scentId !== undefined ? "Форма, цвет или аромат больше недоступны. Удалите эту свечу и выберите новое сочетание в мастерской." : "Форма больше недоступна. Удалите эту свечу и выберите другую форму в мастерской." : "Вариант больше недоступен. Удалите его из корзины."}</p>}</div></article>)}</div>
         {!!shop.items.length && <><div className="order-total"><span>{shop.hasCustom ? "Предварительно, без доставки" : "Итого без доставки"}</span><strong>{shop.hasCustom ? shop.total ? `${money(shop.total)} + по запросу` : "По запросу" : money(shop.total)}</strong></div>{shop.hasCustom && <p className="checkout-note">Стоимость индивидуальных свечей не включена в сумму. Мастер согласует состав, возможность изготовления и цену до начала работы.</p>}</>}
         <p className="checkout-note">Доставка и способ оплаты согласуются с мастерской после подтверждения заказа.</p>

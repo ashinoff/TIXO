@@ -7,6 +7,7 @@ import { recipeFormName, atelierColors, atelierTopNotes, atelierHeartNotes, atel
 import { ImagePreview, ProductEditor, ScentEditor, ColorEditor, FormEditor, StockEditor, AromaProfileEditor } from "./editors";
 import { CandlePreview } from "../components/candle-preview";
 import { CatalogOrder } from "./catalog-order";
+import { MessengerSettings } from "./messenger-settings";
 import "./admin.css";
 
 type Order = { id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
@@ -180,7 +181,7 @@ export default function Admin() {
           <footer><select aria-label={`Статус заказа ${order.orderNumber}`} disabled={busy} value={order.status} onChange={event => updateStatus(order.id, event.target.value as Order["status"])}><option value="new">Новый</option><option value="in_progress">В процессе</option><option value="completed">Выполнен</option></select><button className="delete-order" disabled={busy} onClick={() => removeOrder(order)}>Удалить</button></footer>
         </article>)}</div>
       </>}
-      {tab === "content" && <><p className="admin-intro">Тексты и фотографии новой витрины. Анимация пламени доступна на исходном фото первого экрана; загруженное фото будет показано без искажения.</p><div className="content-grid">{fields.map(field => <Content key={`${field.key}-${content[field.key]?.value ?? ""}`} field={field} value={content[field.key]?.value || field.fallback} save={saveContent} />)}</div></>}
+      {tab === "content" && <><MessengerSettings content={content} onSaved={load} /><p className="admin-intro">Тексты и фотографии новой витрины. Анимация пламени доступна на исходном фото первого экрана; загруженное фото будет показано без искажения.</p><div className="content-grid">{fields.map(field => <Content key={`${field.key}-${content[field.key]?.value ?? ""}`} field={field} value={content[field.key]?.value || field.fallback} save={saveContent} />)}</div></>}
     </section>
     {ordering && <CatalogOrder products={products} onClose={() => setOrdering(false)} onReload={async () => { const fresh = await request<Product[]>("/api/products?admin=1"); setProducts(fresh); return fresh; }} onSave={async (ids, expectedIds) => { const fresh = await request<Product[]>("/api/products/order", { method: "PATCH", ...json({ ids, expectedIds }) }); setProducts(fresh); setOrdering(false); setSaved(true); }} />}
     {editing && <ProductEditor product={editing} forms={forms} scents={scents} colors={colors} onSave={saveProduct} onClose={() => setEditing(null)} />}

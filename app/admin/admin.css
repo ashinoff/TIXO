@@ -76,3 +76,11 @@
 .catalog-order-controls label{display:grid;gap:3px;font-size:10px;margin-left:8px}.catalog-order-controls input{width:64px;min-height:34px;border:1px solid #c6cebb;padding:4px 7px;font-size:16px}
 .catalog-order-editor>footer{position:sticky;bottom:0;background:#f4f4ed;border-top:1px solid #d4d9cd;z-index:2}
 @media(max-width:600px){.catalog-order-editor>header,.catalog-order-editor>footer{padding:16px}.catalog-order-editor>.editor-hint,.catalog-order-editor>.editor-error{margin:0 16px 16px}.catalog-order-list{padding:0 12px}.catalog-order-list>li{gap:9px;flex-wrap:wrap}.catalog-order-name{flex-basis:calc(100% - 120px)}.catalog-order-controls{margin-left:auto}.catalog-order-editor>header h2{font-size:23px}}
+
+.messenger-settings{margin-bottom:32px;max-width:900px}
+.messenger-settings>p{font-size:14px;line-height:1.65;margin:16px 0;color:#727b68}
+.messenger-settings fieldset{padding:0;border:0;min-width:0;display:grid;gap:18px}
+.messenger-settings label{display:grid;gap:7px;font-size:14px}
+.messenger-settings input{width:100%;min-width:0;min-height:46px;padding:12px;border:1px solid #46503d;background:#ffffff05;color:inherit;font:inherit;border-radius:0}
+.messenger-settings small{font-size:12px;line-height:1.5;color:#8b9581}
+.messenger-settings fieldset>button{justify-self:start}

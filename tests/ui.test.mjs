@@ -1,4 +1,4 @@
-import { test, after } from 'node:test';
+import { test, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -37,6 +37,7 @@ const {ShoppingProvider,Catalog,ScentDiscovery,CartOverlay,CartTrigger}=require(
 const {Atelier}=require('./app/components/atelier.js');
 const WorkshopHome=()=>React.createElement(ShoppingProvider,null,React.createElement('div',{className:'tiho-site'},React.createElement(CartTrigger),React.createElement(Catalog),React.createElement(ScentDiscovery),React.createElement(Atelier),React.createElement(CartOverlay)));
 
+beforeEach(()=>window.sessionStorage.clear());
 after(()=>{dom.window.close();rmSync(temp,{recursive:true,force:true});});
 const scents=[['Вишня и миндаль','#b82035','Красный'],['Сандал и дым','#222225','Чёрный'],['Белая ваниль','#f7f5ef','Белый'],['Роза и пион','#e7a0b5','Розовый']].map(([name,color,colorName],i)=>({id:i+1,name,color,colorName,notes:['нота'],description:'Описание',active:true}));
 const colors=scents.map(s=>({id:s.id,name:s.colorName,hex:s.color,active:true}));
@@ -1063,4 +1064,62 @@ test('admin moves catalog positions, preserves drafts after conflict and reloads
     assert.deepEqual(sent[1],{ids:[1,2,3],expectedIds:[2,1,3]});assert.equal(document.querySelector('.catalog-order-editor'),null);
     await click(button('Порядок каталога'));assert.deepEqual(ids(),[1,2,3]);
   }finally{await act(async()=>root.unmount());}
+});
+
+
+test('messenger drafts contain stored prices, full contact details and safely targeted links',()=>{
+  const {orderMessage,messengerLink,normalizeMessengerContact,readMessengerContacts}=require('./lib/order-messaging.js');
+  const message=orderMessage({orderNumber:'T-MESSAGE',customerName:'Анна',phone:'+79990000000',email:'anna@example.com',address:'Сочи, Тихая 7 & 8',delivery:'courier',comment:'После 18:00\nПозвонить заранее',total:5980,items:[{productId:1,name:'ЗМЕЯ',colorName:'Изумруд',accentColorName:'Серебро',scentName:'MOJITO',quantity:2,price:2990},{productId:0,name:'Авторская свеча',scentName:'Хлопок',quantity:1,price:0,quotePending:true}]});
+  for(const value of ['T-MESSAGE','Изумруд','Серебро','MOJITO','2 шт.','5 980','Анна','+79990000000','anna@example.com','Сочи, Тихая 7 & 8','Курьером','После 18:00\nПозвонить заранее','по согласованию'])assert.ok(message.includes(value),value);
+  const wa=messengerLink('whatsapp','+7 (999) 123-45-67',message);
+  assert.equal(new URL(wa.href).pathname,'/79991234567');assert.equal(new URL(wa.href).searchParams.get('text'),message);assert.equal(wa.prefilled,true);
+  const tg=messengerLink('telegram','https://t.me/tixo_example',message);
+  assert.equal(new URL(tg.href).pathname,'/tixo_example');assert.equal(new URL(tg.href).searchParams.get('text'),message);
+  assert.deepEqual(messengerLink('instagram','@tixo.example',message),{href:'https://ig.me/m/tixo.example',prefilled:false});
+  assert.equal(normalizeMessengerContact('whatsapp','https://wa.me/79991234567'),'79991234567');
+  assert.equal(normalizeMessengerContact('telegram',''),'');
+  for(const input of ['https://evil.test/username','https://t.me/example?text=bad','javascript:alert(1)','https://t.me/username/123','https://username:secret@t.me/example'])assert.throws(()=>normalizeMessengerContact('telegram',input));
+  assert.equal(readMessengerContacts({'atelier.contact.telegram':{value:'javascript:alert(1)'}}).telegram,'');
+  assert.deepEqual(messengerLink('telegram','tixo_example','Я'.repeat(5000)),{href:'https://t.me/tixo_example',prefilled:false});
+});
+
+test('checkout offers merchant messengers only after confirmation; copying and reopening never create another order',async()=>{
+  window.localStorage.clear();let posts=0,clipboard='';
+  const message='Заказ T-CHAT\nЗМЕЯ · Изумруд · MOJITO\nТелефон: +79990000000\nАдрес: Сочи';
+  const previousClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{clipboard=value;}}});
+  globalThis.fetch=async(url,init={})=>url==='/api/products'?response(products):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):url==='/api/order-contacts'?response({whatsapp:'79991234567',telegram:'tixo_example',instagram:'tixo.example'}):url==='/api/orders'?(posts++,response({orderNumber:'T-CHAT',total:1500,quotePending:false,message},201)):response({});
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('#filter-scent'));await click(button('Вишня и миндаль'));await click(document.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));
+    assert.equal(document.querySelector('.order-messengers'),null);
+    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Анна',phone:'+79990000000',email:'a@example.com',address:'Сочи'}))form.elements.namedItem(name).value=value;
+    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(posts,1);assert.equal(document.querySelectorAll('.messenger-link').length,3);
+    assert.ok([...document.querySelectorAll('.messenger-link')].every(a=>a.target==='_blank'&&a.rel.includes('noreferrer')));
+    assert.equal(new URL(document.querySelector('.messenger-link').href).searchParams.get('text'),message);
+    await click(document.querySelector('.copy-order'));assert.equal(clipboard,message);assert.equal(posts,1);
+    await click(document.querySelector('.order-text-toggle'));assert.equal(document.querySelector('.order-message-text').value,message);
+    await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+    await act(async()=>root.render(React.createElement(Home)));await click(document.querySelector('.cart-trigger'));
+    assert.match(document.querySelector('.order-success').textContent,/T-CHAT/);assert.equal(posts,1);
+    await click(document.querySelector('.close-cart'));await click(document.querySelector('#filter-scent'));await click(button('Вишня и миндаль'));await click(document.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));
+    assert.equal(document.querySelector('.order-success'),null);assert.ok(document.querySelector('#checkout-form'));assert.equal(window.sessionStorage.getItem('tixo.atelier.receipt.v1'),null);
+  }finally{await act(async()=>root.unmount());if(previousClipboard)Object.defineProperty(navigator,'clipboard',previousClipboard);else delete navigator.clipboard;}
+});
+
+test('messenger failure retains full copyable order and does not claim Instagram prefill',async()=>{
+  const {OrderMessengers}=require('./app/components/order-messengers.js');
+  globalThis.fetch=()=>response({error:'Unavailable'},500);
+  const root=createRoot(document.getElementById('root'));
+  const oldRaf=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=callback=>setTimeout(callback,0);
+  const previousClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('denied');}}});
+  try{
+    await act(async()=>root.render(React.createElement(OrderMessengers,{message:'Полный заказ\nКонтакты и адрес'})));
+    assert.match(document.querySelector('.order-messengers').textContent,/Заказ сохранён/);
+    await click(document.querySelector('.copy-order'));assert.equal(document.querySelector('textarea').value,'Полный заказ\nКонтакты и адрес');assert.match(document.querySelector('.copy-order-status').textContent,/не разрешил/);
+    globalThis.fetch=()=>response({whatsapp:'',telegram:'',instagram:'tixo.example'});await click(button('Попробовать снова'));
+    assert.equal(document.querySelectorAll('.messenger-link').length,1);assert.equal(document.querySelector('.messenger-link').href,'https://ig.me/m/tixo.example');assert.match(document.querySelector('.messenger-option').textContent,/Сначала скопируйте/);
+  }finally{await act(async()=>root.unmount());globalThis.requestAnimationFrame=oldRaf;if(previousClipboard)Object.defineProperty(navigator,'clipboard',previousClipboard);else delete navigator.clipboard;}
 });

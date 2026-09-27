@@ -40,6 +40,7 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await call('/api/products/1/stock',{method:'PATCH',...json({stock:5,expectedStock:3})})).status,401);
   assert.equal((await call('/api/scents/1/profile',{method:'PATCH',...json({})})).status,401);
   assert.equal((await call('/api/orders')).status,401);
+  assert.equal((await call('/api/order-contacts',{method:'PATCH',...json({})})).status,401);
   assert.equal((await call('/api/admin/login',{method:'POST',...json({password:'wrong'})})).status,401);
   const malformed=await call('/api/admin/session',{headers:{cookie:'tiho_admin=NaN.'+'a'.repeat(64)}});
   assert.deepEqual(await malformed.json(),{authenticated:false});
@@ -50,6 +51,14 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const cookie=login.headers.get('set-cookie').split(';')[0];
   const admin=(path,options={})=>call(path,{...options,headers:{...options.headers,cookie}});
   assert.deepEqual(await (await admin('/api/admin/session')).json(),{authenticated:true});
+  const contactSettings={whatsapp:'+7 (999) 123-45-67',telegram:'https://t.me/tixo_example',instagram:'@tixo.example'};
+  assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json(contactSettings)})).status,200);
+  const contacts={whatsapp:'79991234567',telegram:'tixo_example',instagram:'tixo.example'};
+  assert.deepEqual(await (await call('/api/order-contacts')).json(),contacts);
+  assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json({...contactSettings,telegram:'https://evil.test/account'})})).status,400);
+  assert.deepEqual(await (await call('/api/order-contacts')).json(),contacts);
+  assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json({whatsapp:'',telegram:'',instagram:''})})).status,200);
+  assert.deepEqual(await (await call('/api/order-contacts')).json(),{whatsapp:'',telegram:'',instagram:''});
   const orderedBefore=await (await admin('/api/products?admin=1')).json();
   const visibleIds=new Set((await (await call('/api/products')).json()).map(p=>p.id));
   const expectedIds=orderedBefore.map(p=>p.id), ids=[...expectedIds].reverse();
@@ -98,8 +107,14 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const line={productId:product.id,scentId:scents[0].id,colorId:colors[0].id,quantity:1};
   const wrong=await call('/api/orders',{method:'POST',...json({...customer,requestKey:randomUUID(),items:[{...line,colorId:colors[1].id}]})});
   assert.equal(wrong.status,409);
-  const placed=await call('/api/orders',{method:'POST',...json({...customer,requestKey:randomUUID(),items:[line]})});
+  const placedRequest={...customer,requestKey:randomUUID(),items:[line]};
+  const placed=await call('/api/orders',{method:'POST',...json(placedRequest)});
   assert.equal(placed.status,201);
+  assert.equal(placed.headers.get('cache-control'),'no-store');
+  const placedReceipt=await placed.json();
+  for(const value of [placedReceipt.orderNumber,'Тестовый адрес','+79990000000',edited.name,colors[0].name,'1 800'])assert.ok(placedReceipt.message.includes(value),value);
+  const repeated=await (await call('/api/orders',{method:'POST',...json({...placedRequest,address:'Другой адрес'})})).json();
+  assert.equal(repeated.message,placedReceipt.message);
   const orders=await (await admin('/api/orders')).json();
   const order=orders.find(item=>item.items.some(line=>line.productId===product.id));
   assert.equal(order.items.length,1); assert.equal(order.total,1800);assert.equal(order.items[0].colorName,colors[0].name);assert.equal(order.items[0].silhouette,shape.silhouette);
