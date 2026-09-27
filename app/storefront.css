@@ -34,3 +34,10 @@
 @media(max-width:760px){.tiho-site .studio-scene-top .eyebrow,.tiho-site .studio-live,.tiho-site .scene-disclaimer{font-size:12px}}
 
 .tiho-site{position:relative;min-height:100vh}.tiho-site .hero-description{white-space:pre-line}
+
+/* The real vessel is wider than the old pillar: keep it whole beneath mobile copy. */
+@media(max-width:760px){
+ .tiho-site .hero-image{inset:310px 0 0;mask-image:linear-gradient(to bottom,transparent,#000 24%)}
+ .tiho-site .hero-image img,.tiho-site .hero-image canvas{object-position:75% center}
+ .tiho-site .hero-content>.eyebrow{font-size:10px;line-height:1.6;letter-spacing:.08em}
+}

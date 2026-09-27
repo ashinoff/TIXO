@@ -21,11 +21,11 @@ const emptyColor: CandleColor = { id:0, name:"", hex:"#e8ddca", active:true };
 const fields: Field[] = [
   { key: "atelier.hero.title", label: "Первый экран — заголовок", kind: "text", fallback: "Пусть мир" },
   { key: "atelier.hero.emphasis", label: "Первый экран — акцент", kind: "text", fallback: "подождёт" },
-  { key: "atelier.hero.description", label: "Первый экран — описание", kind: "text", fallback: "Один огонь. Любимый аромат.\nИ вечер, который снова принадлежит вам." },
+  { key: "atelier.hero.description", label: "Первый экран — описание", kind: "text", fallback: "Один огонь. Шлейфовый аромат.\nИ вечер, который снова принадлежит вам." },
   { key: "atelier.about.lead", label: "Мастерская — вводный текст", kind: "text", fallback: "ТИХО — мастерская свечей ручной работы. Нам близки простые формы, выразительные ароматы и вещи, рядом с которыми хочется задержаться." },
   { key: "atelier.about.text", label: "Мастерская — основной текст", kind: "text", fallback: "Мы создаём свечи для обычных вечеров, которые однажды становятся любимыми воспоминаниями." },
-  { key: "atelier.image.hero", label: "Фото первого экрана", kind: "image", fallback: "/assets/hero.png" },
-  { key: "atelier.image.about", label: "Фото мастерской", kind: "image", fallback: "/assets/workshop.webp" },
+  { key: "atelier.image.hero", label: "Фото первого экрана", kind: "image", fallback: "/assets/hero-real-candle.webp" },
+  { key: "atelier.image.about", label: "Фото мастерской", kind: "image", fallback: "/assets/workshop-real-candle.webp" },
 ];
 
 const needsQuote = (order: Order) => order.items.some(item => item.quotePending);

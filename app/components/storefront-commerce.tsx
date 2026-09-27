@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sortByName, availableVariants, productImages, emptyAromaProfile, candleShapes, cartKey, money, productShape, type Product, type Scent, type Variant, type CandleColor, type CandleShape, type CandleForm } from "@/lib/catalog";
 import { atelierColors, atelierColorHex, recipeFormName, copyRecipe, isRecipe as validRecipe, recipeKey, recipeSummary, type Recipe } from "@/lib/atelier";
 import { Modal } from "./modal";
+import { CatalogFilter } from "./catalog-filter";
 import { CandlePreview } from "./candle-preview";
 import { FormMiniature } from "./form-miniature";
 import { isLegacyFormPlaceholder } from "@/lib/form-portraits";
@@ -263,49 +264,6 @@ export function CartTrigger() {
   return <button className="cart-trigger" type="button" aria-haspopup="dialog" aria-label={`Открыть корзину, товаров: ${count}`} onClick={() => setCartOpen(true)}><span>Корзина</span><span className="cart-count">({String(count).padStart(2, "0")})</span><svg aria-hidden="true" viewBox="0 0 24 26" fill="none"><path d="M5 8h14l1 15H4L5 8Z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" /></svg></button>;
 }
 
-function CatalogFilter({ id, label, value, preview, open, onToggle, onClose, children }: { id: string; label: string; value: string; preview?: ReactNode; open: boolean; onToggle: () => void; onClose: () => void; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const close = useRef(onClose);
-  useEffect(() => { close.current = onClose; }, [onClose]);
-  useEffect(() => {
-    if (!open) return;
-    ref.current?.querySelector<HTMLElement>('[data-selected="true"]')?.focus({ preventScroll: true });
-    const outside = (event: globalThis.PointerEvent) => { if (!ref.current?.contains(event.target as Node)) close.current(); };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, [open]);
-  useEffect(() => {
-    if (!open || id !== "form") return;
-    const panel = ref.current?.querySelector<HTMLElement>(".filter-panel-form");
-    const trigger = ref.current?.querySelector<HTMLElement>(".catalog-filter-trigger");
-    if (!panel || !trigger) return;
-    const measure = () => {
-      const rect = trigger.getBoundingClientRect();
-      const viewport = window.visualViewport;
-      const top = viewport?.offsetTop ?? 0;
-      const bottom = top + (viewport?.height ?? window.innerHeight);
-      const below = bottom - rect.bottom - 24;
-      const above = rect.top - top - 24;
-      const upwards = below < 280 && above > below;
-      panel.dataset.placement = upwards ? "above" : "below";
-      panel.style.maxHeight = `${Math.max(80, Math.min(620, upwards ? above : below))}px`;
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    window.visualViewport?.addEventListener("resize", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-      window.visualViewport?.removeEventListener("resize", measure);
-    };
-  }, [open, id]);
-  return <div className={`catalog-dropdown ${open ? "is-open" : ""}`} ref={ref} onBlur={event => { if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) onClose(); }} onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); onClose(); document.getElementById(`filter-${id}`)?.focus(); } }}>
-    <button type="button" id={`filter-${id}`} className="catalog-filter-trigger" aria-expanded={open} aria-controls={`filter-panel-${id}`} onClick={onToggle}><span className="filter-caption">{label}</span><span className="filter-value">{preview}{value}<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor"><path d="m4 6 4 4 4-4" /></svg></span></button>
-    {open && <div id={`filter-panel-${id}`} className={`catalog-filter-panel filter-panel-${id}`} role="region" aria-label={`Выбор: ${label.toLowerCase()}`}>{children}</div>}
-  </div>;
-}
-
 const scentChapters = [
   { key: "top", label: "Начало", title: "ПЕРВОЕ ВПЕЧАТЛЕНИЕ" },
   { key: "heart", label: "Сердце", title: "ХАРАКТЕР КОМПОЗИЦИИ" },
@@ -379,13 +337,13 @@ export function Catalog({ number = "01" }: { number?: string }) {
     <div className="catalog-filter-bar">
       <div className="catalog-dropdowns">
         <CatalogFilter id="color" label="Цвет" value={palette?.name ?? "Все цвета"} preview={palette && <i className="filter-selected-color" style={{ background: palette.hex }} />} open={openFilter === "color"} onToggle={() => setOpenFilter(openFilter === "color" ? null : "color")} onClose={() => setOpenFilter(null)}>
-          <div className="filter-color-palette"><button type="button" data-selected={colorId === null} aria-pressed={colorId === null} onClick={() => choose("color", () => setColorId(null))}><i className="all-color-swatch" /><span>Все цвета</span></button>{shop.colors.map(color => <button type="button" key={color.id} aria-label={`Цвет: ${color.name}`} aria-pressed={colorId === color.id} data-selected={colorId === color.id} onClick={() => choose("color", () => setColorId(color.id))}><i style={{ background: color.hex }} /><span>{color.name}</span></button>)}</div>
+          <div className="filter-option-list filter-color-palette"><button type="button" data-selected={colorId === null} aria-pressed={colorId === null} onClick={() => choose("color", () => setColorId(null))}><span className="filter-option-visual"><i className="all-color-swatch" /></span><span className="filter-option-name">Все цвета</span><span className="filter-option-check">{colorId === null && <CheckIcon />}</span></button>{shop.colors.map(color => <button type="button" key={color.id} aria-label={`Цвет: ${color.name}`} aria-pressed={colorId === color.id} data-selected={colorId === color.id} onClick={() => choose("color", () => setColorId(color.id))}><span className="filter-option-visual"><i style={{ background: color.hex }} /></span><span className="filter-option-name">{color.name}</span><span className="filter-option-check">{colorId === color.id && <CheckIcon />}</span></button>)}</div>
         </CatalogFilter>
         <CatalogFilter id="scent" label="Аромат" value={shop.selectedScent?.name ?? "Все ароматы"} open={openFilter === "scent"} onToggle={() => setOpenFilter(openFilter === "scent" ? null : "scent")} onClose={() => setOpenFilter(null)}>
-          <div className="filter-aroma-list"><button type="button" data-selected={shop.activeScent === null} aria-pressed={shop.activeScent === null} onClick={() => choose("scent", () => shop.setActiveScent(null))}><span>Все ароматы</span><small>{shop.scents.length}</small></button>{shop.scents.map(scent => <button type="button" key={scent.id} data-selected={shop.activeScent === scent.id} aria-pressed={shop.activeScent === scent.id} onClick={() => choose("scent", () => shop.setActiveScent(scent.id))}>{scent.image && <img src={scent.image} alt="" width="40" height="40" loading="lazy" />}<span>{scent.name}</span><small aria-hidden="true">{shop.activeScent === scent.id ? <CheckIcon /> : null}</small></button>)}</div>
+          <div className="filter-option-list filter-aroma-list"><button type="button" data-selected={shop.activeScent === null} aria-pressed={shop.activeScent === null} onClick={() => choose("scent", () => shop.setActiveScent(null))}><span className="filter-option-visual filter-option-all" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 27V13m0 6C6 20 4 12 5 6c8 0 12 5 11 13Zm0-5c0-7 5-10 11-10 0 7-4 11-11 10Z" /></svg></span><span className="filter-option-name">Все ароматы</span><span className="filter-option-check">{shop.activeScent === null && <CheckIcon />}</span></button>{shop.scents.map(scent => <button type="button" key={scent.id} data-selected={shop.activeScent === scent.id} aria-pressed={shop.activeScent === scent.id} onClick={() => choose("scent", () => shop.setActiveScent(scent.id))}><span className="filter-option-visual">{scent.image ? <img src={scent.image} alt="" width="72" height="72" loading="lazy" /> : <span className="filter-option-monogram" aria-hidden="true">{scent.name.slice(0, 1)}</span>}</span><span className="filter-option-name">{scent.name}</span><span className="filter-option-check">{shop.activeScent === scent.id && <CheckIcon />}</span></button>)}</div>
         </CatalogFilter>
         <CatalogFilter id="form" label="Форма" value={selectedForm?.name ?? "Все формы"} open={openFilter === "form"} onToggle={() => setOpenFilter(openFilter === "form" ? null : "form")} onClose={() => setOpenFilter(null)}>
-          {shop.formsLoading ? <p role="status" className="filter-notice">Загружаем формы…</p> : shop.formsError ? <div role="alert" className="filter-notice">{shop.formsError}<button type="button" className="text-link" onClick={() => void shop.loadForms()}>Попробовать снова</button></div> : <><div className="filter-form-heading"><span>Выберите свою форму</span><button type="button" className="filter-all-forms" data-selected={formId === null} aria-pressed={formId === null} onClick={() => choose("form", () => setFormId(null))}>Все формы {formId === null && <CheckIcon />}</button></div><div className="filter-form-grid">{filterForms.map(form => <button type="button" key={form.id} aria-label={`Форма: ${form.name}`} data-selected={formId === form.id} aria-pressed={formId === form.id} onClick={() => choose("form", () => setFormId(form.id))}><FormMiniature form={form} /><span className="filter-form-name">{form.name}</span>{formId === form.id && <span className="filter-form-check"><CheckIcon /></span>}</button>)}</div></>}
+          {shop.formsLoading ? <p role="status" className="filter-notice">Загружаем формы…</p> : shop.formsError ? <div role="alert" className="filter-notice">{shop.formsError}<button type="button" className="text-link" onClick={() => void shop.loadForms()}>Попробовать снова</button></div> : <div className="filter-option-list filter-form-grid"><button type="button" className="filter-all-forms" data-selected={formId === null} aria-pressed={formId === null} onClick={() => choose("form", () => setFormId(null))}><span className="filter-option-visual filter-option-all" aria-hidden="true"><svg viewBox="0 0 32 32"><rect x="4" y="4" width="9" height="9" rx="2" /><rect x="19" y="4" width="9" height="9" rx="2" /><rect x="4" y="19" width="9" height="9" rx="2" /><rect x="19" y="19" width="9" height="9" rx="2" /></svg></span><span className="filter-option-name">Все формы</span><span className="filter-option-check">{formId === null && <CheckIcon />}</span></button>{filterForms.map(form => <button type="button" key={form.id} aria-label={`Форма: ${form.name}`} data-selected={formId === form.id} aria-pressed={formId === form.id} onClick={() => choose("form", () => setFormId(form.id))}><span className="filter-option-visual"><FormMiniature form={form} /></span><span className="filter-option-name filter-form-name">{form.name}</span><span className="filter-option-check">{formId === form.id && <CheckIcon />}</span></button>)}</div>}
         </CatalogFilter>
       </div>
       <div className="catalog-filter-summary"><span className="catalog-note" aria-live="polite">{cards.length} вариантов · ручная работа</span>{(colorId !== null || formId !== null || shop.activeScent !== null) && <button type="button" className="catalog-reset" onClick={reset}>Сбросить фильтры ×</button>}</div>
@@ -397,7 +355,7 @@ export function Catalog({ number = "01" }: { number?: string }) {
       const readyToAdd = shop.activeScent !== null || !!product.scentId;
       return <article className="product-card" key={`${product.id}:${color.id}`} data-product-id={product.id} data-color-id={color.id} data-scent-id={shop.activeScent ?? undefined}>
         <button type="button" className={`product-image${photo.src?.endsWith("hero.png") ? " black-image" : ""}`} aria-label={`Подробнее о свече ${product.name}, ${color.name}`} onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)} {...inspection}><CandleVisual src={photo.src} {...visualData(product, color)} label={`${product.name} · ${color.name}`} /><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span><span className="image-detail">Выбрать свечу <span aria-hidden="true"><ArrowIcon /></span></span>{photo.preview && <span className="photo-preview-label">Силуэт формы</span>}</button>
-        <div className="product-category">{color.name}{product.accentColor ? ` / ${product.accentColor.name}` : ""}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}{product.volumeMl != null && <> · <span className="product-volume">{product.volumeMl} мл</span></>}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)}>{product.name}</button><span>{money(product.price)}</span></div><p>{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
+        <div className="product-category">{color.name}{product.accentColor ? ` / ${product.accentColor.name}` : ""}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}{product.volumeMl != null && <> · <span className="product-volume">{product.volumeMl} мл</span></>}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)}>{product.name}</button><span>{money(product.price)}</span></div><p className="product-description">{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
         <CatalogPurchase product={product} scent={scent} color={color} ready={readyToAdd} onChoose={() => shop.openProduct(product.id, undefined, color.id, catalog)} />
       </article>;
     })}</div>

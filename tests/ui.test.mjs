@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -681,7 +681,7 @@ test('hero keeps the burning photograph without controls and section numbers fol
   try{
     await act(async()=>root.render(React.createElement(Home)));
     assert.equal(document.querySelector('#evening-light'),null);assert.equal(document.querySelector('#flame-toggle'),null);assert.equal(document.querySelector('.night-layer'),null);
-    assert.equal(document.querySelector('#hero-image img').getAttribute('src'),'/assets/hero.png');assert.ok(document.querySelector('#home .button-glass'));
+    assert.equal(document.querySelector('#hero-image img').getAttribute('src'),'/assets/hero-real-candle.webp');assert.ok(document.querySelector('#home .button-glass'));
     assert.equal(document.querySelector('.wordmark').textContent,'тихо');assert.equal(document.querySelector('.footer-wordmark').textContent,'тихо');assert.equal(document.querySelector('#care details'),null);
     const labels=['.scent-discovery-heading .eyebrow','#collection .section-heading .eyebrow','#workshop .section-heading .eyebrow','#care .ritual-story-heading .eyebrow'].map(selector=>document.querySelector(selector).textContent.slice(0,2));
     assert.deepEqual(labels,['02','01','03','04']);assert.equal(document.querySelectorAll('.ritual-story button').length,0);
@@ -970,7 +970,7 @@ test('alphabetical dictionaries reach filters, workshop, both colors, admin card
     assert.deepEqual([...document.querySelectorAll('.scent-name-label')].map(n=>n.textContent),['Белая ваниль','Вишня и миндаль','Роза и пион','Сандал и дым']);
     for(const [kind,labels] of [['color',['Белый','Красный','Розовый','Чёрный']],['form',['Змея','Ракушка','Спираль']],['scent',['Белая ваниль','Вишня и миндаль','Роза и пион','Сандал и дым']]]){
       await click(document.querySelector(`#filter-${kind}`));
-      assert.deepEqual([...document.querySelectorAll(`#filter-panel-${kind} button`)].slice(1).map(n=>n.querySelector(':scope > span:last-of-type').textContent),labels);
+      assert.deepEqual([...document.querySelectorAll(`#filter-panel-${kind} button`)].slice(1).map(n=>n.querySelector('.filter-option-name').textContent),labels);
       await click(document.querySelector(`#filter-${kind}`));
     }
     await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
@@ -1246,7 +1246,7 @@ test('form gallery uses neutral textured miniatures, keeps five current forms an
   try{
     await act(async()=>root.render(React.createElement(ShoppingProvider,null,React.createElement(Catalog))));
     await click(document.querySelector('#filter-form'));
-    assert.equal(document.querySelectorAll('.filter-form-grid button').length,5);
+    assert.equal(document.querySelectorAll('.filter-form-grid button[aria-label^="Форма:"]').length,5);
     assert.equal(document.querySelectorAll('.filter-form-grid img').length,5);
     assert.equal(document.querySelector('.filter-form-grid .wax-color-map'),null);
     assert.equal(document.querySelector('[aria-label="Форма: ЗМЕЯ"] img').getAttribute('src'),'/assets/forms/portraits/snake.webp');
@@ -1259,7 +1259,7 @@ test('form gallery uses neutral textured miniatures, keeps five current forms an
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Чёрный"]'));
     await click(document.querySelector('#filter-form'));
     assert.equal(document.querySelector('[aria-label="Форма: ЗМЕЯ"] img').getAttribute('src'),source);
-    assert.ok(document.querySelector('[aria-label="Форма: ЗМЕЯ"] .filter-form-check'));
+    assert.ok(document.querySelector('[aria-label="Форма: ЗМЕЯ"] .filter-option-check svg'));
     await click(document.querySelector('.filter-all-forms'));
     assert.equal(document.querySelector('#filter-form').getAttribute('aria-expanded'),'false');
   }finally{await act(async()=>root.unmount());}
@@ -1271,4 +1271,33 @@ test('form gallery uses neutral textured miniatures, keeps five current forms an
     await act(async()=>image.dispatchEvent(new Event('error')));
     assert.equal(document.querySelector('img'),null);assert.ok(document.querySelector('.wax-missing'));
   }finally{await act(async()=>fallback.unmount());}
+});
+
+test('mobile filters close after selection or downward dismissal without losing the chosen value',async()=>{
+  window.localStorage.clear();
+  const oldMedia=window.matchMedia;
+  window.matchMedia=query=>({matches:query.includes('max-width: 760px') || query.includes('prefers-reduced-motion'),addEventListener(){},removeEventListener(){}});
+  globalThis.fetch=async url=>url==='/api/products'?response(products):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  const root=createRoot(document.getElementById('root'));
+  const touch=(node,type,y)=>{
+    const event=new Event(type,{bubbles:true,cancelable:true});
+    Object.defineProperty(event,'touches',{value:type==='touchend'?[]:[{identifier:17,clientX:90,clientY:y}]});
+    node.dispatchEvent(event);
+  };
+  try{
+    await act(async()=>root.render(React.createElement(ShoppingProvider,null,React.createElement(Catalog))));
+    await click(document.querySelector('#filter-color'));
+    assert.ok(document.querySelector('[role="dialog"][aria-label="Выбор: цвет"]'));
+    assert.equal(document.body.style.overflow,'hidden');
+    await click(document.querySelector('[aria-label="Цвет: Белый"]'));
+    assert.equal(document.querySelector('.catalog-filter-dialog'),null);
+    assert.match(document.querySelector('#filter-color').textContent,/Белый/);
+    await click(document.querySelector('#filter-color'));
+    const header=document.querySelector('.catalog-filter-sheet-header');
+    await act(async()=>{touch(header,'touchstart',30);touch(header,'touchmove',175);touch(header,'touchend',175);await new Promise(resolve=>setTimeout(resolve,20));});
+    assert.equal(document.querySelector('.catalog-filter-dialog'),null);
+    assert.match(document.querySelector('#filter-color').textContent,/Белый/);
+    assert.equal(document.activeElement.id,'filter-color');
+    assert.notEqual(document.body.style.overflow,'hidden');
+  }finally{await act(async()=>root.unmount());window.matchMedia=oldMedia;}
 });

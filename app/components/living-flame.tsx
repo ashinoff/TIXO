@@ -48,20 +48,20 @@ export function LivingFlame({ nextSection = "collection" }: { nextSection?: stri
 
       // Stretch adjacent photographed strips around their moving centre. The
       // outer edges and the wick stay anchored, leaving the candle untouched.
-      for (let y = 112; y < 266; y += 2) {
-        const rise = Math.max(0, (266 - y) / 154);
-        const envelope = Math.sin(Math.PI * Math.min(1, (y - 112) / 154));
+      for (let y = 288; y < 402; y += 2) {
+        const rise = Math.max(0, (402 - y) / 114);
+        const envelope = Math.sin(Math.PI * Math.min(1, (y - 288) / 114));
         const sway = (Math.sin(time * 2.8 + rise * 2.5) * 4.2 + Math.sin(time * 5.3) * 1.6) * rise * envelope;
-        const centre = 1103;
-        const left = 1027;
-        const right = 1183;
+        const centre = 1064;
+        const left = 1034;
+        const right = 1094;
         context.drawImage(photo, left, y, centre - left, 2, left, y, centre - left + sway, 2);
         context.drawImage(photo, centre, y, right - centre, 2, centre + sway, y, right - centre - sway, 2);
       }
 
       context.globalCompositeOperation = "screen";
       context.globalAlpha = 0.02 + (Math.sin(time * 3.4) + 1) * 0.018;
-      context.drawImage(photo, 1056, 127, 97, 145, 1056, 127, 97, 145);
+      context.drawImage(photo, 1044, 298, 40, 102, 1044, 298, 40, 102);
       context.globalAlpha = 1;
       context.globalCompositeOperation = "source-over";
     };
