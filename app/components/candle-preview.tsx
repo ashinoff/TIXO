@@ -19,7 +19,7 @@ export function CandlePreview({ shape, silhouette, color = "#e8ddca", accentColo
     }).concat([0, 0, 0, 1, 0]).join(" ");
     return <div className="wax-stage wax-uploaded wax-two-tone" role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
       <div className="wax-ground" />
-      <svg className="wax-color-map" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg className="wax-color-map" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet">
         <defs><filter id={filterId} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB"><feColorMatrix type="matrix" values={matrix} /></filter></defs>
         <image href={silhouette} width="100" height="100" preserveAspectRatio="xMidYMax meet" filter={`url(#${filterId})`} />
       </svg>

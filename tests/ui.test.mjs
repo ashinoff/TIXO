@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -1180,4 +1180,47 @@ test('messenger handoffs retry after a network failure and admin distinguishes l
   const root=createRoot(document.getElementById('root'));
   try{await act(async()=>root.render(React.createElement(Admin)));await click(button('Заказы'));const cards=document.querySelectorAll('.order-card');assert.match(cards[0].textContent,/Только сайт/);assert.match(cards[1].textContent,/Переход в WhatsApp/);assert.match(cards[1].textContent,/Переход в Telegram/);assert.match(cards[1].textContent,/Отправку сообщения нужно проверить/);}
   finally{await act(async()=>root.unmount());}
+});
+
+test('form gallery uses neutral textured miniatures, keeps five current forms and preserves uploaded masks',async()=>{
+  window.localStorage.clear();
+  const currentForms=[
+    {id:1,name:'ЗМЕЯ',shape:null,silhouette:'/mask-snake.png',twoTone:true,active:true},
+    {id:2,name:'ТЫКВА',shape:null,silhouette:'/mask-pumpkin.png',twoTone:true,active:true},
+    {id:3,name:'КАШПО',shape:null,silhouette:'/mask-pot.png',twoTone:true,active:true},
+    {id:4,name:'ЛИМОН',shape:null,silhouette:'/mask-lemon.png',twoTone:true,active:true},
+    {id:6,name:'КАШПО XS',shape:'ribbed',active:true},
+  ];
+  const legacy=['ЧАША','РЕБРИСТОЕ КАШПО','РЕБРИСТАЯ ЧАША','РЕБРИСТАЯ ЧАША XS'].map((name,i)=>({id:20+i,name,shape:'arch',active:true}));
+  const candle={...products[0],formId:1,form:currentForms[0],colorId:1,color:colors[0],scentId:1,scent:scents[0]};
+  globalThis.fetch=async url=>url==='/api/products'?response([candle]):url==='/api/forms'?response([...currentForms,...legacy]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):response({});
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(ShoppingProvider,null,React.createElement(Catalog))));
+    await click(document.querySelector('#filter-form'));
+    assert.equal(document.querySelectorAll('.filter-form-grid button').length,5);
+    assert.equal(document.querySelectorAll('.filter-form-grid img').length,5);
+    assert.equal(document.querySelector('.filter-form-grid .wax-color-map'),null);
+    assert.equal(document.querySelector('[aria-label="Форма: ЗМЕЯ"] img').getAttribute('src'),'/assets/forms/portraits/snake.webp');
+    assert.equal(document.querySelector('[aria-label="Форма: КАШПО XS"] .filter-form-preview').dataset.small,'true');
+    const source=document.querySelector('[aria-label="Форма: ЗМЕЯ"] img').getAttribute('src');
+    await click(document.querySelector('[aria-label="Форма: ЗМЕЯ"]'));
+    assert.equal(document.activeElement.id,'filter-form');assert.equal(document.querySelectorAll('.product-card').length,1);
+    assert.equal(document.querySelector('.product-card .wax-color-map image').getAttribute('href'),'/mask-snake.png');
+    assert.equal(document.querySelector('.product-card .wax-color-map').getAttribute('preserveAspectRatio'),'xMidYMax meet');
+    await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Чёрный"]'));
+    await click(document.querySelector('#filter-form'));
+    assert.equal(document.querySelector('[aria-label="Форма: ЗМЕЯ"] img').getAttribute('src'),source);
+    assert.ok(document.querySelector('[aria-label="Форма: ЗМЕЯ"] .filter-form-check'));
+    await click(document.querySelector('.filter-all-forms'));
+    assert.equal(document.querySelector('#filter-form').getAttribute('aria-expanded'),'false');
+  }finally{await act(async()=>root.unmount());}
+  const {FormMiniature}=require('./app/components/form-miniature.js');
+  const fallback=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>fallback.render(React.createElement(FormMiniature,{form:{id:100,name:'Новая авторская форма',shape:null,silhouette:'/new-texture.png'}})));
+    const image=document.querySelector('.form-miniature');assert.equal(image.getAttribute('src'),'/new-texture.png');
+    await act(async()=>image.dispatchEvent(new Event('error')));
+    assert.equal(document.querySelector('img'),null);assert.ok(document.querySelector('.wax-missing'));
+  }finally{await act(async()=>fallback.unmount());}
 });
