@@ -70,6 +70,7 @@ test('color and aroma filters intersect independently and checkout keeps every c
     await click(document.querySelector('#filter-scent'));await click(button('Белая ваниль'));
     await click(document.querySelector('.quick-add'));
     await click(document.querySelector('#filter-scent'));await click(button('Вишня и миндаль'));
+    assert.equal(document.querySelector('.quick-add').disabled,true,'All colour/aroma selections use the same stock pool');
     await click(document.querySelector('.quick-add')); // The same form has only three units, across all combinations.
     await click(document.querySelector('.cart-trigger'));
     assert.equal(document.querySelectorAll('.cart-item').length,3);
@@ -1131,20 +1132,67 @@ test('catalog plus adds the configured candle immediately and the floating baske
   let root=createRoot(document.getElementById('root'));
   try{
     await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('.floating-cart'),null);
+    assert.equal(document.querySelector('.catalog-quantity output').textContent,'0');
+    assert.equal(document.querySelector('.catalog-minus').disabled,true);
+    assert.equal(document.querySelector('.catalog-stock').textContent,'В наличии: 2 шт');
     await click(document.querySelector('.quick-add'));assert.equal(document.querySelector('.modal-backdrop'),null);
     assert.equal(document.querySelector('.floating-cart-count').textContent,'1');
+    assert.equal(document.querySelector('.catalog-quantity output').textContent,'1');
     await click(document.querySelector('.quick-add'));await click(document.querySelector('.quick-add'));
     assert.equal(document.querySelector('.floating-cart-count').textContent,'2','The stock limit still applies');
+    assert.equal(document.querySelector('.quick-add').disabled,true);
+    assert.equal(document.querySelector('.catalog-quantity output').textContent,'2');
     await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
     await act(async()=>root.render(React.createElement(Home)));assert.equal(document.querySelector('.floating-cart-count').textContent,'2');
+    assert.equal(document.querySelector('.catalog-quantity output').textContent,'2');
     await click(document.querySelector('.floating-cart'));
     assert.equal(document.querySelector('#checkout-form h3').textContent,'Давайте познакомимся');
     assert.match(document.querySelector('.cart-recipe').textContent,/Сандал и дым · Красный/);
     assert.equal(document.querySelector('.floating-cart').getAttribute('aria-hidden'),'true');
+    await click(document.querySelector('.quantity-row button'));
+    assert.equal(document.querySelector('.catalog-quantity output').textContent,'1','Basket changes update the catalog');
     await click(document.querySelector('.close-cart'));assert.equal(document.querySelector('.floating-cart').getAttribute('aria-hidden'),'false');
+    assert.equal(document.querySelector('.quick-add').disabled,false);
+    await click(document.querySelector('.catalog-minus'));
+    assert.equal(document.querySelector('.floating-cart'),null);assert.equal(document.querySelector('.catalog-quantity output').textContent,'0');
+    assert.equal(document.querySelector('.catalog-minus').disabled,true);
     await click(document.querySelector('.product-image'));assert.ok(document.querySelector('.product-dialog'));
+    await click(document.querySelector('.product-dialog .button-dark'));
+    assert.equal(document.querySelector('.catalog-quantity output').textContent,'1','Modal additions update the catalog');
+    await click(document.querySelector('.product-image'));
     await click(document.querySelector('.detail-close'));await click(document.querySelector('.floating-cart'));await click(document.querySelector('.remove-item'));
-    assert.equal(document.querySelector('.floating-cart'),null);
+    assert.equal(document.querySelector('.floating-cart'),null);assert.equal(document.querySelector('.catalog-quantity output').textContent,'0');
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
+test('catalog counters keep variants independent, disable sold-out candles and allow reducing an outdated cart',async()=>{
+  window.localStorage.clear();
+  const candle={...products[0],scentId:1,scent:scents[0],hasVariants:true,variants:[
+    {id:11,scentId:1,colorId:1,stock:2,active:true,image:null,scent:scents[0],color:colors[0]},
+    {id:12,scentId:1,colorId:2,stock:1,active:true,image:null,scent:scents[0],color:colors[1]},
+    {id:13,scentId:1,colorId:3,stock:0,active:true,image:null,scent:scents[0],color:colors[2]}
+  ]};
+  globalThis.fetch=async url=>url==='/api/products'?response([candle]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  let root=createRoot(document.getElementById('root'));
+  const card=id=>document.querySelector(`.product-card[data-color-id="${id}"]`);
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(card(3).querySelector('.catalog-stock').textContent,'Нет в наличии');
+    assert.equal(card(3).querySelector('.quick-add').disabled,true);
+    await click(card(1).querySelector('.quick-add'));await click(card(1).querySelector('.quick-add'));
+    assert.equal(card(1).querySelector('.quick-add').disabled,true);
+    assert.equal(card(2).querySelector('.quick-add').disabled,false);
+    await click(card(2).querySelector('.quick-add'));assert.equal(card(2).querySelector('.quick-add').disabled,true);
+    assert.equal(document.querySelector('.floating-cart-count').textContent,'3');
+    await click(card(1).querySelector('.catalog-minus'));
+    assert.equal(card(1).querySelector('output').textContent,'1');assert.equal(card(2).querySelector('output').textContent,'1');
+    // Inventory can fall while a buyer is away; keep their selection visible and removable.
+    await act(async()=>root.unmount());candle.variants[0].stock=0;root=createRoot(document.getElementById('root'));
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(card(1).querySelector('output').textContent,'1');assert.equal(card(1).querySelector('.quick-add').disabled,true);
+    assert.equal(card(1).querySelector('.catalog-stock').textContent,'Нет в наличии');
+    assert.equal(card(1).querySelector('.catalog-minus').disabled,false);
+    await click(card(1).querySelector('.catalog-minus'));assert.equal(card(1).querySelector('output').textContent,'0');
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
 

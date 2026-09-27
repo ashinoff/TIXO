@@ -334,6 +334,26 @@ export function ScentDiscovery({ number = "02" }: { number?: string }) {
   </section>;
 }
 
+function CatalogPurchase({ product, scent, color, ready, onChoose }: { product: Product; scent: Scent; color: CandleColor; ready: boolean; onChoose: () => void }) {
+  const shop = useShopping();
+  const variants = availableVariants(product).filter(variant => variant.colorId === color.id);
+  const variant = variantFor(product, scent, color);
+  const key = cartKey(product.id, variant?.id ?? null, scent.id, color.id, product.accentColorId);
+  const quantity = shop.cart.find(line => line.key === key)?.quantity ?? 0;
+  // Legacy unconfigured candles share a stock pool across colours and scents.
+  const inCart = shop.cart.reduce((sum, line) => sum + (!isCustom(line) && line.productId === product.id && line.variantId === (variant?.id ?? null) ? line.quantity : 0), 0);
+  const stock = ready ? stockFor(product, scent, color) : product.hasVariants ? variants.reduce((sum, item) => sum + item.stock, 0) : product.stock;
+  const label = `${product.name}, ${color.name}, ${scent.name}`;
+  return <div className="catalog-purchase">
+    <span className="catalog-stock" data-unavailable={stock <= 0}>{stock > 0 ? `В наличии: ${stock} шт` : "Нет в наличии"}</span>
+    {ready ? <div className="catalog-quantity" role="group" aria-label={`Количество в корзине: ${label}`}>
+      <button className="catalog-minus" type="button" disabled={shop.locked || quantity === 0} aria-label={`Уменьшить в корзине: ${label}`} onClick={() => shop.changeQuantity(key, -1)}>−</button>
+      <output aria-live="polite" aria-label={`В корзине: ${label}`}>{quantity}</output>
+      <button className="quick-add" type="button" disabled={shop.locked || inCart >= stock || quantity >= 99} aria-label={`Добавить в корзину: ${label}`} onClick={() => shop.addProduct(product, scent, color)}>+</button>
+    </div> : <button className="quick-add choose-variant" type="button" disabled={shop.locked || stock <= 0} aria-label={`Выбрать аромат: ${product.name}, ${color.name}`} onClick={onChoose}>Выбрать</button>}
+  </div>;
+}
+
 export function Catalog({ number = "01" }: { number?: string }) {
   const shop = useShopping();
   const [colorId, setColorId] = useState<number | null>(null);
@@ -374,12 +394,11 @@ export function Catalog({ number = "01" }: { number?: string }) {
     {shop.catalogError && <div className="catalog-message" role="alert">{shop.catalogError}<button className="text-link" onClick={() => void shop.loadCatalog()}>Попробовать ещё раз <ArrowIcon /></button></div>}
     {!shop.loading && !shop.catalogError && !cards.length && <div className="catalog-message" role="status"><p>В этом сочетании свечей пока нет.</p><button className="text-link" onClick={reset}>Показать всю коллекцию <ArrowIcon /></button></div>}
     <div className="product-grid" id="product-grid">{cards.map(({ product, color, scent, photo }, index) => {
-      const stock = stockFor(product, scent, color);
       const readyToAdd = shop.activeScent !== null || !!product.scentId;
       return <article className="product-card" key={`${product.id}:${color.id}`} data-product-id={product.id} data-color-id={color.id} data-scent-id={shop.activeScent ?? undefined}>
         <button type="button" className={`product-image${photo.src?.endsWith("hero.png") ? " black-image" : ""}`} aria-label={`Подробнее о свече ${product.name}, ${color.name}`} onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)} {...inspection}><CandleVisual src={photo.src} {...visualData(product, color)} label={`${product.name} · ${color.name}`} /><span className="image-no">{String(index + 1).padStart(2, "0")} / ТИХО</span><span className="image-detail">Выбрать свечу <span aria-hidden="true"><ArrowIcon /></span></span>{photo.preview && <span className="photo-preview-label">Силуэт формы</span>}</button>
         <div className="product-category">{color.name}{product.accentColor ? ` / ${product.accentColor.name}` : ""}{shop.activeScent !== null || product.scentId ? ` · ${scent.name}` : " · АРОМАТ НА ВАШ ВЫБОР"}{product.volumeMl != null && <> · <span className="product-volume">{product.volumeMl} мл</span></>}</div><div className="product-title"><button type="button" onClick={() => shop.openProduct(product.id, product.scentId ?? shop.activeScent ?? undefined, color.id, catalog)}>{product.name}</button><span>{money(product.price)}</span></div><p>{shop.activeScent !== null ? scent.notes.join(" · ") : product.notes || candleShapes[productShape(product)]}</p>
-        <button className={`quick-add${readyToAdd ? "" : " choose-variant"}`} type="button" disabled={shop.locked || (readyToAdd && !stock)} aria-label={readyToAdd ? `Добавить в корзину: ${product.name}, ${color.name}, ${scent.name}` : `Выбрать аромат: ${product.name}, ${color.name}`} onClick={() => readyToAdd ? shop.addProduct(product, scent, color) : shop.openProduct(product.id, undefined, color.id, catalog)}>{readyToAdd ? "+" : "Выбрать"}</button>{(shop.activeScent !== null || !!product.scentId) && !stock && <span className="product-unavailable">Нет в наличии</span>}
+        <CatalogPurchase product={product} scent={scent} color={color} ready={readyToAdd} onChoose={() => shop.openProduct(product.id, undefined, color.id, catalog)} />
       </article>;
     })}</div>
   </section>;
