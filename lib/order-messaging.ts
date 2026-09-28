@@ -3,21 +3,24 @@ import { money, type OrderItem } from "./catalog";
 export const messengerKeys = {
   whatsapp: "atelier.contact.whatsapp",
   telegram: "atelier.contact.telegram",
-  instagram: "atelier.contact.instagram",
 } as const;
 export type Messenger = keyof typeof messengerKeys;
 export type MessengerContacts = Record<Messenger, string>;
-export const emptyMessengerContacts: MessengerContacts = { whatsapp: "", telegram: "", instagram: "" };
-export const messengerNames: Record<Messenger, string> = { whatsapp: "WhatsApp", telegram: "Telegram", instagram: "Instagram" };
+export const emptyMessengerContacts: MessengerContacts = { whatsapp: "", telegram: "" };
+export const messengerNames: Record<Messenger, string> = { whatsapp: "WhatsApp", telegram: "Telegram" };
+// Historical orders retain their original handoff labels; new orders offer only two channels.
+export const orderMessengerNames = { ...messengerNames, instagram: "Instagram" };
+export type OrderMessenger = keyof typeof orderMessengerNames;
 
 /** Only merchant destinations, never arbitrary URLs supplied to the storefront. */
 export function normalizeMessengerContact(kind: Messenger, input: unknown): string {
+  if (!Object.hasOwn(messengerKeys, kind)) throw new Error("Выберите WhatsApp или Telegram.");
   if (typeof input !== "string" || input.length > 200) throw new Error(`Проверьте контакт ${messengerNames[kind]}.`);
   let value = input.trim();
   if (!value) return "";
-  if (/^(https:\/\/|wa\.me\/|t\.me\/|(?:www\.)?instagram\.com\/)/i.test(value)) {
+  if (/^(https:\/\/|wa\.me\/|t\.me\/)/i.test(value)) {
     const url = new URL(value.startsWith("https://") ? value : `https://${value}`);
-    const hosts = { whatsapp: ["wa.me"], telegram: ["t.me"], instagram: ["instagram.com", "www.instagram.com"] };
+    const hosts = { whatsapp: ["wa.me"], telegram: ["t.me"] };
     if (url.protocol !== "https:" || !hosts[kind].includes(url.hostname) || url.username || url.password || url.port || url.search || url.hash || !/^\/[^/]+\/?$/.test(url.pathname)) throw new Error(`Укажите прямой контакт ${messengerNames[kind]}, без дополнительных параметров.`);
     value = url.pathname.replace(/^\/|\/$/g, "");
   }
@@ -27,8 +30,8 @@ export function normalizeMessengerContact(kind: Messenger, input: unknown): stri
     if (!/^[1-9]\d{6,14}$/.test(value)) throw new Error("WhatsApp: укажите полный номер с кодом страны.");
   } else {
     value = value.replace(/^@/, "");
-    const valid = kind === "telegram" ? /^[a-z][a-z0-9_]{4,31}$/i.test(value) : /^(?!\.)(?!.*\.\.)[a-z0-9_.]{1,30}(?<!\.)$/i.test(value);
-    const reserved = kind === "telegram" ? /^(share|joinchat|addstickers|addemoji|login|proxy|socks|iv|boost|giftcode)$/i : /^(accounts|direct|explore|reels|stories|p)$/i;
+    const valid = /^[a-z][a-z0-9_]{4,31}$/i.test(value);
+    const reserved = /^(share|joinchat|addstickers|addemoji|login|proxy|socks|iv|boost|giftcode)$/i;
     if (!valid || reserved.test(value)) throw new Error(`${messengerNames[kind]}: укажите имя аккаунта или прямую ссылку на него.`);
   }
   return value;
@@ -43,7 +46,7 @@ export function readMessengerContacts(content: Record<string, { value?: unknown 
 }
 
 type OrderMessageSource = {
-  orderNumber: string; customerName: string; phone: string; email: string;
+  orderNumber: string; customerName: string; phone: string;
   address: string; delivery: string; comment: string; items: OrderItem[]; total: number;
 };
 
@@ -59,7 +62,7 @@ export function orderMessage(order: OrderMessageSource): string {
     lines.join("\n\n"),
     quotePending ? `Свечи из коллекции: ${money(order.total)}.\nСтоимость индивидуальных свечей — по согласованию.` : `Итого за свечи: ${money(order.total)}.`,
     "Доставка оплачивается отдельно. Оплата и детали заказа — по согласованию.",
-    [`Имя: ${order.customerName}`, `Телефон: ${order.phone}`, order.email ? `Email: ${order.email}` : "", `Доставка: ${order.delivery === "pickup" ? "В пункт выдачи" : order.delivery === "courier" ? "Курьером" : order.delivery}`, `Адрес: ${order.address}`].filter(Boolean).join("\n"),
+    [`Имя: ${order.customerName}`, `Телефон: ${order.phone}`, `Доставка: ${order.delivery === "pickup" ? "В пункт выдачи" : order.delivery === "courier" ? "Курьером" : order.delivery}`, `Адрес: ${order.address}`].join("\n"),
     order.comment ? `Комментарий: ${order.comment}` : "",
   ].filter(Boolean).join("\n\n");
 }
@@ -67,9 +70,9 @@ export function orderMessage(order: OrderMessageSource): string {
 export function messengerLink(kind: Messenger, contact: string, message: string) {
   const normalized = normalizeMessengerContact(kind, contact);
   if (!normalized) return null;
-  const base = kind === "whatsapp" ? `https://wa.me/${normalized}` : kind === "telegram" ? `https://t.me/${normalized}` : `https://ig.me/m/${normalized}`;
+  const base = kind === "whatsapp" ? `https://wa.me/${normalized}` : `https://t.me/${normalized}`;
   const draft = `${base}?text=${encodeURIComponent(message)}`;
   // Long orders remain intact in the copyable text rather than being silently truncated.
-  const prefilled = kind !== "instagram" && [...message].length <= 4096 && draft.length <= 8000;
+  const prefilled = [...message].length <= 4096 && draft.length <= 8000;
   return { href: prefilled ? draft : base, prefilled };
 }

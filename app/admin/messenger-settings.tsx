@@ -25,7 +25,7 @@ export function MessengerSettings({ content, onSaved }: { content: Record<string
     <fieldset disabled={saving}>
       {(Object.keys(messengerKeys) as Messenger[]).map(kind => <label key={kind}>{messengerNames[kind]}
         <input value={draft[kind]} type={kind === "whatsapp" ? "tel" : "text"} autoComplete="off" maxLength={200} placeholder={kind === "whatsapp" ? "+7 999 123-45-67" : "@имя_аккаунта"} onChange={event => { setDraft(current => ({ ...current, [kind]: event.target.value })); setSaved(false); }} />
-        <small>{kind === "whatsapp" ? "Номер магазина с кодом страны. Можно вставить ссылку wa.me." : kind === "telegram" ? "Личный аккаунт или аккаунт Telegram Business, в который можно написать. Не канал и не бот. Допустима ссылка t.me." : "Имя аккаунта или ссылка на профиль. Покупатель скопирует заказ и вставит его в Direct."}</small>
+        <small>{kind === "whatsapp" ? "Номер магазина с кодом страны. Можно вставить ссылку wa.me." : "Личный аккаунт или аккаунт Telegram Business, в который можно написать. Не канал и не бот. Допустима ссылка t.me."}</small>
       </label>)}
       <button type="submit">{saving ? "Сохраняем…" : "Сохранить контакты"}</button>
     </fieldset>

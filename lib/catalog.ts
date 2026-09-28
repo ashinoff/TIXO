@@ -58,6 +58,9 @@ export type Product = {
   categorySlug: string | null;
   notes: string;
   volumeMl?: number | null;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  depthCm?: number | null;
   price: number;
   stock: number;
   published: boolean;
@@ -99,6 +102,12 @@ export const money = (value: number) => `${value.toLocaleString("ru-RU")} ₽`;
 
 export const MAX_PRODUCT_IMAGES = 10;
 export const MAX_PRODUCT_VOLUME_ML = 100000;
+export const MAX_PRODUCT_DIMENSION_CM = 1000;
+export const productDimensionFields = [
+  { key: "widthCm", label: "Ширина" },
+  { key: "heightCm", label: "Высота" },
+  { key: "depthCm", label: "Глубина" },
+] as const;
 export function productImages(product: { images?: string[] | null; image?: string | null }): string[] {
   return Array.isArray(product.images) ? product.images : product.image ? [product.image] : [];
 }

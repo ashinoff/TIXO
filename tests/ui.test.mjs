@@ -77,7 +77,7 @@ test('color and aroma filters intersect independently and checkout keeps every c
     assert.match(document.querySelector('.cart-items').textContent,/Красный/);
     assert.match(document.querySelector('.cart-items').textContent,/Чёрный/);
     const form=document.querySelector('#checkout-form');
-    for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))form.elements.namedItem(name).value=value;
+    for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Адрес'}))form.elements.namedItem(name).value=value;
     await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.deepEqual(sent.items.map(i=>i.colorId),[1,2,2]);
     assert.deepEqual(sent.items.map(i=>i.scentId),[2,2,3]);
@@ -130,7 +130,7 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
     assert.match(cart,/Красный/);assert.match(cart,/Чёрный/);
     assert.equal(document.querySelectorAll('.cart-item').length,2);
     const form=document.querySelector('#checkout-form');
-    for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Тестовый адрес'}))form.elements.namedItem(name).value=value;
+    for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Тестовый адрес'}))form.elements.namedItem(name).value=value;
     await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.equal(sent.length,1);
     assert.match(document.querySelector('.pending-order').textContent,/Повторить отправку/);
@@ -385,7 +385,7 @@ test('workshop uses active catalog forms and carries their silhouettes through c
     assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
     assert.match(document.querySelector('.cart-items').textContent,/Наша ракушка/);assert.match(document.querySelector('.cart-items').textContent,/Наш куб/);
     const masks=[...document.querySelectorAll('.cart-custom-preview .wax-uploaded')];assert.equal(masks.length,2);assert.match(masks[0].getAttribute('style'),/our-shell\.png/);assert.match(masks[1].getAttribute('style'),/our-cube\.png/);
-    const checkout=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))checkout.elements.namedItem(name).value=value;
+    const checkout=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Адрес'}))checkout.elements.namedItem(name).value=value;
     await submit(checkout);
     assert.deepEqual(sent.items.map(line=>line.customRecipe.formId),[21,22]);assert.ok(sent.items.every(line=>!Object.hasOwn(line.customRecipe,'shape')));assert.match(document.querySelector('.order-success').textContent,/T-FORMS/);
   }finally{await act(async()=>root.unmount());}
@@ -418,7 +418,7 @@ test('workshop handles failed and empty catalogs and blocks a saved cart form th
 
 test('admin order uses the saved builder form name and silhouette even when the live form no longer exists',async()=>{
   const recipe={formId:61,color:'red',top:'lemon',heart:'fig',base:'oud'};
-  globalThis.fetch=async url=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/orders'?response([{id:77,orderNumber:'T-SNAPSHOT',customerName:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес',delivery:'Самовывоз',comment:'',items:[{productId:0,name:'Авторская свеча · Старое название формы',formName:'Старое название формы',silhouette:'/api/uploads/historical-form.png',color:'#6d2636',customRecipe:recipe,price:0,quantity:1,quotePending:true}],total:0,status:'new',createdAt:'2026-09-23T00:00:00.000Z',stockReserved:false}]):url==='/api/content'?response({}):response([]);
+  globalThis.fetch=async url=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/orders'?response([{id:77,orderNumber:'T-SNAPSHOT',customerName:'Тест',phone:'+79990000000',address:'Адрес',delivery:'Самовывоз',comment:'',items:[{productId:0,name:'Авторская свеча · Старое название формы',formName:'Старое название формы',silhouette:'/api/uploads/historical-form.png',color:'#6d2636',customRecipe:recipe,price:0,quantity:1,quotePending:true}],total:0,status:'new',createdAt:'2026-09-23T00:00:00.000Z',stockReserved:false}]):url==='/api/content'?response({}):response([]);
   const root=createRoot(document.getElementById('root'));
   try{
     await act(async()=>root.render(React.createElement(Admin)));await click(button('Заказы'));
@@ -444,7 +444,7 @@ test('builder chooses catalog aromas and displays their authored chapters withou
     await click(document.querySelector('#studio-step-3'));assert.match(document.querySelector('#recipe-summary').textContent,/Сандал и дым/);await click(document.querySelector('#add-custom'));
     await click(document.querySelector('.cart-trigger'));assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
     assert.match(document.querySelector('.cart-items').textContent,/Вишня и миндаль/);assert.match(document.querySelector('.cart-items').textContent,/Сандал и дым/);
-    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))form.elements.namedItem(name).value=value;
+    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Адрес'}))form.elements.namedItem(name).value=value;
     await submit(form);assert.deepEqual(sent.items.map(item=>item.customRecipe),[{formId:2,color:'ivory',colorId:3,scentId:1},{formId:2,color:'ivory',colorId:3,scentId:2}]);
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
@@ -983,7 +983,7 @@ test('two-color workshop uses the administrator palette and keeps both colors th
     assert.equal(document.querySelectorAll('.cart-item.custom').length,2);
     assert.equal(document.querySelectorAll('.cart-custom-preview .wax-two-tone').length,2);
     assert.match(document.querySelector('.cart-items').textContent,/Изумруд мастерской.*Серебро мастерской/s);assert.match(document.querySelector('.cart-items').textContent,/Золото мастерской/);
-    const checkout=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',email:'test@example.com',address:'Адрес'}))checkout.elements.namedItem(name).value=value;
+    const checkout=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Адрес'}))checkout.elements.namedItem(name).value=value;
     await submit(checkout);assert.deepEqual(sent.items.map(item=>[item.customRecipe.colorId,item.customRecipe.accentColorId]),[[21,22],[21,23]]);
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
@@ -1062,6 +1062,36 @@ test('optional volume is editable and appears with color and aroma in catalog an
 });
 
 
+test('optional decimal dimensions save in the editor and appear only in the product modal',async()=>{
+  window.localStorage.clear();let saved;
+  const candle={...products[0],formId:1,form:forms[0],colorId:1,color:colors[0],scentId:1,scent:scents[0],widthCm:7.5,heightCm:4.25,depthCm:7.5};
+  const {ProductEditor}=require('./app/admin/editors.js');
+  let root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(ProductEditor,{product:candle,forms,colors,scents,onClose(){},onSave:async data=>{saved=data;}})));
+    for(const key of ['widthCm','heightCm','depthCm']){
+      const input=document.querySelector(`input[name="${key}"]`);
+      assert.equal(input.value,String(candle[key]));assert.equal(input.required,false);assert.equal(input.step,'0.01');
+    }
+    await setValue(document.querySelector('input[name="heightCm"]'),'5.25');
+    await setValue(document.querySelector('input[name="depthCm"]'),'');
+    await submit(document.querySelector('.product-editor form'));
+    assert.equal(saved.get('widthCm'),'7.5');assert.equal(saved.get('heightCm'),'5.25');assert.equal(saved.get('depthCm'),'');
+    await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+    const fixtures=[candle,{...candle,id:2,widthCm:null,heightCm:3.5,depthCm:null},{...candle,id:3,widthCm:null,heightCm:null,depthCm:null}];
+    globalThis.fetch=async url=>url==='/api/products'?response(fixtures):url==='/api/forms'?response(forms):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):response({});
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(document.querySelectorAll('.product-card').length,3);
+    assert.doesNotMatch(document.querySelector('.product-grid')?.textContent??document.querySelector('#collection').textContent,/Ширина|Высота|Глубина|7,5 см|4,25 см/);
+    for(let i=0;i<3;i++){
+      await click(document.querySelectorAll('.product-card .product-image')[i]);
+      const dimensions=[...document.querySelectorAll('.detail-dimension')].map(node=>node.textContent);
+      assert.deepEqual(dimensions,[['Ширина7,5 см','Высота4,25 см','Глубина7,5 см'],['Высота3,5 см'],[]][i]);
+      await click(document.querySelector('[aria-label="Закрыть карточку свечи"]'));
+    }
+  }finally{await act(async()=>root.unmount());window.localStorage.clear();}
+});
+
 test('photo halves navigate only the photo and a swipe suppresses its synthetic click',async()=>{
   window.localStorage.clear();
   const candle={...products[0],formId:1,form:forms[0],colorId:1,color:colors[0],scentId:1,scent:scents[0],image:'/tap-a.png',images:['/tap-a.png','/tap-b.png','/tap-c.png']};
@@ -1117,12 +1147,14 @@ test('admin moves catalog positions, preserves drafts after conflict and reloads
 test('messenger drafts contain stored prices, full contact details and safely targeted links',()=>{
   const {orderMessage,messengerLink,normalizeMessengerContact,readMessengerContacts}=require('./lib/order-messaging.js');
   const message=orderMessage({orderNumber:'T-MESSAGE',customerName:'Анна',phone:'+79990000000',email:'anna@example.com',address:'Сочи, Тихая 7 & 8',delivery:'courier',comment:'После 18:00\nПозвонить заранее',total:5980,items:[{productId:1,name:'ЗМЕЯ',colorName:'Изумруд',accentColorName:'Серебро',scentName:'MOJITO',quantity:2,price:2990},{productId:0,name:'Авторская свеча',scentName:'Хлопок',quantity:1,price:0,quotePending:true}]});
-  for(const value of ['T-MESSAGE','Изумруд','Серебро','MOJITO','2 шт.','5 980','Анна','+79990000000','anna@example.com','Сочи, Тихая 7 & 8','Курьером','После 18:00\nПозвонить заранее','по согласованию'])assert.ok(message.includes(value),value);
+  for(const value of ['T-MESSAGE','Изумруд','Серебро','MOJITO','2 шт.','5 980','Анна','+79990000000','Сочи, Тихая 7 & 8','Курьером','После 18:00\nПозвонить заранее','по согласованию'])assert.ok(message.includes(value),value);
   const wa=messengerLink('whatsapp','+7 (999) 123-45-67',message);
   assert.equal(new URL(wa.href).pathname,'/79991234567');assert.equal(new URL(wa.href).searchParams.get('text'),message);assert.equal(wa.prefilled,true);
   const tg=messengerLink('telegram','https://t.me/tixo_example',message);
   assert.equal(new URL(tg.href).pathname,'/tixo_example');assert.equal(new URL(tg.href).searchParams.get('text'),message);
-  assert.deepEqual(messengerLink('instagram','@tixo.example',message),{href:'https://ig.me/m/tixo.example',prefilled:false});
+  assert.throws(()=>messengerLink('instagram','@tixo.example',message));
+  assert.doesNotMatch(message,/Email|anna@example.com/);
+  assert.deepEqual(readMessengerContacts({'atelier.contact.instagram':{value:'tixo.example'}}),{whatsapp:'',telegram:''});
   assert.equal(normalizeMessengerContact('whatsapp','https://wa.me/79991234567'),'79991234567');
   assert.equal(normalizeMessengerContact('telegram',''),'');
   for(const input of ['https://evil.test/username','https://t.me/example?text=bad','javascript:alert(1)','https://t.me/username/123','https://username:secret@t.me/example'])assert.throws(()=>normalizeMessengerContact('telegram',input));
@@ -1131,19 +1163,21 @@ test('messenger drafts contain stored prices, full contact details and safely ta
 });
 
 test('checkout offers merchant messengers only after confirmation; copying and reopening never create another order',async()=>{
-  window.localStorage.clear();let posts=0,clipboard='';
+  window.localStorage.clear();let posts=0,clipboard='',submitted;
   const message='Заказ T-CHAT\nЗМЕЯ · Изумруд · MOJITO\nТелефон: +79990000000\nАдрес: Сочи';
   const previousClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');
   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{clipboard=value;}}});
-  globalThis.fetch=async(url,init={})=>url==='/api/products'?response(products):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):url==='/api/order-contacts'?response({whatsapp:'79991234567',telegram:'tixo_example',instagram:'tixo.example'}):url==='/api/orders'?(posts++,response({orderNumber:'T-CHAT',total:1500,quotePending:false,message},201)):response({});
+  globalThis.fetch=async(url,init={})=>url==='/api/products'?response(products):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):url==='/api/order-contacts'?response({whatsapp:'79991234567',telegram:'tixo_example',instagram:'tixo.example'}):url==='/api/orders'?(submitted=JSON.parse(init.body),posts++,response({orderNumber:'T-CHAT',total:1500,quotePending:false,message},201)):response({});
   let root=createRoot(document.getElementById('root'));
   try{
     await act(async()=>root.render(React.createElement(Home)));
     await click(document.querySelector('#filter-scent'));await click(button('Вишня и миндаль'));await click(document.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));
     assert.equal(document.querySelector('.order-messengers'),null);
-    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Анна',phone:'+79990000000',email:'a@example.com',address:'Сочи'}))form.elements.namedItem(name).value=value;
+    assert.equal(document.querySelector('#checkout-form input[name="email"]'),null);
+    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Анна',phone:'+79990000000',address:'Сочи'}))form.elements.namedItem(name).value=value;
     await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
-    assert.equal(posts,1);assert.equal(document.querySelectorAll('.messenger-link').length,3);
+    assert.equal(posts,1);assert.equal(Object.hasOwn(submitted,'email'),false);assert.equal(document.querySelectorAll('.messenger-link').length,2);
+    assert.doesNotMatch(document.querySelector('.order-messengers').textContent,/Instagram/);
     assert.ok([...document.querySelectorAll('.messenger-link')].every(a=>a.target==='_blank'&&a.rel.includes('noreferrer')));
     assert.equal(new URL(document.querySelector('.messenger-link').href).searchParams.get('text'),message);
     await click(document.querySelector('.copy-order'));assert.equal(clipboard,message);assert.equal(posts,1);
@@ -1156,7 +1190,7 @@ test('checkout offers merchant messengers only after confirmation; copying and r
   }finally{await act(async()=>root.unmount());if(previousClipboard)Object.defineProperty(navigator,'clipboard',previousClipboard);else delete navigator.clipboard;}
 });
 
-test('messenger failure retains full copyable order and does not claim Instagram prefill',async()=>{
+test('messenger failure retains the copyable order and ignores a retired Instagram contact',async()=>{
   const {OrderMessengers}=require('./app/components/order-messengers.js');
   globalThis.fetch=()=>response({error:'Unavailable'},500);
   const root=createRoot(document.getElementById('root'));
@@ -1167,7 +1201,7 @@ test('messenger failure retains full copyable order and does not claim Instagram
     assert.match(document.querySelector('.order-messengers').textContent,/Заказ сохранён/);
     await click(document.querySelector('.copy-order'));assert.equal(document.querySelector('textarea').value,'Полный заказ\nКонтакты и адрес');assert.match(document.querySelector('.copy-order-status').textContent,/не разрешил/);
     globalThis.fetch=()=>response({whatsapp:'',telegram:'',instagram:'tixo.example'});await click(button('Попробовать снова'));
-    assert.equal(document.querySelectorAll('.messenger-link').length,1);assert.equal(document.querySelector('.messenger-link').href,'https://ig.me/m/tixo.example');assert.match(document.querySelector('.messenger-option').textContent,/Сначала скопируйте/);
+    assert.equal(document.querySelectorAll('.messenger-link').length,0);assert.doesNotMatch(document.querySelector('.order-messengers').textContent,/Instagram/);assert.equal(document.querySelector('textarea').value,'Полный заказ\nКонтакты и адрес');
   }finally{await act(async()=>root.unmount());globalThis.requestAnimationFrame=oldRaf;if(previousClipboard)Object.defineProperty(navigator,'clipboard',previousClipboard);else delete navigator.clipboard;}
 });
 
@@ -1269,7 +1303,7 @@ test('messenger handoffs retry after a network failure and admin distinguishes l
   globalThis.fetch=async(url,init)=>{assert.equal(url,'/api/orders/messenger');assert.equal(init.keepalive,true);sent.push(JSON.parse(init.body));if(failed)throw new Error('offline');return new Response(null,{status:204});};
   recordMessengerHandoff(key,'telegram');await new Promise(resolve=>setImmediate(resolve));assert.equal(JSON.parse(window.sessionStorage.getItem('tixo.atelier.handoffs.v1')).length,1);
   failed=false;await flushMessengerHandoffs();assert.equal(JSON.parse(window.sessionStorage.getItem('tixo.atelier.handoffs.v1')).length,0);assert.equal(sent.length,2);
-  const order={id:1,orderNumber:'T-CHANNEL',customerName:'Анна',phone:'+79990000000',email:'a@example.com',address:'Сочи',delivery:'pickup',comment:'',items:[],total:0,status:'new',createdAt:new Date().toISOString(),stockReserved:false};
+  const order={id:1,orderNumber:'T-CHANNEL',customerName:'Анна',phone:'+79990000000',address:'Сочи',delivery:'pickup',comment:'',items:[],total:0,status:'new',createdAt:new Date().toISOString(),stockReserved:false};
   globalThis.fetch=async url=>url==='/api/admin/session'?response({authenticated:true}):url==='/api/orders'?response([order,{...order,id:2,orderNumber:'T-MULTI',messengerChannels:['whatsapp','telegram']} ]):url==='/api/content'?response({}):response([]);
   const root=createRoot(document.getElementById('root'));
   try{await act(async()=>root.render(React.createElement(Admin)));await click(button('Заказы'));const cards=document.querySelectorAll('.order-card');assert.match(cards[0].textContent,/Только сайт/);assert.match(cards[1].textContent,/Переход в WhatsApp/);assert.match(cards[1].textContent,/Переход в Telegram/);assert.match(cards[1].textContent,/Отправку сообщения нужно проверить/);}
