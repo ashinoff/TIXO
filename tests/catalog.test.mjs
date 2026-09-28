@@ -32,10 +32,19 @@ const { saveForm } = require('./lib/server/forms');
 const { saveScent } = require('./lib/server/scents');
 const { aromaPortraits } = require('./lib/aroma-portraits');
 const { createOrder, deleteOrder } = require('./lib/server/orders');
-const customer = { customerName:'Тестовый покупатель', phone:'+79990000000', email:'test@example.com', address:'Тестовый адрес', delivery:'Пункт выдачи', comment:'' };
+const customer = { customerName:'Тестовый покупатель', phone:'+79990000000', address:'Тестовый адрес', delivery:'Пункт выдачи', comment:'' };
 let defaultColorId;
 const orderBody = items => ({ ...customer, items: items.map(item => item.productId && !item.variantId && defaultColorId ? {colorId:defaultColorId,...item} : item), requestKey: randomUUID() });
 const recipe = { shape:'sphere', color:'red', top:'lemon', heart:'fig', base:'oud' };
+
+test('new orders do not require or collect email and historical contact data remains readable',()=>{
+  const payload=orderBody([{productId:1,quantity:1}]);
+  assert.equal(parseOrder(payload).email,'');
+  assert.equal(parseOrder({...payload,email:'old-client@example.com'}).email,'');
+  for(const phone of ['','short','123','+7 abc 999'])assert.throws(()=>parseOrder({...payload,phone}));
+  const historical=domain.mapOrder({id:1,order_number:'OLD',customer_name:'История',phone:'0000000',email:'old@example.com',address:'Адрес',delivery:'Доставка',items:[],total:0,status:'new',created_at:new Date().toISOString(),messenger_channels:['instagram','telegram','unknown']});
+  assert.equal(historical.email,'old@example.com');assert.deepEqual(historical.messengerChannels,['instagram','telegram']);
+});
 
 test('custom candle choices are validated, copied and aggregated separately from catalog lines', () => {
   assert.equal(isRecipe(recipe), true);
@@ -348,6 +357,30 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     candle=await saveProduct(clear,candle.id);assert.equal(candle.volumeMl,null);
     const unset=await saveProduct(formFor({...product,stock:0,published:false}));assert.equal(unset.volumeMl,null);
     await assert.rejects(pool.query('UPDATE products SET volume_ml=0 WHERE id=$1',[candle.id]),error=>error.code==='23514');
+  });
+  await t.test('decimal dimensions persist independently, preserve missing fields and clear explicit blanks',async()=>{
+    const keys=['widthCm','heightCm','depthCm'];
+    const dims=p=>keys.map(key=>p[key]);
+    const create=formFor({...product,stock:0,published:false});
+    for(const [key,value] of [['widthCm','7.5'],['heightCm','4,25'],['depthCm','6']])create.set(key,value);
+    let candle=await saveProduct(create);
+    assert.deepEqual(dims(candle),[7.5,4.25,6]);
+    assert.deepEqual(dims((await domain.listProducts(true,candle.id))[0]),[7.5,4.25,6]);
+    const edit=formFor(candle);edit.set('widthCm','8.75');edit.set('depthCm','');
+    candle=await saveProduct(edit,candle.id);assert.deepEqual(dims(candle),[8.75,4.25,null]);
+    candle=await saveProduct(formFor({...candle,notes:'Старый редактор без размеров'}),candle.id);
+    assert.deepEqual(dims(candle),[8.75,4.25,null]);
+    for(const key of keys)for(const invalid of ['0','-1','1.234','1000.01','NaN','Infinity','abc','1e2']){
+      const invalidForm=formFor(candle);invalidForm.set(key,invalid);
+      await assert.rejects(saveProduct(invalidForm,candle.id),error=>error.status===400);
+    }
+    assert.deepEqual(dims((await domain.listProducts(true,candle.id))[0]),[8.75,4.25,null]);
+    globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();
+    assert.deepEqual(dims((await domain.listProducts(true,candle.id))[0]),[8.75,4.25,null]);
+    for(const column of ['width_cm','height_cm','depth_cm'])await assert.rejects(pool.query(`UPDATE products SET ${column}=0 WHERE id=$1`,[candle.id]),error=>error.code==='23514');
+    const clear=formFor(candle);for(const key of keys)clear.set(key,'');
+    candle=await saveProduct(clear,candle.id);assert.deepEqual(dims(candle),[null,null,null]);
+    const unset=await saveProduct(formFor({...product,stock:0,published:false}));assert.deepEqual(dims(unset),[null,null,null]);
   });
   const candleLine = (quantity=1) => ({productId:product.id,scentId:red,colorId:redColor,quantity});
   await t.test('orders require the configured combination, snapshot the current form and use the server price', async () => {

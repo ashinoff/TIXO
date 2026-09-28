@@ -1,8 +1,8 @@
 import { Pool } from "pg";
 import { aromaPortraits } from "../aroma-portraits";
 import type { Product, OrderItem, Scent, Variant, CandleColor, CandleForm } from "../catalog";
-import { candleShapes, emptyAromaProfile, productShape, MAX_PRODUCT_VOLUME_ML, type CandleShape } from "../catalog";
-import { messengerKeys, type Messenger } from "../order-messaging";
+import { candleShapes, emptyAromaProfile, productShape, MAX_PRODUCT_VOLUME_ML, MAX_PRODUCT_DIMENSION_CM, type CandleShape } from "../catalog";
+import { orderMessengerNames, type OrderMessenger } from "../order-messaging";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
@@ -12,7 +12,7 @@ export type StoredCategory={id:number;name:string;slug:string;mood:string;descri
 export type StoredOrder = {
   id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string;
   delivery:string; comment:string; items:OrderItem[]; stockReserved:boolean;
-  messengerChannels: Messenger[];
+  messengerChannels: OrderMessenger[];
   total:number; status:"new"|"in_progress"|"completed"; createdAt:string;
 };
 
@@ -163,6 +163,10 @@ export async function ensureSchema() {
     // Null positions keep the existing ID order and append newly created candles.
     await db.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS catalog_position BIGINT");
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS volume_ml INTEGER CHECK (volume_ml > 0 AND volume_ml <= ${MAX_PRODUCT_VOLUME_ML})`);
+    await db.query(`ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS width_cm NUMERIC(6,2) CHECK (width_cm > 0 AND width_cm <= ${MAX_PRODUCT_DIMENSION_CM}),
+      ADD COLUMN IF NOT EXISTS height_cm NUMERIC(6,2) CHECK (height_cm > 0 AND height_cm <= ${MAX_PRODUCT_DIMENSION_CM}),
+      ADD COLUMN IF NOT EXISTS depth_cm NUMERIC(6,2) CHECK (depth_cm > 0 AND depth_cm <= ${MAX_PRODUCT_DIMENSION_CM})`);
     await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS image TEXT");
     const portraits = await db.query("INSERT INTO app_migrations(key) VALUES('aroma-portraits-v1') ON CONFLICT DO NOTHING RETURNING key");
     if (portraits.rowCount) {
@@ -189,14 +193,16 @@ export async function ensureSchema() {
 export function mapProduct(row: Record<string, unknown>): StoredProduct {
   const images = Array.isArray(row.images) ? row.images.map(String) : row.image ? [String(row.image)] : [];
   return { formId: row.form_id ? Number(row.form_id) : null, colorId: row.color_id ? Number(row.color_id) : null, scentId: row.scent_id ? Number(row.scent_id) : null,
-    images, volumeMl: row.volume_ml == null ? null : Number(row.volume_ml), accentColorId: row.accent_color_id ? Number(row.accent_color_id) : null, accentColor: row.accent_color ? mapColor(row.accent_color as Record<string, unknown>) : null,
+    images, volumeMl: row.volume_ml == null ? null : Number(row.volume_ml),
+    widthCm: row.width_cm == null ? null : Number(row.width_cm), heightCm: row.height_cm == null ? null : Number(row.height_cm), depthCm: row.depth_cm == null ? null : Number(row.depth_cm),
+    accentColorId: row.accent_color_id ? Number(row.accent_color_id) : null, accentColor: row.accent_color ? mapColor(row.accent_color as Record<string, unknown>) : null,
     form: row.form ? mapForm(row.form as Record<string, unknown>) : null, color: row.color ? mapColor(row.color as Record<string, unknown>) : null, scent: row.scent ? mapScent(row.scent as Record<string, unknown>) : null,
     id:Number(row.id), name:String(row.form_name || row.name), category:String(row.category_name || row.category), notes:String(row.notes), price:Number(row.price), stock:Number(row.stock), published:Boolean(row.published), image:row.image ? String(row.image) : null, categoryId:row.category_id?Number(row.category_id):null, categorySlug:row.category_slug?String(row.category_slug):null, hasVariants:Boolean(row.has_variants), variants:[], shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : productShape({id:Number(row.id)}) };
 }
 export function mapCategory(row:Record<string,unknown>):StoredCategory{return{id:Number(row.id),name:String(row.name),slug:String(row.slug),mood:String(row.mood),description:String(row.description),notes:Array.isArray(row.notes)?row.notes.map(String):[],paper:String(row.paper),ink:String(row.ink),accent:String(row.accent),soft:String(row.soft)}}
 
 export function mapOrder(row: Record<string, unknown>): StoredOrder {
-  return { messengerChannels: Array.isArray(row.messenger_channels) ? row.messenger_channels.filter((value): value is Messenger => typeof value === "string" && Object.hasOwn(messengerKeys, value)) : [], id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
+  return { messengerChannels: Array.isArray(row.messenger_channels) ? row.messenger_channels.filter((value): value is OrderMessenger => typeof value === "string" && Object.hasOwn(orderMessengerNames, value)) : [], id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
 }
 
 export function mapScent(row: Record<string, unknown>): Scent {

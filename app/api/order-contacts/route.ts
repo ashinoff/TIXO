@@ -22,7 +22,7 @@ export async function PATCH(request: Request) {
       contacts = Object.fromEntries((Object.keys(messengerKeys) as Messenger[]).map(kind => [kind, normalizeMessengerContact(kind, body?.[kind])]));
     } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Проверьте контакты." }, { status: 400 }); }
     await ensureSchema();
-    // Save all three settings atomically. Empty strings deliberately hide a channel.
+    // Save the two active settings atomically. Empty strings deliberately hide a channel.
     await getPool().query(`INSERT INTO site_content(key,value,kind)
       SELECT key,value,'text' FROM unnest($1::text[],$2::text[]) AS setting(key,value)
       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,kind='text',updated_at=NOW()`,

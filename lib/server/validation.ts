@@ -56,11 +56,12 @@ export function parseOrder(body: Record<string, unknown>) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Проверьте данные заказа");
   const customerName = textValue(body.customerName, "Имя", 160);
   const phone = textValue(body.phone, "Телефон", 40);
-  const email = textValue(body.email, "Email", 254);
+  // Keep the legacy database column, but new orders no longer collect email.
+  const email = "";
   const address = textValue(body.address, "Адрес", 1000);
   const delivery = textValue(body.delivery, "Доставка", 100);
   const comment = textValue(body.comment ?? "", "Комментарий", 2000, false);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^[+\d\s()\-]{7,40}$/.test(phone) || phone.replace(/\D/g, "").length < 7) throw new InputError("Проверьте телефон и email");
+  if (!/^[+\d\s()\-]{7,40}$/.test(phone) || phone.replace(/\D/g, "").length < 7) throw new InputError("Проверьте телефон");
   const requestKey = body.requestKey === undefined ? null : textValue(body.requestKey, "Номер запроса", 36);
   if (requestKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) throw new InputError("Некорректный номер запроса");
   if (!Array.isArray(body.items) || !body.items.length || body.items.length > 100) throw new InputError("Проверьте состав заказа");

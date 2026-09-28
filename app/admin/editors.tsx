@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
-import { sortByName, type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile, productImages, MAX_PRODUCT_IMAGES, MAX_PRODUCT_VOLUME_ML } from "@/lib/catalog";
+import { sortByName, type CandleShape, type Product, type Scent, type CandleColor, type CandleForm, type AromaProfile, emptyAromaProfile, productImages, MAX_PRODUCT_IMAGES, MAX_PRODUCT_VOLUME_ML, MAX_PRODUCT_DIMENSION_CM, productDimensionFields } from "@/lib/catalog";
 import { aromaPortraits } from "@/lib/aroma-portraits";
 import { Modal } from "../components/modal";
 import { CandlePreview } from "../components/candle-preview";
@@ -30,7 +30,7 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
   const save = async (event: FormEvent) => {
     event.preventDefault(); if (saving) return; setSaving(true); setError("");
     const data = new FormData();
-    for (const key of ["formId", "colorId", "scentId", "notes", "volumeMl", "price", "stock", "published"] as const) data.set(key, String(draft[key] ?? ""));
+    for (const key of ["formId", "colorId", "scentId", "notes", "volumeMl", "widthCm", "heightCm", "depthCm", "price", "stock", "published"] as const) data.set(key, String(draft[key] ?? ""));
     data.set("accentColorId", String(forms.find(form => form.id === draft.formId)?.twoTone ? draft.accentColorId ?? "" : ""));
     data.set("expectedStock", String(product.stock));
     let upload = 0;
@@ -53,6 +53,8 @@ export function ProductEditor({ product, forms, scents, colors, onSave, onClose 
       <p className="editor-hint">Новые варианты добавляются в разделах «Формы», «Цвета» и «Ароматы». Остаток относится только к выбранному сочетанию.</p>
       <label>Описание свечи<textarea maxLength={2000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} placeholder="Размер, вес, особенности — напишите своими словами" /></label>
       <label>Объём, мл<input name="volumeMl" type="number" min="1" max={MAX_PRODUCT_VOLUME_ML} step="1" value={draft.volumeMl ?? ""} onChange={event => setDraft({ ...draft, volumeMl: event.target.value === "" ? null : Number(event.target.value) })} placeholder="Например, 180" /><span className="image-field-hint">Необязательно. Отображается рядом с цветом и ароматом в каталоге.</span></label>
+      <div className="editor-row editor-dimensions">{productDimensionFields.map(({ key, label }) => <label key={key}>{label}, см<input name={key} type="number" min="0.01" max={MAX_PRODUCT_DIMENSION_CM} step="0.01" inputMode="decimal" value={draft[key] ?? ""} onChange={event => setDraft({ ...draft, [key]: event.target.value === "" ? null : Number(event.target.value) })} placeholder="Например, 7,5" /></label>)}</div>
+      <p className="image-field-hint">Размеры необязательны. Показываются только в открытой карточке свечи.</p>
       <div className="candle-image-field"><h3>Фотографии свечи <small>{photos.length} / {MAX_PRODUCT_IMAGES}</small></h3>
         {!!photos.length && <div className="editor-photo-grid">{photos.map((photo, index) => <div className="editor-photo" key={photo.src ?? `${photo.file?.name}-${index}`}><ImagePreview file={photo.file} src={photo.src} alt={`Фото свечи ${index + 1}`} /><span className="photo-role">{index === 0 ? "Главное фото" : `Фото ${index + 1}`}</span><div className="editor-photo-actions"><button type="button" disabled={index === 0} onClick={() => setPhotos([photo, ...photos.filter((_, i) => i !== index)])}>{index === 0 ? "Главное" : "Сделать главным"}</button><button type="button" aria-label={`Удалить фото ${index + 1}`} onClick={() => setPhotos(photos.filter((_, i) => i !== index))}>Убрать фото</button></div></div>)}</div>}
         {!photos.length && <div className="candle-editor-silhouette"><CandlePreview shape={selectedForm?.shape} silhouette={selectedForm?.silhouette} color={selectedColor?.hex} twoTone={selectedForm?.twoTone} accentColor={colors.find(color => color.id === draft.accentColorId)?.hex} label={selectedForm?.name ?? "Форма свечи"} /></div>}
