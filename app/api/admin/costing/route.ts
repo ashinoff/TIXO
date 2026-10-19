@@ -12,6 +12,16 @@ async function prepare() {
   await db.query(`CREATE TABLE IF NOT EXISTS costing_history (id BIGSERIAL PRIMARY KEY, recipe_id BIGINT REFERENCES costing_recipes(id) ON DELETE SET NULL, snapshot JSONB NOT NULL, saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   // One-time import of price assumptions from the provided workbook; don't overwrite later manual edits.
   for(const [name,unit,price] of defaults) await db.query("INSERT INTO costing_materials(name,unit,unit_price) VALUES($1,$2,$3) ON CONFLICT(name) DO NOTHING",[name,unit,price]);
+  // Import the sole filled example row from the uploaded workbook exactly once.
+  const imported=await db.query("INSERT INTO app_migrations(key) VALUES('costing-example-pumpkin-v1') ON CONFLICT DO NOTHING RETURNING key");
+  if(imported.rowCount){
+    const units=[300,85,8,1,1,0,1,1,0,1,1];
+    const rows=await db.query("SELECT id,name FROM costing_materials WHERE name=ANY($1::text[])",[defaults.map(item=>item[0])]);
+    const idFor=new Map(rows.rows.map(row=>[row.name,Number(row.id)]));
+    const items:Record<string,number>={};
+    defaults.forEach(([name],i)=>{const id=idFor.get(name);if(id&&units[i])items[String(id)]=units[i];});
+    await db.query("INSERT INTO costing_recipes(name,markup_pct,sale_price,items,note) VALUES($1,$2,$3,$4::jsonb,$5)",["Тыква",100,1300,JSON.stringify(items),"Импорт из файла «калькулятор.xlsx»: 572,25 ₽ на 1 шт."]);
+  }
 }
 const number=(x:unknown,max=100000000)=>{const n=Number(x);if(!Number.isFinite(n)||n<0||n>max)throw Error("Укажите корректное неотрицательное число");return n;};
 const fail=(error:unknown)=>error instanceof Error&&/корректное|название|Не найдено|не более|Некорректная/.test(error.message)?NextResponse.json({error:error.message},{status:400}):apiError(error);
