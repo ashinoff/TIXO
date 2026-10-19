@@ -7,13 +7,14 @@ import { recipeFormName, atelierColors, atelierTopNotes, atelierHeartNotes, atel
 import { ImagePreview, ProductEditor, ScentEditor, ColorEditor, FormEditor, StockEditor, AromaProfileEditor } from "./editors";
 import { CandlePreview } from "../components/candle-preview";
 import { CatalogOrder } from "./catalog-order";
+import { CostCalculator } from "./cost-calculator";
 import { MessengerSettings } from "./messenger-settings";
 import { orderMessengerNames, type OrderMessenger } from "../../lib/order-messaging";
 import "./admin.css";
 
 type Order = { messengerChannels?: OrderMessenger[]; id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
 type Field = { key:string; label:string; kind:"text"|"image"; fallback:string };
-type Tab = "products" | "forms" | "colors" | "scents" | "aroma" | "orders" | "content";
+type Tab = "products" | "forms" | "colors" | "scents" | "aroma" | "orders" | "content" | "costing";
 const empty: Product = { id:0, name:"", category:"", categoryId:null, categorySlug:null, notes:"", price:0, stock:0, published:false, image:null, hasVariants:false, variants:[] };
 const emptyScent: Scent = { id:0, name:"", description:"", notes:[], active:true };
 const emptyForm: CandleForm = { id:0, name:"", shape:null, silhouette:null, active:true };
@@ -142,7 +143,7 @@ export default function Admin() {
   const aromaScent = scents.find(scent => scent.id === aromaId) ?? scents[0];
   const active = orders.filter(order => order.status !== "completed");
   const done = orders.filter(order => order.status === "completed");
-  const labels: Record<Tab, string> = { products: "Остатки", forms: "Формы", colors: "Цвета", scents: "Ароматы", aroma: "Искусство аромата", orders: "Заказы", content: "Контент" };
+  const labels: Record<Tab, string> = { products: "Остатки", forms: "Формы", colors: "Цвета", scents: "Ароматы", aroma: "Искусство аромата", orders: "Заказы", content: "Контент", costing: "Себестоимость" };
   if (auth === null) return <main className="admin-login"><div className="login-card"><h1>Мастерская ТИХО</h1>{error ? <><p className="editor-error" role="alert">{error}</p><button className="save" onClick={() => { setError(""); void checkSession(); }}>Повторить подключение</button></> : <p role="status">Проверяем подключение…</p>}</div></main>;
   if (!auth) return <main className="admin-login"><form className="login-card" onSubmit={login}><Link className="admin-logo" href="/">ТИХО</Link><span className="admin-kicker">Мастерская</span><h1>Вход в админку</h1><label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required autoFocus /></label>{error && <p className="editor-error" role="alert">{error}</p>}<button className="save" disabled={busy}>{busy ? "Входим…" : "Войти"}</button></form></main>;
   return <main className="admin-shell">
@@ -155,6 +156,7 @@ export default function Admin() {
       {tab === "products" && <Inventory products={products} forms={forms} colors={colors} scents={scents} onEdit={setEditing} onStock={setStockProduct} onDelete={removeProduct} busy={busy || loadingData} />}
       {tab === "forms" && <><p className="admin-intro">У каждой формы отдельная миниатюра для фильтра и технический силуэт для свечей без фотографии. Удаление архивирует форму и связанные свечи, сохраняя заказы и данные.</p>{!forms.length && <p className="empty-admin">Добавьте первую форму.</p>}<div className="scent-admin-grid">{forms.map(form => <article className="scent-admin-card" key={form.id}><div className="form-card-preview">{form.filterImage ? <img src={form.filterImage} alt={`Миниатюра ${form.name}`} className="admin-form-thumbnail" /> : <CandlePreview shape={form.shape} silhouette={form.silhouette} twoTone={form.twoTone} accentColor="#c8c9cb" color="#285543" label={form.name} />}</div><div className="scent-admin-body"><span className="admin-kicker">{form.active ? "Доступна" : "Отключена"} · {products.filter(p => p.formId === form.id).length} позиций</span><h2>{form.name}</h2><footer><button onClick={() => setEditingForm(form)}>Редактировать</button><button disabled={busy} onClick={() => removeForm(form)}>Удалить</button></footer></div></article>)}</div></>}
       {tab === "aroma" && <><p className="admin-intro">Выберите конкретный аромат и опишите его раскрытие. Этот разбор не зависит от формы и цвета свечи.</p>{aromaScent ? <><div className="aroma-admin-intro"><img src="/assets/hero.png" alt="Свеча из блока «Искусство аромата»" /><div><label htmlFor="admin-aroma">Аромат для разбора<select id="admin-aroma" value={aromaScent.id} onChange={event => setAromaId(Number(event.target.value))}>{scents.map(scent => <option value={scent.id} key={scent.id}>{scent.name}{!scent.active ? " · отключён" : ""}</option>)}</select></label><p>{aromaScent.description}</p><small>В блоке на сайте остаётся эта фотография.</small></div></div><AromaProfileEditor key={`${aromaScent.id}:${JSON.stringify(aromaScent.profile)}`} scent={aromaScent} onSave={async profile => { await request(`/api/scents/${aromaScent.id}/profile`, { method: "PATCH", ...json(profile) }); await load(); setSaved(true); }} /></> : <div className="empty-admin"><p>Сначала создайте аромат в справочнике.</p><button className="save" onClick={() => setTab("scents")}>К ароматам</button></div>}</>}
+      {tab === "costing" && <CostCalculator />}
       {tab === "orders" && <>
         <div className="admin-stats order-stats">
           <Stat label="Все заказы" value={String(orders.length)} note={`${orders.filter(order => order.status === "new").length} новых`} />
