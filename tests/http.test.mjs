@@ -41,6 +41,8 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await call('/api/scents/1/profile',{method:'PATCH',...json({})})).status,401);
   assert.equal((await call('/api/orders')).status,401);
   assert.equal((await call('/api/order-contacts',{method:'PATCH',...json({})})).status,401);
+  assert.equal((await call('/api/admin/costing')).status,401);
+  assert.equal((await call('/api/admin/costing',{method:'POST',...json({action:'material',name:'Гипс',unit:'г',price:1})})).status,401);
   assert.equal((await call('/api/admin/login',{method:'POST',...json({password:'wrong'})})).status,401);
   const malformed=await call('/api/admin/session',{headers:{cookie:'tiho_admin=NaN.'+'a'.repeat(64)}});
   assert.deepEqual(await malformed.json(),{authenticated:false});
@@ -51,6 +53,15 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const cookie=login.headers.get('set-cookie').split(';')[0];
   const admin=(path,options={})=>call(path,{...options,headers:{...options.headers,cookie}});
   assert.deepEqual(await (await admin('/api/admin/session')).json(),{authenticated:true});
+  const costFirst=await admin('/api/admin/costing');assert.equal(costFirst.status,200);
+  const costing=await costFirst.json();
+  assert.equal(costing.materials.length,11);
+  const pumpkin=costing.recipes.find(r=>r.name==='Тыква');assert.ok(pumpkin);
+  const computed=costing.materials.reduce((sum,m)=>sum+(pumpkin.items[String(m.id)]||0)*Number(m.price),0);
+  assert.equal(Number(computed.toFixed(2)),572.25);
+  const savedCost=await admin('/api/admin/costing',{method:'POST',...json({action:'recipe',name:'Тестовая свеча',product_id:null,items:pumpkin.items,markup_pct:100,sale_price:1300,note:'Тест'})});
+  assert.equal(savedCost.status,200);
+  assert.ok((await (await admin('/api/admin/costing')).json()).history.some(h=>h.snapshot.name==='Тестовая свеча'&&h.snapshot.total===572.25));
   const contactSettings={whatsapp:'+7 (999) 123-45-67',telegram:'https://t.me/tixo_example',instagram:'@tixo.example'};
   assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json(contactSettings)})).status,200);
   const contacts={whatsapp:'79991234567',telegram:'tixo_example'};
@@ -138,7 +149,7 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await (await admin('/api/products?admin=1')).json()).find(p=>p.id===product.id).stock,6);
   form.set('stock','6');form.set('expectedStock','6');form.set('notes','Обновлено вручную');
   assert.equal((await admin(`/api/products/${product.id}`,{method:'PATCH',body:form})).status,200);
-  for(const [kind,id] of [['forms',shape.id],['colors',colors[0].id],['scents',scents[0].id]])assert.equal((await admin(`/api/${kind}/${id}`,{method:'DELETE'})).status,409);
+  for(const [kind,id] of [['colors',colors[0].id],['scents',scents[0].id]])assert.equal((await admin(`/api/${kind}/${id}`,{method:'DELETE'})).status,409);
   shapeData.set('name','Изменённый силуэт');
   const replaced=await admin(`/api/forms/${shape.id}`,{method:'PATCH',body:shapeData});assert.equal(replaced.status,200);const replacement=await replaced.json();assert.notEqual(replacement.silhouette,shape.silhouette);
   assert.equal((await call(shape.silhouette)).status,200);
@@ -175,6 +186,22 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await admin(`/api/products/${product.id}`,{method:'DELETE'})).status,200);
   assert.equal((await (await admin('/api/products?admin=1')).json()).some(p=>p.id===product.id),false);
   assert.equal((await call(multi.images[1])).status,200);
+  // Even when past products/orders reference the form, deletion archives it safely.
+  assert.equal((await admin(`/api/forms/${shape.id}`,{method:'DELETE'})).status,200);
+  assert.equal((await (await admin('/api/forms?admin=1')).json()).some(f=>f.id===shape.id),false);
+  const oldForm=(await pool.query('SELECT archived,active FROM candle_forms WHERE id=$1',[shape.id])).rows[0];
+  assert.equal(oldForm.archived,true);assert.equal(oldForm.active,false);
+  const oldProduct=(await pool.query('SELECT archived,stock FROM products WHERE id=$1',[product.id])).rows[0];
+  assert.equal(oldProduct.archived,true);assert.equal(Number(oldProduct.stock),6);
+  const removable=await (await admin('/api/forms',{method:'POST',...json({name:'Архивная форма',shape:'arch',active:true})})).json();
+  const archivalProduct=new FormData();
+  for(const [key,value] of Object.entries({formId:removable.id,colorId:colors[0].id,scentId:scents[0].id,notes:'Для архивирования',price:2300,stock:4,published:true})) archivalProduct.set(key,String(value));
+  const shouldArchive=await admin('/api/products',{method:'POST',body:archivalProduct});assert.equal(shouldArchive.status,201);
+  const oldId=(await shouldArchive.json()).id;
+  assert.equal((await admin(`/api/forms/${removable.id}`,{method:'DELETE'})).status,200);
+  assert.equal((await (await call('/api/products')).json()).some(p=>p.id===oldId),false);
+  assert.equal((await (await admin('/api/products?admin=1')).json()).some(p=>p.id===oldId),false);
+  assert.deepEqual((await pool.query('SELECT archived,stock FROM products WHERE id=$1',[oldId])).rows.map(v=>({archived:v.archived,stock:v.stock})),[{archived:true,stock:4}]);
   for(const portrait of scents.filter(scent=>scent.image?.startsWith('/assets/aromas/'))){const asset=await call(portrait.image);assert.equal(asset.status,200);assert.match(asset.headers.get('content-type'),/image\/webp/);}
   const portraitData=new FormData();portraitData.set('data',JSON.stringify({name:'HTTP портрет',description:'Сохранённое описание',notes:[],active:true,profile:aromaProfile}));portraitData.set('image',new File([silhouette],'portrait.png',{type:'image/png'}));
   assert.equal((await call('/api/scents',{method:'POST',body:portraitData})).status,401);
