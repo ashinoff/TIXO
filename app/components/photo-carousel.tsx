@@ -114,8 +114,8 @@ export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]
   }}>
     <div className="detail-photo">
       <div className="detail-photo-track" ref={track}>
-        <img key={photos[index]} className="photo-current" src={photos[index]} alt={`${label}${count > 1 ? ` · фото ${index + 1}` : ""}`} decoding="async" draggable={false} />
-        {count > 1 && <><img key={photos[previous]} className="photo-adjacent photo-previous" src={photos[previous]} alt="" aria-hidden="true" decoding="async" draggable={false} /><img key={photos[next]} className="photo-adjacent photo-next" src={photos[next]} alt="" aria-hidden="true" decoding="async" draggable={false} /></>}
+        <img key={`current:${photos[index]}`} className="photo-current" src={photos[index]} alt={`${label}${count > 1 ? ` · фото ${index + 1}` : ""}`} decoding="async" draggable={false} />
+        {count > 1 && <><img key={`previous:${photos[previous]}`} className="photo-adjacent photo-previous" src={photos[previous]} alt="" aria-hidden="true" decoding="async" draggable={false} /><img key={`next:${photos[next]}`} className="photo-adjacent photo-next" src={photos[next]} alt="" aria-hidden="true" decoding="async" draggable={false} /></>}
       </div>
       {count > 1 && <div className="photo-tap-zones">
         <button type="button" className="photo-tap-target" aria-label="Предыдущее фото — левая половина" disabled={motion !== null} onClick={() => move(-1)} />
