@@ -368,3 +368,6 @@
  .tiho-site .catalog-filter-bar.is-floating .catalog-filter-summary{padding:7px 10px}
 }
 @media(prefers-reduced-motion:reduce){.tiho-site .catalog-filter-bar.is-floating{transition:none}}
+
+/* Decoded image frames replace rather than crossfade stale browser bitmaps. */
+.tiho-site .detail-photo-track img,.tiho-site .catalog-photo-track img{transition:none!important}
