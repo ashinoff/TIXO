@@ -7,15 +7,22 @@ export type PhotoCarouselHandle = { move: (offset: number) => void; drag: (dista
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 // Decode before exposing an image: browsers otherwise briefly paint an old bitmap.
 const cache = new Map<string, Promise<void>>();
+const decoded = new Set<string>();
 export function preparePhoto(url: string): Promise<void> {
-  if (!url || typeof Image === "undefined") return Promise.resolve();
+  if (!url) return Promise.resolve();
+  if (typeof window === "undefined" || typeof window.Image !== "function") {
+    decoded.add(url);
+    return Promise.resolve();
+  }
   if (!cache.has(url)) {
     const loading = new Promise<void>(resolve => {
-      const image = new Image();
-      image.onload = () => { Promise.resolve(image.decode?.()).catch(() => {}).finally(resolve); };
-      image.onerror = () => resolve();
+      const image = new window.Image();
+      let done = false;
+      const finish = () => { if (done) return; done = true; decoded.add(url); resolve(); };
+      image.onload = () => { Promise.resolve(image.decode?.()).catch(() => {}).finally(finish); };
+      image.onerror = finish;
       image.src = url;
-      if (image.complete) image.onload?.(new Event("load"));
+      if (image.complete && image.naturalWidth > 0) image.onload?.(new Event("load"));
     });
     cache.set(url, loading);
     if (cache.size > 240) cache.delete(cache.keys().next().value!);
@@ -50,12 +57,15 @@ export function usePhotoCarousel<T extends HTMLElement = HTMLDivElement>(count: 
     clearTimeout(timer.current);
     busy.current = true;
     const token = ++serial.current;
-    // Keep the current visible frame stable until the next full image is decoded.
-    void preparePhoto(photos[target] ?? "").then(() => {
+    const start = () => {
       if (token !== serial.current) return;
       if (reducedMotion()) { paint(0); setIndex(target); busy.current = false; return; }
       setMotion({ target, direction });
-    });
+    };
+    // A decoded/cached destination navigates immediately, including keyboard and swipe.
+    // A cold destination leaves the previous frame stable instead of flashing stale pixels.
+    if (decoded.has(photos[target])) start();
+    else void preparePhoto(photos[target] ?? "").then(start);
   };
   const cancel = () => {
     if (busy.current) return;

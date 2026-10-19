@@ -11,7 +11,10 @@ async function prepare() {
   await db.query(`CREATE TABLE IF NOT EXISTS costing_recipes (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, product_id BIGINT REFERENCES products(id) ON DELETE SET NULL, markup_pct NUMERIC(9,2) NOT NULL DEFAULT 100, sale_price NUMERIC(14,2), items JSONB NOT NULL DEFAULT '{}'::jsonb, note TEXT NOT NULL DEFAULT '', updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await db.query(`CREATE TABLE IF NOT EXISTS costing_history (id BIGSERIAL PRIMARY KEY, recipe_id BIGINT REFERENCES costing_recipes(id) ON DELETE SET NULL, snapshot JSONB NOT NULL, saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   // One-time import of price assumptions from the provided workbook; don't overwrite later manual edits.
-  for(const [name,unit,price] of defaults) await db.query("INSERT INTO costing_materials(name,unit,unit_price) VALUES($1,$2,$3) ON CONFLICT(name) DO NOTHING",[name,unit,price]);
+  const initialized = await db.query("INSERT INTO app_migrations(key) VALUES('costing-seed-materials-v1') ON CONFLICT DO NOTHING RETURNING key");
+  if(initialized.rowCount){
+    for(const [name,unit,price] of defaults) await db.query("INSERT INTO costing_materials(name,unit,unit_price) VALUES($1,$2,$3) ON CONFLICT(name) DO NOTHING",[name,unit,price]);
+  }
   // Import the sole filled example row from the uploaded workbook exactly once.
   const imported=await db.query("INSERT INTO app_migrations(key) VALUES('costing-example-pumpkin-v1') ON CONFLICT DO NOTHING RETURNING key");
   if(imported.rowCount){

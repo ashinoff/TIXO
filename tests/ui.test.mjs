@@ -920,7 +920,10 @@ test('product swipes follow the filtered catalog, separate photo gestures and pr
   };
   const swipe=async(selector,dx,dy=0)=>{
     const target=document.querySelector(selector);assert.ok(target);
-    await touch('touchstart',target,220,300);const event=await touch('touchmove',target,220+dx,300+dy);await touch('touchend',target,220+dx,300+dy);return event;
+    await touch('touchstart',target,220,300);const event=await touch('touchmove',target,220+dx,300+dy);await touch('touchend',target,220+dx,300+dy);
+    // Gallery navigation may await asynchronous image decoding before showing the target.
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});
+    return event;
   };
   try{
     await act(async()=>root.render(React.createElement(Home)));
