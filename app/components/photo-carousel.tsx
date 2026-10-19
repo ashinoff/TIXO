@@ -55,6 +55,8 @@ export function usePhotoCarousel<T extends HTMLElement = HTMLDivElement>(count: 
   const navigate = (target: number, direction: number) => {
     if (busy.current || count < 2 || target === index) return;
     clearTimeout(timer.current);
+    // Accessibility preference: skip async motion and swap the keyed image directly.
+    if (reducedMotion()) { paint(0); setIndex(target); return; }
     busy.current = true;
     const token = ++serial.current;
     const start = () => {
