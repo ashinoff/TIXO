@@ -8,7 +8,7 @@ import { ArrowIcon } from "./ui-icon";
 export function CatalogPhotoGallery({ photos, label, onOpen, inspection, children }: {
   photos: string[]; label: string; onOpen: () => void; inspection: HTMLAttributes<HTMLButtonElement>; children: ReactNode;
 }) {
-  const { index, motion, track, previous, next, move, drag, cancel } = usePhotoCarousel<HTMLSpanElement>(photos.length);
+  const { index, motion, track, previous, next, move, drag, cancel } = usePhotoCarousel<HTMLSpanElement>(photos.length, photos);
   const swipe = useCatalogPhotoSwipe({ move, drag, cancel });
   const multiple = photos.length > 1;
   return <div className="catalog-photo-gallery" ref={swipe} role="group" aria-label={`Фотографии: ${label}`} onKeyDown={event => {
@@ -16,8 +16,8 @@ export function CatalogPhotoGallery({ photos, label, onOpen, inspection, childre
   }}>
     <button type="button" className={`product-image${photos[index]?.endsWith("hero.png") ? " black-image" : ""}`} aria-label={`Подробнее о свече ${label}`} onClick={onOpen} {...inspection}>
       <span className="catalog-photo-track" ref={track}>
-        <span className="catalog-photo-slide"><img className="catalog-photo-current" src={photos[index]} alt={`${label}${multiple ? ` · фото ${index + 1}` : ""}`} loading="lazy" decoding="async" draggable={false} /></span>
-        {multiple && <><span className="catalog-photo-slide catalog-photo-previous"><img src={photos[previous]} alt="" aria-hidden="true" loading="lazy" decoding="async" draggable={false} /></span><span className="catalog-photo-slide catalog-photo-next"><img src={photos[next]} alt="" aria-hidden="true" loading="lazy" decoding="async" draggable={false} /></span></>}
+        <span className="catalog-photo-slide"><img key={`current:${photos[index]}`} className="catalog-photo-current" src={photos[index]} alt={`${label}${multiple ? ` · фото ${index + 1}` : ""}`} loading="lazy" decoding="async" draggable={false} /></span>
+        {multiple && <><span className="catalog-photo-slide catalog-photo-previous"><img key={`previous:${photos[previous]}`} src={photos[previous]} alt="" aria-hidden="true" loading="lazy" decoding="async" draggable={false} /></span><span className="catalog-photo-slide catalog-photo-next"><img key={`next:${photos[next]}`} src={photos[next]} alt="" aria-hidden="true" loading="lazy" decoding="async" draggable={false} /></span></>}
       </span>
       {children}
     </button>

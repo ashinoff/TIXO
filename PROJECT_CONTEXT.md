@@ -6,8 +6,8 @@
 
 | Назначение | Адрес / расположение |
 | --- | --- |
-| Действующий сайт | https://tixo-ashinoff.amvera.io/ |
-| Административная панель | https://tixo-ashinoff.amvera.io/admin |
+| Действующий сайт | https://tixo-mia-ashinoff.mia0.amvera.tech/ |
+| Административная панель | https://tixo-mia-ashinoff.mia0.amvera.tech/admin |
 | Репозиторий | https://github.com/ashinoff/TIXO |
 | Ветка публикации | `main` |
 | Хостинг приложения | Amvera, Docker, порт `3000` |
