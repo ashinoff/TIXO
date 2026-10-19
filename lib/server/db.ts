@@ -134,9 +134,11 @@ export async function ensureSchema() {
       id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, shape TEXT NOT NULL DEFAULT 'ribbed', active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
-    await db.query("ALTER TABLE candle_forms ADD COLUMN IF NOT EXISTS silhouette TEXT, ADD COLUMN IF NOT EXISTS two_tone BOOLEAN NOT NULL DEFAULT FALSE");
+    await db.query("ALTER TABLE candle_forms ADD COLUMN IF NOT EXISTS silhouette TEXT, ADD COLUMN IF NOT EXISTS two_tone BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS filter_image TEXT, ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE");
     await db.query("ALTER TABLE candle_forms ALTER COLUMN shape DROP NOT NULL, ALTER COLUMN shape DROP DEFAULT");
-    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS candle_forms_name_unique ON candle_forms(LOWER(name))");
+    // Archived forms keep historical orders/products but no longer reserve their name.
+    await db.query("DROP INDEX IF EXISTS candle_forms_name_unique");
+    await db.query("CREATE UNIQUE INDEX IF NOT EXISTS candle_forms_live_name_unique ON candle_forms(LOWER(name)) WHERE NOT archived");
     await db.query("ALTER TABLE scents ADD COLUMN IF NOT EXISTS profile JSONB NOT NULL DEFAULT '{}'::jsonb");
     await db.query(`ALTER TABLE products
       ADD COLUMN IF NOT EXISTS form_id BIGINT REFERENCES candle_forms(id) ON DELETE RESTRICT,
@@ -223,7 +225,7 @@ export function mapVariant(row: Record<string, unknown>): Variant {
 }
 
 export function mapForm(row: Record<string, unknown>): CandleForm {
-  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : null, silhouette: row.silhouette ? String(row.silhouette) : null, twoTone: Boolean(row.two_tone) };
+  return { id: Number(row.id), name: String(row.name), active: Boolean(row.active), shape: typeof row.shape === "string" && Object.hasOwn(candleShapes, row.shape) ? row.shape as CandleShape : null, silhouette: row.silhouette ? String(row.silhouette) : null, filterImage: row.filter_image ? String(row.filter_image) : null, twoTone: Boolean(row.two_tone) };
 }
 
 export async function listProducts(admin = false, id?: number): Promise<Product[]> {

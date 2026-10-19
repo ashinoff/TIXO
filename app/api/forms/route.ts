@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const admin = new URL(request.url).searchParams.get("admin") === "1";
     if (admin && !await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
     await ensureSchema();
-    const result = await getPool().query("SELECT * FROM candle_forms WHERE $1::boolean OR active ORDER BY id", [admin]);
+    const result = await getPool().query("SELECT * FROM candle_forms WHERE NOT archived AND ($1::boolean OR active) ORDER BY id", [admin]);
     return NextResponse.json(result.rows.map(mapForm));
   } catch (error) { return apiError(error); }
 }

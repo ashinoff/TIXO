@@ -86,3 +86,12 @@
 .messenger-settings fieldset>button{justify-self:start}
 
 .order-channels{padding:16px 0;border-bottom:1px solid #dedfd5;margin:0 22px 18px}.order-channels>div{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0}.order-channel{font-size:12px;line-height:1.5;padding:6px 10px;background:#e7ecdf;color:#3d5130;border:1px solid #cbd5c0;border-radius:14px}.order-channels>small{display:block;font-size:12px;line-height:1.6;color:#737a6a}
+
+/* Separate filter artwork from the technical tintable silhouette. */
+.filter-image-editor{display:grid;gap:12px;padding:18px;border:1px solid #d4d9c8;background:#f5f4ec}
+.filter-image-editor>strong{font-size:16px;font-weight:600}
+.filter-image-editor .editor-hint{margin:0}
+.filter-image-sample{width:150px;height:150px;display:grid;place-items:center;background:#e8e9de;border:1px solid #cbd0bf}
+.filter-image-sample img,.form-card-preview .admin-form-thumbnail{width:100%;height:100%;object-fit:contain;display:block}
+.form-card-preview .admin-form-thumbnail{max-width:190px;margin:0 auto;padding:12px}
+.filter-image-editor input{max-width:100%;font-size:14px}

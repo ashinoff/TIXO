@@ -17,12 +17,18 @@ export async function PATCH(request: Request, context: Context) {
 
 export async function DELETE(_request: Request, context: Context) {
   if (!await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
+  const id = integer((await context.params).id, "Форма", 1);
+  const db = await getPool().connect();
   try {
-    const id = integer((await context.params).id, "Форма", 1);
     await ensureSchema();
-    const used = await getPool().query("SELECT 1 FROM products WHERE form_id=$1 LIMIT 1", [id]);
-    if (used.rowCount) return NextResponse.json({ error: "Форма используется в свечах. Отключите её, чтобы сохранить свечи и остатки." }, { status: 409 });
-    const result = await getPool().query("DELETE FROM candle_forms WHERE id=$1", [id]);
-    return result.rowCount ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Форма не найдена" }, { status: 404 });
-  } catch (error) { return apiError(error); }
+    await db.query("BEGIN");
+    const found = await db.query("SELECT id FROM candle_forms WHERE id=$1 AND NOT archived FOR UPDATE", [id]);
+    if (!found.rowCount) { await db.query("ROLLBACK"); return NextResponse.json({ error: "Форма не найдена" }, { status: 404 }); }
+    // Keep orders and stock history safe: hiding a form also archives its attached live candles.
+    const removed = await db.query("UPDATE products SET archived=TRUE,published=FALSE,updated_at=NOW() WHERE form_id=$1 AND NOT archived RETURNING id", [id]);
+    await db.query("UPDATE candle_forms SET active=FALSE,archived=TRUE,updated_at=NOW() WHERE id=$1", [id]);
+    await db.query("COMMIT");
+    return NextResponse.json({ ok: true, archivedProducts: removed.rowCount });
+  } catch (error) { await db.query("ROLLBACK"); return apiError(error); }
+  finally { db.release(); }
 }

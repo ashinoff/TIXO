@@ -8,7 +8,7 @@ export function sortByName<T extends { name: string }>(items: readonly T[]): T[]
 
 export type AromaProfile = Record<"top" | "heart" | "base", { notes: string; description: string }>;
 export const emptyAromaProfile = (): AromaProfile => ({ top: { notes: "", description: "" }, heart: { notes: "", description: "" }, base: { notes: "", description: "" } });
-export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null; twoTone?: boolean };
+export type CandleForm = { id: number; name: string; active: boolean; shape: CandleShape | null; silhouette?: string | null; filterImage?: string | null; twoTone?: boolean };
 
 export type Scent = {
   image?: string | null;
