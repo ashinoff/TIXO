@@ -39,9 +39,15 @@ export function CostCalculator() {
     const res = await fetch("/api/admin/costing", { cache: "no-store" });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "Не загрузились расчёты");
-    const payload = normalizeCosting(json); setData(payload); return payload;
+    return normalizeCosting(json);
   }, []);
-  useEffect(() => { void load().catch(e => setError(e.message)).finally(() => setLoading(false)); }, [load]);
+  useEffect(() => {
+    let active = true;
+    void load().then(payload => { if (active) setData(payload); })
+      .catch(e => { if (active) setError(e.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [load]);
   const edit = (next: Recipe) => { setDraft(next); setDirty(true); setNotice(""); };
   const open = (recipe: Recipe) => {
     if (dirty && !window.confirm("Есть несохранённые изменения. Перейти к другой калькуляции без сохранения?")) return;
@@ -70,7 +76,7 @@ export function CostCalculator() {
         setData(current => ({ ...current, recipes: current.recipes.filter(r => r.id !== Number(body.id)) }));
         setNotice("Калькуляция удалена. Товары и история сохранены.");
       } else setNotice("Цена материала сохранена.");
-      try { await load(); } catch { setError("Сохранено в базе, но обновить список не удалось. Нажмите «Обновить список»."); }
+      try { setData(await load()); } catch { setError("Сохранено в базе, но обновить список не удалось. Нажмите «Обновить список»."); }
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Ошибка сохранения"); return false; }
     finally { saving.current = false; setBusy(false); }
@@ -82,7 +88,7 @@ export function CostCalculator() {
     <p className="admin-intro">Одна калькуляция может быть связана с несколькими товарами. Себестоимость общая, а прибыль каждого товара рассчитывается по его цене в каталоге. Цены и остатки товаров здесь не меняются.</p>
     <div className="costing-tabs">{([["recipes", "Калькулятор"], ["materials", "Прайс материалов"], ["history", "История"]] as const).map(([key, label]) => <button type="button" key={key} disabled={busy} className={tab === key ? "selected" : ""} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}</div>
     {loading && <p role="status">Загружаем калькуляции…</p>}
-    {error && <div className="editor-error" role="alert">{error}<button type="button" className="text-action" disabled={busy || loading} onClick={() => { setError(""); void load().catch(e => setError(e.message)); }}>Обновить список</button></div>}
+    {error && <div className="editor-error" role="alert">{error}<button type="button" className="text-action" disabled={busy || loading} onClick={() => { setError(""); void load().then(setData).catch(e => setError(e.message)); }}>Обновить список</button></div>}
     {notice && <p className="costing-notice" role="status">{notice}</p>}
     {tab === "materials" && <div className="costing-materials"><header><h2>Материалы и закупочные цены</h2><p>Цена за 1 грамм, штуку или другую указанную единицу.</p></header>
       {data.materials.map(m => <MaterialRow key={`${m.id}:${m.name}:${m.unit}:${m.price}`} material={m} onSave={value => save({ action: "material", ...value })} disabled={busy || loading} />)}
