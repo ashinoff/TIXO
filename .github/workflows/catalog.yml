@@ -37,6 +37,7 @@ jobs:
           TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
       - run: npm run lint
       - run: npm run test:ui
+      - run: node --test tests/costing-ui.test.mjs
       - run: npm run build:amvera
         env:
           NEXT_TELEMETRY_DISABLED: 1
@@ -44,3 +45,20 @@ jobs:
         env:
           NODE_ENV: production
           TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
+      - run: node --test tests/costing-http.test.mjs
+        env:
+          NODE_ENV: production
+          TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
+
+  publication:
+    name: Confirm admin on Amvera (read-only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-costing-publication.mjs
