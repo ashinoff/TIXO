@@ -1,0 +1,45 @@
+/* Scope all new controls to the existing administration costing workspace. */
+.costing .costing-editor-fields{border:0;padding:0;margin:0;min-width:0}
+.costing .costing-editor-fields:disabled{opacity:.7}
+.costing .costing-notice{padding:14px 18px;background:#e8efde;border:1px solid #bacaaa;color:#33492a;line-height:1.6}
+.costing .costing-save-state{align-self:center;color:#68735b;font-size:13px}
+.costing .costing-help{font-size:12px;line-height:1.7;color:#69725f;margin:12px 0}
+.costing .costing-product-picker{border:1px solid #c8cfba;background:#f4f5ed;padding:18px;margin:18px 0 28px;min-width:0}
+.costing .costing-product-picker>header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}
+.costing .costing-product-picker h3{margin:0 0 5px;font-size:20px}
+.costing .costing-product-picker header p{margin:0;font-size:13px;color:#69725f}
+.costing .costing-product-picker header>strong{white-space:nowrap;background:#dce7d0;color:#354a2a;padding:9px 12px;font-size:13px;font-weight:500}
+.costing .costing-product-tools{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.costing .costing-product-tools>input{flex:1;min-width:150px;width:100%;min-height:44px;padding:11px 12px;border:1px solid #bcc7ac;background:#fffef9;font:inherit;color:#283423}
+.costing .costing-product-tools label{display:flex;align-items:center;gap:8px;font-size:13px;min-height:44px}
+.costing .costing-product-tools input[type=checkbox],.costing .costing-product-option>input{width:19px;height:19px;accent-color:#4f6740;flex-shrink:0}
+.costing .costing-product-bulk{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.costing .costing-product-bulk button{padding:9px 12px;min-height:40px;background:#fffef9;border:1px solid #bfc8b2;font-size:12px;color:#34462c}
+.costing .costing-product-bulk span{margin-left:auto;font-size:12px;color:#6c7561}
+.costing .costing-product-list{max-height:400px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;border:1px solid #d1d7c6;background:#fcfcf7}
+.costing .costing-product-option{display:grid;grid-template-columns:24px minmax(120px,1fr) minmax(85px,.45fr) minmax(90px,.45fr);align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid #e0e4d8;cursor:pointer;min-height:82px}
+.costing .costing-product-option:last-child{border-bottom:0}
+.costing .costing-product-option[data-selected=true]{background:#eaf0e1}
+.costing .costing-product-option:focus-within{outline:2px solid #61794d;outline-offset:-2px}
+.costing .costing-product-name,.costing .costing-product-money{display:grid;gap:4px;min-width:0}
+.costing .costing-product-name strong{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.costing .costing-product-name small{font-size:11px;line-height:1.5;color:#69725f;overflow-wrap:anywhere}
+.costing .costing-product-money{text-align:right;font-variant-numeric:tabular-nums}
+.costing .costing-product-money strong{font-size:13px;font-weight:600}
+.costing .costing-product-money small{font-size:10px;color:#68725c;line-height:1.5}
+.costing .costing-product-money[data-loss=true],.costing .costing-product-money[data-loss=true] small{color:#943f32}
+.costing .costing-empty-products{padding:20px;font-size:13px;line-height:1.7;color:#68725c}
+.costing .costing-recipes>div button{max-width:100%;overflow-wrap:anywhere}
+.costing .costing-recipes>div button small{max-width:300px;line-height:1.5}
+.costing .editor-error button{display:block;margin-top:8px}
+@media(max-width:750px){
+ .costing .costing-product-picker{padding:12px}
+ .costing .costing-product-picker>header{align-items:flex-start;gap:10px;flex-wrap:wrap}
+ .costing .costing-product-option{grid-template-columns:22px minmax(0,1fr) minmax(70px,.55fr);gap:8px;padding:12px 10px}
+ .costing .costing-product-option>input{grid-column:1;grid-row:1/3;align-self:start;margin-top:2px}
+ .costing .costing-product-name{grid-column:2/-1}
+ .costing .costing-product-money{grid-row:2;text-align:left}
+ .costing .costing-product-money:last-child{text-align:right}
+ .costing .costing-product-tools{gap:6px}
+ .costing .costing-product-tools>input{flex-basis:100%;font-size:16px}
+}
