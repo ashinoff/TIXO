@@ -43,3 +43,8 @@
  .costing .costing-product-tools{gap:6px}
  .costing .costing-product-tools>input{flex-basis:100%;font-size:16px}
 }
+@media(max-width:380px){
+ .costing .costing-lines label{grid-template-columns:minmax(0,1fr) 62px 24px 72px;gap:5px}
+ .costing .costing-lines strong{font-size:12px;overflow-wrap:anywhere}
+ .costing .costing-lines label>span{min-width:0;overflow-wrap:anywhere}
+}
