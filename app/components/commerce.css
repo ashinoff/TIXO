@@ -354,7 +354,7 @@
 /* The same filters return at the top only while scrolling upward through the catalog. */
 .tiho-site .catalog-filter-slot{margin:34px 0 38px}
 .tiho-site .catalog-filter-slot>.catalog-filter-bar{margin:0}
-.tiho-site .catalog-filter-bar.is-floating{position:fixed;z-index:50;top:max(10px,env(safe-area-inset-top));left:var(--gutter);right:var(--gutter);background:#f6f5edf5;box-shadow:0 8px 30px #1726091c;backdrop-filter:blur(12px);transform:translateY(calc(-100% - 30px));opacity:0;pointer-events:none;transition:transform .32s cubic-bezier(.22,.7,.25,1),opacity .22s ease}
+.tiho-site .catalog-filter-bar.is-floating{position:fixed;z-index:50;top:0;padding-top:env(safe-area-inset-top);left:var(--gutter);right:var(--gutter);background:#f6f5edf5;box-shadow:0 8px 30px #1726091c;backdrop-filter:blur(12px);transform:translateY(calc(-100% - 30px));opacity:0;pointer-events:none;transition:transform .32s cubic-bezier(.22,.7,.25,1),opacity .22s ease}
 .tiho-site .catalog-filter-bar.is-floating.is-visible{transform:translateY(0);opacity:1;pointer-events:auto}
 .tiho-site .catalog-filter-bar.is-floating .catalog-filter-trigger{min-height:65px;padding:11px 18px}
 .tiho-site .catalog-filter-bar.is-floating .filter-caption{margin-bottom:5px;font-size:9px}

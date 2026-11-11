@@ -1,18 +1,16 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- small transparent local assets and original uploaded artwork */
+/* eslint-disable @next/next/no-img-element -- original transparent artwork */
 import { useState } from "react";
 import type { CandleForm } from "@/lib/catalog";
 import { formPortrait } from "@/lib/form-portraits";
-import { CandlePreview } from "./candle-preview";
 
+/** One artwork source for the storefront, form cards and form editor. Legacy masks stay in saved data only. */
 export function FormMiniature({ form }: { form: CandleForm }) {
   const portrait = formPortrait(form);
-  const [failedSource, setFailedSource] = useState<string | null>(null);
-  const src = form.filterImage ?? portrait?.src ?? form.silhouette;
-  // Authored filter artwork keeps its colors; only fallback silhouettes are neutralized.
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const src = [form.filterImage, portrait?.src].find((url): url is string => Boolean(url) && !failedSources.includes(url!));
   return <span className="filter-form-preview" data-small={portrait?.small || undefined} aria-hidden="true">
-    {src && src !== failedSource
-      ? <img className={!form.filterImage && !portrait ? "form-miniature form-miniature-uploaded" : "form-miniature"} src={src} alt="" width="640" height="640" loading="lazy" decoding="async" draggable={false} onError={() => setFailedSource(src)} />
-      : <span className="form-miniature-fallback"><CandlePreview shape={form.shape} color="#cbbb9f" /></span>}
+    {src ? <img className="form-miniature" src={src} alt="" width="640" height="640" loading="lazy" decoding="async" draggable={false} onError={() => setFailedSources(current => [...current, src])} />
+      : <span className="form-miniature-empty">Миниатюра пока не добавлена</span>}
   </span>;
 }

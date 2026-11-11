@@ -1,12 +1,12 @@
+import { prepareCosting } from "@/lib/server/costing";
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/server/auth";
-import { ensureSchema, getPool } from "@/lib/server/db";
+import { getPool } from "@/lib/server/db";
 import { InputError } from "@/lib/server/validation";
 import { apiError } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const defaults: [string, string, number][] = [["Гипс", "г", 0.13], ["Воск", "г", 0.65], ["Отдушка", "г", 20], ["Фитиль", "шт", 5], ["Краска", "шт", 50], ["Упаковка S", "шт", 87], ["Упаковка L", "шт", 103], ["Доп. расходы", "усл. ед.", 10], ["Подставка S", "шт", 50], ["Подставка L", "шт", 80], ["Спички", "шт", 70]];
 const headers = { "Cache-Control": "no-store" };
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 function numeric(value: unknown, max = 100000000): number {
@@ -35,41 +35,10 @@ const productQuery = `SELECT p.id,p.name,p.price,p.published,p.archived,c.name A
   FROM products p LEFT JOIN colors c ON c.id=p.color_id LEFT JOIN colors a ON a.id=p.accent_color_id
   LEFT JOIN scents s ON s.id=p.scent_id LEFT JOIN candle_forms f ON f.id=p.form_id`;
 
-/** All schema changes and legacy links migrate together, without changing products or past snapshots. */
-async function prepare() {
-  await ensureSchema();
-  const db = await getPool().connect();
-  try {
-    await db.query("BEGIN");
-    await db.query("SELECT pg_advisory_xact_lock(84173027)");
-    await db.query(`CREATE TABLE IF NOT EXISTS costing_materials (id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,unit TEXT NOT NULL,unit_price NUMERIC(14,4) NOT NULL CHECK(unit_price>=0),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await db.query(`CREATE TABLE IF NOT EXISTS costing_recipes (id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL,product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,markup_pct NUMERIC(9,2) NOT NULL DEFAULT 100,sale_price NUMERIC(14,2),items JSONB NOT NULL DEFAULT '{}'::jsonb,note TEXT NOT NULL DEFAULT '',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await db.query("ALTER TABLE costing_recipes ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1");
-    await db.query(`CREATE TABLE IF NOT EXISTS costing_history (id BIGSERIAL PRIMARY KEY,recipe_id BIGINT REFERENCES costing_recipes(id) ON DELETE SET NULL,snapshot JSONB NOT NULL,saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await db.query(`CREATE TABLE IF NOT EXISTS costing_recipe_products (recipe_id BIGINT NOT NULL REFERENCES costing_recipes(id) ON DELETE CASCADE,product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,PRIMARY KEY(recipe_id,product_id))`);
-    await db.query("CREATE INDEX IF NOT EXISTS costing_recipe_products_product_idx ON costing_recipe_products(product_id)");
-    const seeded = await db.query("INSERT INTO app_migrations(key) VALUES('costing-seed-materials-v1') ON CONFLICT DO NOTHING RETURNING key");
-    if (seeded.rowCount) for (const [name, unit, price] of defaults) await db.query("INSERT INTO costing_materials(name,unit,unit_price) VALUES($1,$2,$3) ON CONFLICT(name) DO NOTHING", [name, unit, price]);
-    const imported = await db.query("INSERT INTO app_migrations(key) VALUES('costing-example-pumpkin-v1') ON CONFLICT DO NOTHING RETURNING key");
-    if (imported.rowCount) {
-      const units = [300,85,8,1,1,0,1,1,0,1,1];
-      const rows = await db.query("SELECT id,name FROM costing_materials WHERE name=ANY($1::text[])", [defaults.map(item => item[0])]);
-      const byName = new Map(rows.rows.map(row => [row.name, String(row.id)]));
-      const items: Record<string, number> = {};
-      defaults.forEach(([name], index) => { const key = byName.get(name); if (key && units[index]) items[key] = units[index]; });
-      await db.query("INSERT INTO costing_recipes(name,markup_pct,sale_price,items,note) VALUES($1,$2,$3,$4::jsonb,$5)", ["Тыква",100,1300,JSON.stringify(items),"Импорт из файла «калькулятор.xlsx»: 572,25 ₽ на 1 шт."]);
-    }
-    const linked = await db.query("INSERT INTO app_migrations(key) VALUES('costing-product-links-v1') ON CONFLICT DO NOTHING RETURNING key");
-    if (linked.rowCount) await db.query("INSERT INTO costing_recipe_products(recipe_id,product_id) SELECT id,product_id FROM costing_recipes WHERE product_id IS NOT NULL ON CONFLICT DO NOTHING");
-    await db.query("COMMIT");
-  } catch (error) { await db.query("ROLLBACK"); throw error; }
-  finally { db.release(); }
-}
-
 export async function GET() {
   if (!await isAdmin()) return NextResponse.json({ error: "Требуется вход" }, { status: 401, headers });
   try {
-    await prepare();
+    await prepareCosting();
     const db = getPool();
     const [materials, recipes, history, products] = await Promise.all([
       db.query("SELECT id,name,unit,unit_price AS price FROM costing_materials ORDER BY id"),
@@ -92,7 +61,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError("Некорректные данные запроса");
-    await prepare();
+    await prepareCosting();
     if (body.action === "material") {
       const name = String(body.name ?? "").trim(), unit = String(body.unit ?? "").trim();
       if (!name || name.length > 160 || !unit || unit.length > 32) throw new InputError("Укажите название материала и единицу");
