@@ -111,3 +111,9 @@
 .costing-note{margin-top:24px}.costing-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}.costing-actions button,.costing-material-row button{border:0;padding:13px 19px;background:#343f2b;color:#fff}.costing-actions button.danger{background:#8c4343}.costing-disclaimer{font-size:12px;color:#666b5d;margin-top:18px;line-height:1.6}
 .costing-material-row{display:grid;grid-template-columns:minmax(130px,2fr) 85px 140px auto;gap:10px;margin:10px 0}.costing-history article{display:flex;flex-wrap:wrap;gap:20px;align-items:center;padding:16px 0;border-bottom:1px solid #d9dfd2}.costing-history details{width:100%;font-size:13px}
 @media(max-width:750px){.costing-editor,.costing-materials,.costing-history{padding:14px}.costing-fields{grid-template-columns:1fr}.costing-lines label{grid-template-columns:minmax(100px,1fr) 76px 25px 90px;gap:6px}.costing-lines input{padding:8px}.costing-metrics{grid-template-columns:1fr 1fr}.costing-breakdown>div{grid-template-columns:95px minmax(10px,1fr) 80px 35px;gap:6px}.costing-material-row{grid-template-columns:1fr 70px}.costing-material-row input:first-child{grid-column:1/-1}}
+
+/* Form cards and the editor show exactly the same authored artwork as the catalog. */
+.admin-shell .form-card-preview .filter-form-preview,.form-editor .filter-image-sample .filter-form-preview{display:flex;align-items:center;justify-content:center;width:160px;max-width:100%;height:100%;margin:auto}
+.admin-shell .form-card-preview .form-miniature,.form-editor .filter-image-sample .form-miniature{width:100%;height:100%;object-fit:contain;transform:scale(.95)}
+.admin-shell .form-card-preview [data-small=true] .form-miniature,.form-editor .filter-image-sample [data-small=true] .form-miniature{transform:scale(.76)}
+.form-miniature-empty{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;line-height:1.5;text-align:center;color:#747d68;padding:8px}

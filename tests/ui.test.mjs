@@ -23,7 +23,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -219,7 +219,7 @@ test('inventory uses separate dropdowns for create/edit, quick stock updates and
     await submit(document.querySelector('.stock-editor form'));
     assert.deepEqual(stockBody,{stock:7,expectedStock:3});assert.match(document.querySelector('.stock-button').textContent,/7/);
     await click(button('Формы'));await click(button('Добавить форму'));
-    await setValue(document.querySelector('input[placeholder="Например, Колонна"]'),'Своя форма');
+    await setValue(document.querySelector('input[placeholder="Например, Мини кашпо"]'),'Своя форма');
     await submit(document.querySelector('.product-editor form'));assert.equal(addedForm.name,'Своя форма');
     await click(button('Остатки'));await click(button('Добавить свечу'));
     selects=[...document.querySelectorAll('.candle-selects select')];assert.deepEqual(selects.map(s=>s.value),['','','']);
@@ -316,7 +316,7 @@ test('uploaded form is the colored fallback in gallery, detail and cart; a candl
   }finally{await act(async()=>root.unmount());}
 });
 
-test('form editor uploads the named silhouette and candle photo removal previews the selected form',async()=>{
+test('form editor uploads filter artwork without rewriting old masks; existing product photo removal stays compatible',async()=>{
   let sent;let edited;
   const form={id:1,name:'Моя форма',shape:null,silhouette:'/api/uploads/my-form.png',active:true};
   const candle={...products[0],formId:1,form,colorId:2,scentId:1,color:colors[1],scent:scents[0],image:'/api/uploads/real-photo.webp'};
@@ -338,13 +338,13 @@ test('form editor uploads the named silhouette and candle photo removal previews
     await act(async()=>root.render(React.createElement(Admin)));
     await click(button('Формы'));await click(document.querySelector('.scent-admin-card footer button'));
     assert.equal(document.querySelector('.form-editor select'),null);
-    await setValue(document.querySelector('input[placeholder="Например, Колонна"]'),'Свой силуэт');
+    await setValue(document.querySelector('input[placeholder="Например, Мини кашпо"]'),'Своя форма');
     const file=new dom.window.File(['png'],'my-form.png',{type:'image/png'});
-    const input=document.querySelector('[aria-label="Загрузить силуэт"]');Object.defineProperty(input,'files',{value:[file]});
+    const input=document.querySelector('[aria-label="Миниатюра для фильтра"]');Object.defineProperty(input,'files',{value:[file]});
     await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
-    assert.match(document.querySelector('.silhouette-preview .wax-uploaded').getAttribute('style'),/blob:test-silhouette/);
+    assert.equal(document.querySelector('.filter-image-sample img').getAttribute('src'),'blob:test-silhouette');
     await submit(document.querySelector('.form-editor form'));
-    assert.equal(sent.get('name'),'Свой силуэт');assert.equal(sent.get('silhouette').name,'my-form.png');assert.equal(sent.has('shape'),false);
+    assert.equal(sent.get('name'),'Своя форма');assert.equal(sent.get('filterImage').name,'my-form.png');assert.equal(sent.has('shape'),false);assert.equal(sent.has('silhouette'),false);assert.equal(sent.has('twoTone'),false);
     await click(button('Остатки'));await click(document.querySelector('[aria-label="Редактировать свечу № 1"]'));
     assert.equal(document.querySelector('.editor-photo img').getAttribute('src'),candle.image);
     await click(button('Убрать фото'));
@@ -533,7 +533,7 @@ test('portrait browsing preserves the catalog until explicitly applying its arom
     assert.equal(document.querySelector('.scent-portrait img').getAttribute('src'),'/assets/aromas/wine.webp');assert.equal(document.querySelector('.scent-portrait-caption h3').textContent,'WINE');assert.match(document.querySelector('#filter-scent').textContent,/Все ароматы/);assert.equal(document.querySelectorAll('.product-card').length,3);assert.equal(document.querySelector('#ritual-aroma'),null);assert.equal(document.querySelector('#ritual'),null);assert.equal(document.querySelector('.scent-discovery-heading .eyebrow').textContent,'02 / ИСКУССТВО АРОМАТА');assert.ok(document.querySelector('#aromas #note-panel'));
     await click(document.querySelector('.scent-library>.button'));
     assert.match(document.querySelector('#filter-scent').textContent,/WINE/);assert.equal(document.querySelectorAll('.product-card').length,2);
-    await click(document.querySelector('#filter-form'));assert.ok(document.querySelector('.filter-form-preview .wax-stage'));await click(document.querySelector('[aria-label="Форма: Спираль"]'));
+    await click(document.querySelector('#filter-form'));assert.ok(document.querySelector('.filter-form-preview .form-miniature-empty'));await click(document.querySelector('[aria-label="Форма: Спираль"]'));
     assert.equal(document.querySelectorAll('.product-card').length,1);assert.equal(document.querySelector('.product-card').dataset.productId,'3');assert.equal(document.activeElement.id,'filter-form');
     await click(document.querySelector('#filter-color'));await click(document.querySelector('[aria-label="Цвет: Красный"]'));assert.equal(document.querySelectorAll('.product-card').length,0);
     await click(document.querySelector('.catalog-reset'));assert.equal(document.querySelectorAll('.product-card').length,3);
@@ -991,15 +991,17 @@ test('two-color workshop uses the administrator palette and keeps both colors th
   }finally{await act(async()=>root.unmount());window.localStorage.clear();}
 });
 
-test('form editor installs the prepared two-color snake template without an upload',async()=>{
+test('form editor uses the built-in thumbnail and no longer offers custom candle masks',async()=>{
   const {FormEditor}=require('./app/admin/editors.js');let saved;
   const root=createRoot(document.getElementById('root'));
   try{
     await act(async()=>root.render(React.createElement(FormEditor,{form:{id:0,name:'Змея',active:true,shape:null},onClose(){},onSave:async data=>{saved=data;}})));
-    await click(button('Использовать готовый силуэт'));
-    assert.equal(document.querySelector('.silhouette-preview .wax-color-map image').getAttribute('href'),'/assets/forms/snake-two-tone.png');
+    assert.equal(document.querySelector('.filter-image-sample img').getAttribute('src'),'/assets/forms/portraits/snake.webp');
+    assert.equal(button('Использовать готовый силуэт'),undefined);
+    assert.equal(document.querySelector('[aria-label="Загрузить силуэт"]'),null);
+    assert.doesNotMatch(document.querySelector('.form-editor').textContent,/Двухцветная форма|техническая маска|Силуэт свечи/);
     await submit(document.querySelector('.form-editor form'));
-    assert.equal(saved.get('twoTone'),'true');assert.equal(saved.get('silhouettePreset'),'snake-two-tone');
+    assert.equal(saved.has('twoTone'),false);assert.equal(saved.has('silhouettePreset'),false);assert.equal(saved.has('removeSilhouette'),false);
   }finally{await act(async()=>root.unmount());}
 });
 
@@ -1357,10 +1359,13 @@ test('form gallery uses neutral textured miniatures, keeps five current forms an
   const {FormMiniature}=require('./app/components/form-miniature.js');
   const fallback=createRoot(document.getElementById('root'));
   try{
-    await act(async()=>fallback.render(React.createElement(FormMiniature,{form:{id:100,name:'Новая авторская форма',shape:null,silhouette:'/new-texture.png'}})));
+    await act(async()=>fallback.render(React.createElement(FormMiniature,{form:{id:100,name:'Новая форма',shape:null,filterImage:'/new-texture.png',silhouette:'/old-mask.png'}})));
     const image=document.querySelector('.form-miniature');assert.equal(image.getAttribute('src'),'/new-texture.png');
     await act(async()=>image.dispatchEvent(new Event('error')));
-    assert.equal(document.querySelector('img'),null);assert.ok(document.querySelector('.wax-missing'));
+    assert.equal(document.querySelector('img'),null);assert.ok(document.querySelector('.form-miniature-empty'));
+    await act(async()=>fallback.render(React.createElement(FormMiniature,{form:{id:2,name:'Кашпо',shape:null,filterImage:'/missing-upload.png',silhouette:'/old-mask.png'}})));
+    await act(async()=>document.querySelector('img').dispatchEvent(new Event('error')));
+    assert.equal(document.querySelector('img').getAttribute('src'),'/assets/forms/portraits/pot.webp');
   }finally{await act(async()=>fallback.unmount());}
 });
 
@@ -1445,4 +1450,38 @@ test('catalog filters reappear on upward scrolling and leave with the catalog ev
     await scroll(2450);assert.equal(panel.classList.contains('is-floating'),false);assert.equal(left,1,'Leaving the catalog closes its menu');
     await act(async()=>root.render(render(false)));await scroll(400);assert.equal(panel.classList.contains('is-floating'),false);
   }finally{await act(async()=>root.unmount());Object.defineProperty(window,'scrollY',oldY);window.requestAnimationFrame=oldRAF;window.cancelAnimationFrame=oldCAF;}
+});
+
+test('trade dashboard distinguishes unknown costs, filters the register and saves expense entries without touching products',async()=>{
+  const {CostingWorkspace}=require('./app/admin/trade-dashboard.js');
+  const {buildTradeReport}=require('./lib/trade-report.js');
+  const source={products:[{id:91,name:'Кашпо',color:'Белый',accent:'',scent:'MINT',stock:2,price:100,published:true,visible:true,archived:false},{id:92,name:'Змея',color:'Чёрный',accent:'',scent:'HONEY',stock:1,price:150,published:false,visible:false,archived:false}],materials:[{id:1,name:'Воск',unit:'г',price:.65}],recipes:[{id:1,name:'Кашпо',productIds:[91],items:{1:100}}],orders:[],expenses:[],history:[]};
+  const writes=[];let fail=false;
+  globalThis.fetch=async(url,init={})=>{
+    if(String(url).startsWith('/api/admin/reports/export'))return response({error:'Требуется вход'},401);
+    assert.ok(String(url).startsWith('/api/admin/reports'));
+    if(init.method==='POST'){
+      const body=JSON.parse(init.body);writes.push(body);
+      if(fail)return response({error:'Сохранение не прошло'},500);
+      source.expenses.push({...body,id:1,version:1});return response({ok:true});
+    }
+    return response(buildTradeReport(source,{from:'',to:''}));
+  };
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(CostingWorkspace)));
+    assert.match(document.querySelector('.trade-warning').textContent,/Не рассчитано: 1 позиций · 1 шт/);
+    assert.match(document.querySelector('.trade-metrics').textContent,/Доступно свечей3 шт/);
+    await click(button('Реестр остатков'));assert.equal(document.querySelectorAll('tbody tr').length,2);
+    await setValue(document.querySelector('[aria-label="Поиск в реестре остатков"]'),'Змея');assert.equal(document.querySelectorAll('tbody tr').length,1);
+    assert.match(document.querySelector('tbody').textContent,/Нет калькуляции/);
+    await click(button('Реестр в Excel'));assert.match(document.querySelector('.export-control [role="alert"]').textContent,/Требуется вход/);
+    await click(button('Расходы'));
+    await setValue(document.querySelector('[aria-label="Сумма расхода"]'),'800');
+    await setValue(document.querySelector('[aria-label="Описание расхода"]'),'Закупка воска');
+    fail=true;await submit(document.querySelector('.trade-expense-form'));assert.equal(document.querySelector('[aria-label="Описание расхода"]').value,'Закупка воска');
+    fail=false;await submit(document.querySelector('.trade-expense-form'));
+    assert.equal(source.expenses.length,1);assert.match(document.querySelector('tbody').textContent,/Закупка воска/);assert.match(document.querySelector('.trade-notice').textContent,/сохранён/);
+    assert.equal(writes.every(w=>w.action==='expense'),true);assert.equal(source.products[0].stock,2);
+  }finally{await act(async()=>root.unmount());}
 });
