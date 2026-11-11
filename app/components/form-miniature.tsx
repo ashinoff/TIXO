@@ -9,9 +9,10 @@ export function FormMiniature({ form }: { form: CandleForm }) {
   const portrait = formPortrait(form);
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const src = form.filterImage ?? portrait?.src ?? form.silhouette;
+  // Authored filter artwork keeps its colors; only fallback silhouettes are neutralized.
   return <span className="filter-form-preview" data-small={portrait?.small || undefined} aria-hidden="true">
     {src && src !== failedSource
-      ? <img className={form.filterImage || !portrait ? "form-miniature form-miniature-uploaded" : "form-miniature"} src={src} alt="" width="640" height="640" loading="lazy" decoding="async" draggable={false} onError={() => setFailedSource(src)} />
+      ? <img className={!form.filterImage && !portrait ? "form-miniature form-miniature-uploaded" : "form-miniature"} src={src} alt="" width="640" height="640" loading="lazy" decoding="async" draggable={false} onError={() => setFailedSource(src)} />
       : <span className="form-miniature-fallback"><CandlePreview shape={form.shape} color="#cbbb9f" /></span>}
   </span>;
 }
