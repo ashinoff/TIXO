@@ -66,11 +66,17 @@ export async function POST(request: Request) {
       const name = String(body.name ?? "").trim(), unit = String(body.unit ?? "").trim();
       if (!name || name.length > 160 || !unit || unit.length > 32) throw new InputError("Укажите название материала и единицу");
       const price = numeric(body.price);
-      if (body.id != null && body.id !== 0 && body.id !== "0") {
-        const result = await getPool().query("UPDATE costing_materials SET name=$1,unit=$2,unit_price=$3,updated_at=NOW() WHERE id=$4", [name, unit, price, id(body.id)]);
+      try {
+        const result = body.id != null && body.id !== 0 && body.id !== "0"
+          ? await getPool().query("UPDATE costing_materials SET name=$1,unit=$2,unit_price=$3,updated_at=NOW() WHERE id=$4 RETURNING id,name,unit,unit_price AS price", [name, unit, price, id(body.id)])
+          : await getPool().query("INSERT INTO costing_materials(name,unit,unit_price) VALUES($1,$2,$3) RETURNING id,name,unit,unit_price AS price", [name, unit, price]);
         if (!result.rowCount) throw new InputError("Материал не найден", 404);
-      } else await getPool().query("INSERT INTO costing_materials(name,unit,unit_price) VALUES($1,$2,$3)", [name, unit, price]);
-      return NextResponse.json({ ok: true }, { headers });
+        const material = result.rows[0];
+        return NextResponse.json({ ok: true, material: { ...material, id: id(material.id), price: Number(material.price) } }, { headers });
+      } catch (error) {
+        if ((error as { code?: string })?.code === "23505") throw new InputError("Материал с таким названием уже есть. Измените существующую позицию.", 409);
+        throw error;
+      }
     }
     if (body.action === "remove-recipe") {
       const result = await getPool().query("DELETE FROM costing_recipes WHERE id=$1 AND ($2::integer IS NULL OR version=$2)", [id(body.id), body.expected_version == null ? null : id(body.expected_version)]);
