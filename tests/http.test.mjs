@@ -62,12 +62,15 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const savedCost=await admin('/api/admin/costing',{method:'POST',...json({action:'recipe',name:'Тестовая свеча',product_id:null,items:pumpkin.items,markup_pct:100,sale_price:1300,note:'Тест'})});
   assert.equal(savedCost.status,200);
   assert.ok((await (await admin('/api/admin/costing')).json()).history.some(h=>h.snapshot.name==='Тестовая свеча'&&h.snapshot.total===572.25));
+  assert.deepEqual(await (await call('/api/order-contacts')).json(),{whatsapp:'79899998988',telegram:'+79899998988'});
   const contactSettings={whatsapp:'+7 (999) 123-45-67',telegram:'https://t.me/tixo_example',instagram:'@tixo.example'};
   assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json(contactSettings)})).status,200);
   const contacts={whatsapp:'79991234567',telegram:'tixo_example'};
   assert.deepEqual(await (await call('/api/order-contacts')).json(),contacts);
   assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json({...contactSettings,telegram:'https://evil.test/account'})})).status,400);
   assert.deepEqual(await (await call('/api/order-contacts')).json(),contacts);
+  assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json({whatsapp:'+7 (989) 999-89-88',telegram:'https://t.me/+79899998988'})})).status,200);
+  assert.deepEqual(await (await call('/api/order-contacts')).json(),{whatsapp:'79899998988',telegram:'+79899998988'});
   assert.equal((await admin('/api/order-contacts',{method:'PATCH',...json({whatsapp:'',telegram:''})})).status,200);
   assert.deepEqual(await (await call('/api/order-contacts')).json(),{whatsapp:'',telegram:''});
   const orderedBefore=await (await admin('/api/products?admin=1')).json();

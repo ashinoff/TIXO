@@ -24,15 +24,17 @@ export function normalizeMessengerContact(kind: Messenger, input: unknown): stri
     if (url.protocol !== "https:" || !hosts[kind].includes(url.hostname) || url.username || url.password || url.port || url.search || url.hash || !/^\/[^/]+\/?$/.test(url.pathname)) throw new Error(`Укажите прямой контакт ${messengerNames[kind]}, без дополнительных параметров.`);
     value = url.pathname.replace(/^\/|\/$/g, "");
   }
-  if (kind === "whatsapp") {
-    if (!/^\+?[\d\s().-]+$/.test(value)) throw new Error("WhatsApp: укажите номер с кодом страны, например +7 999 123-45-67.");
+  if (kind === "whatsapp" || /^\+?[\d\s().-]+$/.test(value)) {
+    if (!/^\+?[\d\s().-]+$/.test(value)) throw new Error(`${messengerNames[kind]}: укажите номер с кодом страны, например +7 999 123-45-67.`);
     value = value.replace(/\D/g, "");
-    if (!/^[1-9]\d{6,14}$/.test(value)) throw new Error("WhatsApp: укажите полный номер с кодом страны.");
+    if (!/^[1-9]\d{6,14}$/.test(value)) throw new Error(`${messengerNames[kind]}: укажите полный номер с кодом страны.`);
+    // Telegram phone links require the leading + to distinguish them from usernames.
+    if (kind === "telegram") value = `+${value}`;
   } else {
     value = value.replace(/^@/, "");
     const valid = /^[a-z][a-z0-9_]{4,31}$/i.test(value);
     const reserved = /^(share|joinchat|addstickers|addemoji|login|proxy|socks|iv|boost|giftcode)$/i;
-    if (!valid || reserved.test(value)) throw new Error(`${messengerNames[kind]}: укажите имя аккаунта или прямую ссылку на него.`);
+    if (!valid || reserved.test(value)) throw new Error(`${messengerNames[kind]}: укажите имя аккаунта, номер с кодом страны или прямую ссылку.`);
   }
   return value;
 }

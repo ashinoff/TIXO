@@ -86,6 +86,14 @@ export async function ensureSchema() {
     await db.query("CREATE UNIQUE INDEX IF NOT EXISTS scents_name_unique ON scents (LOWER(name))");
 
     await db.query("CREATE TABLE IF NOT EXISTS app_migrations (key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+    const orderContacts = await db.query("INSERT INTO app_migrations(key) VALUES('order-contacts-20261111') ON CONFLICT DO NOTHING RETURNING key");
+    if (orderContacts.rowCount) {
+      // Apply the owner's contact correction once; later admin edits remain authoritative.
+      await db.query(`INSERT INTO site_content(key,value,kind) VALUES
+        ('atelier.contact.whatsapp','79899998988','text'),
+        ('atelier.contact.telegram','+79899998988','text')
+        ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,kind='text',updated_at=NOW()`);
+    }
     const presets = await db.query("INSERT INTO app_migrations(key) VALUES('global-scents-v1') ON CONFLICT DO NOTHING RETURNING key");
     if (presets.rowCount) {
       const colors = [
