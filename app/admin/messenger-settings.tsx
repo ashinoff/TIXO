@@ -24,8 +24,8 @@ export function MessengerSettings({ content, onSaved }: { content: Record<string
     <p>После оформления покупатель сможет открыть ваш чат с текстом заказа. Заказ уже сохранён в разделе «Заказы». Оставьте поле пустым, чтобы скрыть этот мессенджер.</p>
     <fieldset disabled={saving}>
       {(Object.keys(messengerKeys) as Messenger[]).map(kind => <label key={kind}>{messengerNames[kind]}
-        <input value={draft[kind]} type={kind === "whatsapp" ? "tel" : "text"} autoComplete="off" maxLength={200} placeholder={kind === "whatsapp" ? "+7 999 123-45-67" : "@имя_аккаунта"} onChange={event => { setDraft(current => ({ ...current, [kind]: event.target.value })); setSaved(false); }} />
-        <small>{kind === "whatsapp" ? "Номер магазина с кодом страны. Можно вставить ссылку wa.me." : "Личный аккаунт или аккаунт Telegram Business, в который можно написать. Не канал и не бот. Допустима ссылка t.me."}</small>
+        <input value={draft[kind]} type={kind === "whatsapp" ? "tel" : "text"} autoComplete="off" maxLength={200} placeholder={kind === "whatsapp" ? "+7 999 123-45-67" : "@имя_аккаунта или +7 999 123-45-67"} onChange={event => { setDraft(current => ({ ...current, [kind]: event.target.value })); setSaved(false); }} />
+        <small>{kind === "whatsapp" ? "Номер магазина с кодом страны. Можно вставить ссылку wa.me." : "Личный аккаунт или Telegram Business, в который можно написать. Укажите имя аккаунта, номер с кодом страны или ссылку t.me. Не канал и не бот."}</small>
       </label>)}
       <button type="submit">{saving ? "Сохраняем…" : "Сохранить контакты"}</button>
     </fieldset>

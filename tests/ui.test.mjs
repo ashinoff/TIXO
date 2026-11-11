@@ -1155,12 +1155,20 @@ test('messenger drafts contain stored prices, full contact details and safely ta
   assert.equal(new URL(wa.href).pathname,'/79991234567');assert.equal(new URL(wa.href).searchParams.get('text'),message);assert.equal(wa.prefilled,true);
   const tg=messengerLink('telegram','https://t.me/tixo_example',message);
   assert.equal(new URL(tg.href).pathname,'/tixo_example');assert.equal(new URL(tg.href).searchParams.get('text'),message);
+  for(const contact of ['+79899998988','79899998988','+7 (989) 999-89-88','https://t.me/+79899998988','t.me/+79899998988/']) {
+    assert.equal(normalizeMessengerContact('telegram',contact),'+79899998988');
+    const phoneLink=messengerLink('telegram',contact,message);
+    assert.equal(new URL(phoneLink.href).pathname,'/+79899998988');
+    assert.equal(new URL(phoneLink.href).searchParams.get('text'),message);
+  }
+  assert.deepEqual(readMessengerContacts({'atelier.contact.telegram':{value:'+79899998988'}}),{whatsapp:'',telegram:'+79899998988'});
+  assert.deepEqual(messengerLink('telegram','+79899998988','Я'.repeat(5000)),{href:'https://t.me/+79899998988',prefilled:false});
   assert.throws(()=>messengerLink('instagram','@tixo.example',message));
   assert.doesNotMatch(message,/Email|anna@example.com/);
   assert.deepEqual(readMessengerContacts({'atelier.contact.instagram':{value:'tixo.example'}}),{whatsapp:'',telegram:''});
   assert.equal(normalizeMessengerContact('whatsapp','https://wa.me/79991234567'),'79991234567');
   assert.equal(normalizeMessengerContact('telegram',''),'');
-  for(const input of ['https://evil.test/username','https://t.me/example?text=bad','javascript:alert(1)','https://t.me/username/123','https://username:secret@t.me/example'])assert.throws(()=>normalizeMessengerContact('telegram',input));
+  for(const input of ['https://evil.test/username','https://t.me/example?text=bad','javascript:alert(1)','https://t.me/username/123','https://username:secret@t.me/example','https://t.me/+inviteHash','+123','+0123456789','+1234567890123456','https://t.me/+79899998988?text=bad'])assert.throws(()=>normalizeMessengerContact('telegram',input));
   assert.equal(readMessengerContacts({'atelier.contact.telegram':{value:'javascript:alert(1)'}}).telegram,'');
   assert.deepEqual(messengerLink('telegram','tixo_example','Я'.repeat(5000)),{href:'https://t.me/tixo_example',prefilled:false});
 });

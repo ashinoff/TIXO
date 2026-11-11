@@ -168,7 +168,7 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     INSERT INTO categories(name,slug,mood,description) VALUES('Старый раздел','original','Авторский заголовок','Авторское описание');
     INSERT INTO products(name,category,category_id,notes,price,stock,published,image) VALUES('Форма из рабочего каталога','Старый раздел',1,'Исходные ноты',1500,12,TRUE,'/api/uploads/original.webp');
     INSERT INTO orders(order_number,customer_name,phone,email,address,delivery,items,total) VALUES('OLD-01','История','0000000','old@example.com','Адрес','Доставка','[{"productId":1,"name":"Старое название","price":1300,"quantity":2}]',2600);
-    INSERT INTO site_content(key,value) VALUES('hero.title','Сохранённый заголовок');`);
+    INSERT INTO site_content(key,value) VALUES('hero.title','Сохранённый заголовок'),('atelier.contact.whatsapp','79990000000'),('atelier.contact.telegram','previous_account');`);
   // Existing deployed scent-bound variants must survive the one-time separation.
   await pool.query(`CREATE TABLE scents(id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',notes TEXT[] NOT NULL DEFAULT '{}',color TEXT NOT NULL,color_name TEXT NOT NULL,active BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ DEFAULT NOW(),updated_at TIMESTAMPTZ DEFAULT NOW());
     CREATE UNIQUE INDEX scents_color_unique ON scents(LOWER(color));
@@ -218,6 +218,18 @@ test('PostgreSQL catalog, migration and order workflow', { skip: !databaseUrl &&
     assert.equal((await pool.query("SELECT active FROM scents WHERE name='Мой красный аромат'")).rows[0].active, false);
     assert.deepEqual((await pool.query('SELECT * FROM products ORDER BY id')).rows,migratedRows);
     await pool.query("UPDATE scents SET active=TRUE WHERE color_name='Красный'");
+  });
+  await t.test('order contacts are corrected once and later admin changes survive restart',async()=>{
+    const readContacts=async()=>(await pool.query("SELECT key,value,kind,updated_at FROM site_content WHERE key IN ('atelier.contact.whatsapp','atelier.contact.telegram') ORDER BY key")).rows;
+    const corrected=await readContacts();
+    assert.deepEqual(Object.fromEntries(corrected.map(row=>[row.key,row.value])),{
+      'atelier.contact.telegram':'+79899998988','atelier.contact.whatsapp':'79899998988'
+    });
+    assert.ok(corrected.every(row=>row.kind==='text'));
+    await pool.query("UPDATE site_content SET value=CASE key WHEN 'atelier.contact.telegram' THEN '' ELSE '79991234567' END,updated_at=NOW() WHERE key IN ('atelier.contact.whatsapp','atelier.contact.telegram')");
+    const edited=await readContacts();
+    globalThis.tihoSchemaReady=undefined;await domain.ensureSchema();
+    assert.deepEqual(await readContacts(),edited);
   });
   await t.test('cancelling a pre-migration reserved order returns stock to the migrated candle',async()=>{
     const old=domain.mapOrder((await pool.query("SELECT * FROM orders WHERE order_number='OLD-VARIANT'")).rows[0]);
