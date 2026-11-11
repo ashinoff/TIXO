@@ -32,7 +32,37 @@
 .costing .costing-recipes>div button{max-width:100%;overflow-wrap:anywhere}
 .costing .costing-recipes>div button small{max-width:300px;line-height:1.5}
 .costing .editor-error button{display:block;margin-top:8px}
+.costing .costing-material-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:24px 0 14px}
+.costing .costing-material-heading h2,.costing .costing-material-heading h3{margin:0 0 8px}
+.costing .costing-material-heading p{font-size:13px;color:#69725f;line-height:1.6;margin:0}
+.costing .costing-material-heading button,.costing .costing-material-item button,.costing .costing-line-name button{min-height:40px;padding:9px 13px;border:1px solid #bcc7ac;background:#fafbf4;color:#34482c;font:inherit;font-size:13px}
+.costing button:disabled{cursor:default;opacity:.5}
+.costing .costing-material-editor{padding:22px;margin:18px 0;border:1px solid #aab99a;background:#edf2e5;scroll-margin-top:24px}
+.costing .costing-material-editor h3{margin:0 0 10px;font-size:21px}
+.costing .costing-material-editor>p{max-width:70ch;font-size:13px;line-height:1.7;color:#56664b;margin:0 0 18px}
+.costing .costing-material-editor fieldset{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.3fr);gap:15px;padding:0;margin:0;border:0;min-width:0}
+.costing .costing-material-editor label{display:grid;gap:7px;font-size:13px;color:#4d6040;min-width:0}
+.costing .costing-material-editor input{width:100%;min-width:0;min-height:44px;padding:10px;border:1px solid #b3c0a4;background:#fffef9;font:inherit;font-size:16px;color:#283b20}
+.costing .costing-material-editor input:focus-visible{outline:2px solid #6c8257;outline-offset:2px}
+.costing .costing-material-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px}
+.costing .costing-material-actions button{min-height:44px;padding:11px 16px;border:1px solid #526744;background:#3c5130;color:#fffef9;font:inherit;font-size:13px}
+.costing .costing-material-actions button:last-child{background:transparent;color:#3c5130}
+.costing .costing-material-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.5fr) auto;gap:18px;align-items:center;padding:15px 0;border-bottom:1px solid #d9dfd0;font-size:14px}
+.costing .costing-material-item>strong{font-weight:500;overflow-wrap:anywhere}
+.costing .costing-material-item>span{color:#56684b;overflow-wrap:anywhere}
+.costing .costing-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,130px) minmax(80px,140px);gap:18px;align-items:center;padding:16px 0;border-bottom:1px solid #d9dfd0}
+.costing .costing-line-name{display:grid;justify-items:start;gap:5px;min-width:0;overflow-wrap:anywhere}
+.costing .costing-line-name strong{font-size:15px;font-weight:500}
+.costing .costing-line-name small,.costing .costing-line-total small{font-size:12px;color:#69755e}
+.costing .costing-line-name button{padding:4px 0;border:0;border-bottom:1px solid #7b8d6b;background:none;min-height:30px}
+.costing .costing-lines .costing-quantity{display:flex;flex-direction:column;gap:6px;min-width:0;padding:0;border:0;font-size:12px;color:#627255}
+.costing .costing-quantity input{width:100%;min-width:0;min-height:44px;font-size:16px}
+.costing .costing-line-total{display:grid;gap:8px;text-align:right;min-width:0;overflow-wrap:anywhere}
+.costing .costing-line-total strong{font-size:15px;font-weight:500}
 @media(max-width:750px){
+ .costing .costing-material-editor{padding:16px}
+ .costing .costing-material-editor fieldset{grid-template-columns:1fr 1fr}
+ .costing .costing-material-editor label:first-child{grid-column:1/-1}
  .costing .costing-product-picker{padding:12px}
  .costing .costing-product-picker>header{align-items:flex-start;gap:10px;flex-wrap:wrap}
  .costing .costing-product-option{grid-template-columns:22px minmax(0,1fr) minmax(70px,.55fr);gap:8px;padding:12px 10px}
@@ -42,6 +72,14 @@
  .costing .costing-product-money:last-child{text-align:right}
  .costing .costing-product-tools{gap:6px}
  .costing .costing-product-tools>input{flex-basis:100%;font-size:16px}
+}
+@media(max-width:480px){
+ .costing .costing-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+ .costing .costing-line-name{grid-column:1/-1}
+ .costing .costing-material-item{grid-template-columns:minmax(0,1fr) auto;gap:10px}
+ .costing .costing-material-item>strong{grid-column:1/-1}
+ .costing .costing-material-editor fieldset{grid-template-columns:minmax(0,1fr)}
+ .costing .costing-material-actions button{flex:1}
 }
 @media(max-width:380px){
  .costing .costing-lines label{grid-template-columns:minmax(0,1fr) 62px 24px 72px;gap:5px}

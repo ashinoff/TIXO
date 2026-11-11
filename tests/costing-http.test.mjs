@@ -62,8 +62,21 @@ test('costing HTTP: migrate scalar links, normalize BIGINTs, atomically persist 
   data = await get(); const history = data.history.find(h => h.recipe_id === recipe.id);
   assert.equal(history.snapshot.total, 65); assert.deepEqual(history.snapshot.product_ids, [p1, p2]);
   assert.deepEqual(history.snapshot.products.map(p => [p.id, p.price, p.profit]), [[p1, 1300, 1235], [p2, 1800, 1735]]);
-  assert.equal((await post({ action: 'material', ...wax, price: 1 })).status, 200);
+  const editedMaterial = await post({ action: 'material', ...wax, price: 1 }); assert.equal(editedMaterial.status, 200);
+  assert.deepEqual((await editedMaterial.json()).material, { id: wax.id, name: wax.name, unit: wax.unit, price: 1 });
   assert.deepEqual((await get()).history.find(h => h.id === history.id).snapshot, history.snapshot, 'Past prices and product references remain frozen');
+  const newMaterial = await post({ action: 'material', id: 0, name: 'Новый материал', unit: 'мл', price: .8125 }); assert.equal(newMaterial.status, 200);
+  const material = (await newMaterial.json()).material;
+  assert.equal(typeof material.id, 'number'); assert.equal(material.price, .8125);
+  assert.deepEqual((await get()).materials.find(m => m.id === material.id), material);
+  const renamed = await post({ action: 'material', ...material, name: 'Новое название', unit: 'г', price: 1.0625 }); assert.equal(renamed.status, 200);
+  assert.deepEqual((await renamed.json()).material, { ...material, name: 'Новое название', unit: 'г', price: 1.0625 });
+  const duplicate = await post({ action: 'material', id: 0, name: 'Новое название', unit: 'шт', price: 1 }); assert.equal(duplicate.status, 409);
+  assert.match((await duplicate.json()).error, /Материал с таким названием/);
+  assert.equal((await post({ action: 'material', ...material, id: 99999999 })).status, 404);
+  assert.equal((await post({ action: 'material', ...material, price: -1 })).status, 400);
+  assert.equal((await get()).materials.filter(m => m.id === material.id).length, 1);
+  assert.deepEqual((await get()).recipes.find(r => r.id === recipe.id).items, input.items, 'Changing material data cannot replace the recipe draft or its quantities');
   for (const product_ids of [[true], [null], [-1], [1.2], ['oops'], '12', [Number.MAX_SAFE_INTEGER + 1]]) {
     assert.equal((await post({ ...input, id: recipe.id, product_ids })).status, 400);
   }

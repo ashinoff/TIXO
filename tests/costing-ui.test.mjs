@@ -144,3 +144,73 @@ test('new calculation keeps its persisted identity, zero sale price has no infin
     await click(button('Сохранить расчёт и снимок')); assert.equal(posted.id, 25, 'Second save updates instead of creating another recipe');
   } finally { await act(async () => root.unmount()); }
 });
+
+test('material editing inside a calculation preserves its draft, links and quantities while updating the unit cost', async () => {
+  let data = fixture(); const posted = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method !== 'POST') return response(data);
+    const body = JSON.parse(init.body); posted.push(body);
+    const material = { id: '3', name: body.name, unit: body.unit, price: String(body.price) };
+    data = { ...data, materials: [material] };
+    return response({ ok: true, material });
+  };
+  const root = createRoot(document.getElementById('root'));
+  try {
+    await act(async () => root.render(React.createElement(CostCalculator)));
+    await click(button('Тыква общая')); await click(checkbox(12));
+    await input(document.querySelector('[aria-label="Название модели"]'), 'Мой несохранённый расчёт');
+    await input(document.querySelector('[aria-label="Расход: Воск"]'), '125');
+    await click(document.querySelector('[aria-label="Изменить материал: Воск"]'));
+    assert.equal(document.activeElement.getAttribute('aria-label'), 'Название материала');
+    assert.equal(button('Сохранить расчёт и снимок').disabled, true);
+    await input(document.querySelector('[aria-label="Название материала"]'), 'Воск соевый');
+    await input(document.querySelector('[aria-label="Единица измерения"]'), 'мл');
+    await input(document.querySelector('[aria-label="Цена материала за единицу"]'), '0,8125');
+    await click(button('Сохранить материал'));
+    assert.deepEqual(posted, [{ action: 'material', id: 3, name: 'Воск соевый', unit: 'мл', price: .8125 }]);
+    assert.equal(document.querySelector('.costing-material-editor'), null);
+    assert.equal(document.querySelector('[aria-label="Название модели"]').value, 'Мой несохранённый расчёт');
+    assert.equal(document.querySelector('[aria-label="Расход: Воск соевый"]').value, '125');
+    assert.equal(checkbox(11).checked, true); assert.equal(checkbox(12).checked, true);
+    assert.match(document.querySelector('.costing-save-state').textContent, /несохранённые/);
+    assert.match(document.querySelector('.costing-line-name').textContent, /0,8125 ₽ \/ мл/);
+    assert.match(document.querySelector('.costing-metrics article').textContent, /101,56 ₽/);
+    await click(button('Прайс материалов'));
+    await click(document.querySelector('[aria-label="Изменить материал: Воск соевый"]'));
+    assert.equal(document.querySelector('[aria-label="Цена материала за единицу"]').value, '0.8125');
+    await input(document.querySelector('[aria-label="Цена материала за единицу"]'), '2');
+    await click(button('Отмена')); await click(button('Калькулятор'));
+    assert.equal(posted.length, 1); assert.match(document.querySelector('.costing-line-name').textContent, /0,8125/);
+  } finally { await act(async () => root.unmount()); }
+});
+
+test('adding a material keeps failed input, prevents duplicate submissions and uses the saved row even if refreshing fails', async () => {
+  let fail = true, saved = false, posted = 0;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method !== 'POST') return saved ? response({ error: 'Нет соединения' }, 503) : response(fixture());
+    posted++; const body = JSON.parse(init.body);
+    if (fail) return response({ error: 'Материал с таким названием уже есть' }, 409);
+    saved = true; return response({ ok: true, material: { ...body, id: '19' } });
+  };
+  const root = createRoot(document.getElementById('root'));
+  try {
+    await act(async () => root.render(React.createElement(CostCalculator)));
+    await click(button('Тыква общая')); await click(button('+ Добавить материал'));
+    await input(document.querySelector('[aria-label="Название материала"]'), 'Коробка');
+    await input(document.querySelector('[aria-label="Цена материала за единицу"]'), '87,50');
+    await click(button('Добавить в материалы'));
+    assert.match(document.querySelector('.costing-material-editor [role="alert"]').textContent, /уже есть/);
+    assert.equal(document.querySelector('[aria-label="Название материала"]').value, 'Коробка');
+    assert.equal(document.querySelector('[aria-label="Цена материала за единицу"]').value, '87,50');
+    fail = false; const count = posted;
+    await act(async () => { const add = button('Добавить в материалы'); add.click(); add.click(); });
+    assert.equal(posted - count, 1);
+    assert.equal(document.querySelector('.costing-material-editor'), null);
+    assert.match(document.querySelector('[role="alert"]').textContent, /Сохранено в базе/);
+    assert.equal(document.querySelector('[aria-label="Расход: Коробка"]').value, '0');
+    await input(document.querySelector('[aria-label="Расход: Коробка"]'), '2');
+    assert.match(document.querySelector('.costing-metrics article').textContent, /240 ₽/);
+    assert.equal(document.querySelector('[aria-label="Расход: Воск"]').value, '100');
+    assert.equal(document.querySelector('[aria-label="Название модели"]').value, 'Тыква общая');
+  } finally { await act(async () => root.unmount()); }
+});
