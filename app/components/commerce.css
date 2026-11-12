@@ -372,8 +372,8 @@
 /* Decoded image frames replace rather than crossfade stale browser bitmaps. */
 .tiho-site .detail-photo-track img,.tiho-site .catalog-photo-track img{transition:none!important}
 .order-consent { grid-column:1 / -1; width:100%; min-width:0; margin:8px 0 14px; }
-.live-checkout .order-consent>label,.pending-order .order-consent>label { display:flex; flex-direction:row; align-items:flex-start; gap:12px; font-size:12px; font-weight:450; line-height:1.65; cursor:pointer; }
-.live-checkout .order-consent input[type="checkbox"],.pending-order .order-consent input[type="checkbox"] { appearance:auto; flex:0 0 18px; width:18px; height:18px; min-height:18px; margin:2px 0 0; padding:0; border-radius:3px; accent-color:#3b3831; }
+.tiho-site #checkout-form>fieldset .order-consent>label,.tiho-site .pending-order .order-consent>label { display:flex; flex-direction:row; align-items:flex-start; gap:12px; margin-bottom:0; font-size:12px; font-weight:450; line-height:1.65; text-align:left; cursor:pointer; }
+.tiho-site #checkout-form .order-consent input[type="checkbox"],.tiho-site .pending-order .order-consent input[type="checkbox"] { appearance:auto; flex:0 0 18px; width:18px; height:18px; min-height:18px; margin:2px 0 0; padding:0; border-radius:3px; accent-color:#3b3831; }
 .order-consent a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
-.order-consent>p { margin:9px 0 0 30px; color:#756f64; font-size:11px; line-height:1.65; }
+.tiho-site .order-consent>p { margin:9px 0 0 30px; color:#756f64; font-size:11px; line-height:1.65; text-align:left; }
 .order-consent input:focus-visible { outline:2px solid #89765f; outline-offset:4px; }
