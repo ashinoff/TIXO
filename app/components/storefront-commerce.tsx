@@ -18,6 +18,8 @@ import { PhotoCarousel, type PhotoCarouselHandle } from "./photo-carousel";
 import { useProductSwipe } from "../../lib/use-product-swipe";
 import { OrderMessengers } from "./order-messengers";
 import { flushMessengerHandoffs } from "../../lib/messenger-handoff";
+import { consentChoice, type ConsentChoice } from "../../lib/legal";
+import { OrderConsent } from "./order-consent";
 
 const STORAGE_KEY = "tixo.atelier.cart.v1";
 const REQUEST_KEY = "tixo.atelier.request.v1";
@@ -27,11 +29,12 @@ type StandardLine = CandleVisualData & { key: string; productId: number; variant
 type CustomLine = CandleVisualData & { scentName?: string; formName?: string; key: string; customRecipe: Recipe; quantity: number };
 type Line = StandardLine | CustomLine;
 type DisplayLine = CandleVisualData & { formName?: string; key: string; name: string; scentName: string; quantity: number; image: string | null; price: number | null; available: number; customRecipe?: Recipe };
-type OrderPayload = { requestKey: string; customerName: string; phone: string; address: string; delivery: string; comment: string; items: ({ productId: number; variantId: number | null; scentId: number; colorId: number; accentColorId?: number | null; quantity: number } | { customRecipe: Recipe; quantity: number })[] };
+type OrderPayload = { privacyConsent?: ConsentChoice; requestKey: string; customerName: string; phone: string; address: string; delivery: string; comment: string; items: ({ productId: number; variantId: number | null; scentId: number; colorId: number; accentColorId?: number | null; quantity: number } | { customRecipe: Recipe; quantity: number })[] };
 type Receipt = { requestKey?: string; orderNumber: string; total: number; quotePending: boolean; message?: string };
 type CandleSelection = { productId: number; scentId?: number; colorId?: number };
 type Selection = CandleSelection & { catalog: CandleSelection[] };
 type Shop = {
+  consentVersion: string; consentAccepted: boolean; setConsentAccepted: (value: boolean) => void; consentError: string; loadConsent: () => Promise<void>;
   forms: CandleForm[]; formsLoading: boolean; formsError: string; loadForms: () => Promise<void>;
   products: Product[]; scents: Scent[]; colors: CandleColor[]; loading: boolean; catalogError: string; loadCatalog: () => Promise<void>;
   activeScent: number | null; setActiveScent: (id: number | null) => void; selectedScent?: Scent;
@@ -73,7 +76,7 @@ function restoreRequest(value: unknown): OrderPayload | null {
   if (typeof data.requestKey !== "string" || !/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(data.requestKey)) return null;
   if (![data.customerName, data.phone, data.address, data.delivery, data.comment].every(value => typeof value === "string") || !Array.isArray(data.items) || !data.items.length || data.items.length > 100) return null;
   if (!data.items.every(item => item && positiveInteger(item.quantity) && item.quantity <= 99 && ("customRecipe" in item ? validRecipe(item.customRecipe) : positiveInteger(item.productId) && positiveInteger(item.scentId) && (item.variantId === null || positiveInteger(item.variantId))))) return null;
-  return { requestKey: data.requestKey, customerName: data.customerName, phone: data.phone, address: data.address, delivery: data.delivery, comment: data.comment, items: data.items };
+  return { privacyConsent: consentChoice(data.privacyConsent), requestKey: data.requestKey, customerName: data.customerName, phone: data.phone, address: data.address, delivery: data.delivery, comment: data.comment, items: data.items };
 }
 function storageWrite(key: string, value: unknown) { try { if (value === null) window.localStorage.removeItem(key); else window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* The cart remains usable when browser storage is unavailable. */ } }
 function variantFor(product: Product, scent: Scent, color: CandleColor): Variant | undefined {
@@ -104,6 +107,19 @@ const inspection = {
 };
 
 export function ShoppingProvider({ children }: { children: ReactNode }) {
+  const [consentVersion, setConsentVersion] = useState("");
+  const [acceptedConsentVersion, setAcceptedConsentVersion] = useState("");
+  const [consentError, setConsentError] = useState("");
+  const consentAccepted = Boolean(consentVersion) && acceptedConsentVersion === consentVersion;
+  const setConsentAccepted = (accepted: boolean) => setAcceptedConsentVersion(accepted ? consentVersion : "");
+  const loadConsent = useCallback(async () => {
+    try {
+      const response = await fetch("/api/legal", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || typeof data.version !== "string" || !/^[a-f0-9]{64}$/.test(data.version)) throw new Error();
+      setConsentVersion(data.version); setConsentError("");
+    } catch { setConsentVersion(""); setConsentError("Не удалось загрузить согласие. Попробуйте ещё раз."); }
+  }, []);
   const [forms, setForms] = useState<CandleForm[]>([]); const [formsLoading, setFormsLoading] = useState(true); const [formsError, setFormsError] = useState("");
   const [products, setProducts] = useState<Product[]>([]); const [scents, setScents] = useState<Scent[]>([]); const [colors, setColors] = useState<CandleColor[]>([]);
   const [loading, setLoading] = useState(true); const [catalogError, setCatalogError] = useState("");
@@ -152,16 +168,16 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate browser storage after SSR
       setCart(restored);
       const saved = restoreRequest(JSON.parse(window.localStorage.getItem(REQUEST_KEY) ?? "null"));
-      if (saved) { setPending(saved); setCartOpenState(true); }
+      if (saved) { setPending(saved); setAcceptedConsentVersion(saved.privacyConsent?.version ?? ""); setCartOpenState(true); }
       else if (!restored.length) {
         const confirmation = JSON.parse(window.sessionStorage.getItem(RECEIPT_KEY) ?? "null");
         if (confirmation?.expires > Date.now() && typeof confirmation.receipt?.orderNumber === "string" && Number.isFinite(confirmation.receipt.total) && typeof confirmation.receipt.message === "string") setReceiptState(confirmation.receipt);
         else window.sessionStorage.removeItem(RECEIPT_KEY);
       }
     } catch { /* Ignore stale browser storage. */ }
-    void loadCatalog(); void loadForms();
+    void loadCatalog(); void loadForms(); void loadConsent();
     return () => clearTimeout(toastTimer.current);
-  }, [loadCatalog, loadForms, setCart, setPending]);
+  }, [loadCatalog, loadForms, loadConsent, setCart, setPending]);
   useEffect(() => {
     const retry = () => { void flushMessengerHandoffs(); };
     retry(); window.addEventListener("online", retry); window.addEventListener("focus", retry);
@@ -226,38 +242,44 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
   };
   const sendOrder = async (payload: OrderPayload) => {
     if (busy.current) return;
+    if (!consentChoice(payload.privacyConsent) || payload.privacyConsent?.version !== consentVersion) { setOrderError("Подтвердите согласие на обработку персональных данных."); return; }
     busy.current = true; setSubmitting(true); setOrderError(""); setPending(payload);
     const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 25000);
     try {
       const response = await fetch("/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
       const data = await response.json();
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) { setPending(null); setOrderError(data.error || "Проверьте данные заказа."); if (response.status === 409) await Promise.all([loadCatalog(), loadForms()]); }
+        if (data.code === "CONSENT_UPDATED") {
+          setAcceptedConsentVersion(""); setConsentVersion(""); await loadConsent();
+          setOrderError(data.error || "Текст согласия обновился. Подтвердите его ещё раз."); return;
+        }
+        if (response.status >= 400 && response.status < 500) { setPending(null); setAcceptedConsentVersion(""); setOrderError(data.error || "Проверьте данные заказа."); if (response.status === 409) await Promise.all([loadCatalog(), loadForms()]); }
         else setOrderError("Не удалось получить подтверждение. Повторите отправку: номер запроса сохранён, второй заказ не создастся.");
         return;
       }
       if (typeof data.orderNumber !== "string" || typeof data.total !== "number") throw new Error("Unknown order result");
       setReceipt({ requestKey: payload.requestKey, orderNumber: data.orderNumber, total: data.total, quotePending: Boolean(data.quotePending) || payload.items.some(item => "customRecipe" in item), message: typeof data.message === "string" ? data.message : undefined });
-      setCart([]); setPending(null); await loadCatalog();
+      setCart([]); setPending(null); setAcceptedConsentVersion(""); await loadCatalog();
     } catch { setOrderError("Связь прервалась. Повторите отправку: номер запроса сохранён, второй заказ не создастся."); }
     finally { clearTimeout(timeout); busy.current = false; setSubmitting(false); }
   };
   const submitOrder = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (busy.current) return;
-    if (pendingRef.current) { void sendOrder(pendingRef.current); return; }
+    if (!consentAccepted) { setOrderError("Подтвердите согласие на обработку персональных данных."); return; }
+    if (pendingRef.current) { void sendOrder({ ...pendingRef.current, privacyConsent: { accepted: true, version: consentVersion } }); return; }
     if (!cartRef.current.length || loading || catalogError || items.some(item => item.quantity > item.available)) return;
     const form = new FormData(event.currentTarget);
-    const payload: OrderPayload = { requestKey: crypto.randomUUID(), customerName: String(form.get("name") ?? ""), phone: String(form.get("phone") ?? ""), address: String(form.get("address") ?? ""), delivery: String(form.get("delivery") ?? ""), comment: String(form.get("comment") ?? ""), items: cartRef.current.map(line => isCustom(line) ? { customRecipe: { ...line.customRecipe }, quantity: line.quantity } : { productId: line.productId, variantId: line.variantId, scentId: line.scentId, colorId: line.colorId, ...(line.accentColorId ? { accentColorId: line.accentColorId } : {}), quantity: line.quantity }) };
+    const payload: OrderPayload = { privacyConsent: { accepted: true, version: consentVersion }, requestKey: crypto.randomUUID(), customerName: String(form.get("name") ?? ""), phone: String(form.get("phone") ?? ""), address: String(form.get("address") ?? ""), delivery: String(form.get("delivery") ?? ""), comment: String(form.get("comment") ?? ""), items: cartRef.current.map(line => isCustom(line) ? { customRecipe: { ...line.customRecipe }, quantity: line.quantity } : { productId: line.productId, variantId: line.variantId, scentId: line.scentId, colorId: line.colorId, ...(line.accentColorId ? { accentColorId: line.accentColorId } : {}), quantity: line.quantity }) };
     void sendOrder(payload);
   };
-  const setCartOpen = (open: boolean) => { if (!open && busy.current) return; setCartOpenState(open); if (open) setDetail(null); };
+  const setCartOpen = (open: boolean) => { if (!open && busy.current) return; setCartOpenState(open); if (open) setDetail(null); else if (!pendingRef.current) setAcceptedConsentVersion(""); };
   const moveProduct = (offset: number) => setDetail(current => {
     if (!current) return null;
     const index = current.catalog.findIndex(item => sameCandle(item, current));
     const next = current.catalog[index + offset];
     return next ? { ...next, catalog: current.catalog } : current;
   });
-  const value: Shop = { forms, formsLoading, formsError, loadForms, products, scents, colors, loading, catalogError, loadCatalog, activeScent, setActiveScent, selectedScent: scents.find(scent => scent.id === activeScent), cart, items, count: cart.reduce((sum, line) => sum + line.quantity, 0), total: items.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0), hasCustom: items.some(item => item.customRecipe), locked: submitting || Boolean(pending), addProduct, addCustom, changeQuantity, remove, cartOpen, setCartOpen, detail, openProduct: (productId, scentId, colorId, catalog = []) => setDetail({ productId, scentId, colorId, catalog }), closeProduct: () => setDetail(null), moveProduct, submitOrder, retryOrder: () => { if (pendingRef.current) void sendOrder(pendingRef.current); }, pending, submitting, orderError, receipt, toast, dismissToast: () => setToast("") };
+  const value: Shop = { consentVersion, consentAccepted, setConsentAccepted, consentError, loadConsent, forms, formsLoading, formsError, loadForms, products, scents, colors, loading, catalogError, loadCatalog, activeScent, setActiveScent, selectedScent: scents.find(scent => scent.id === activeScent), cart, items, count: cart.reduce((sum, line) => sum + line.quantity, 0), total: items.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0), hasCustom: items.some(item => item.customRecipe), locked: submitting || Boolean(pending), addProduct, addCustom, changeQuantity, remove, cartOpen, setCartOpen, detail, openProduct: (productId, scentId, colorId, catalog = []) => setDetail({ productId, scentId, colorId, catalog }), closeProduct: () => setDetail(null), moveProduct, submitOrder, retryOrder: () => { if (pendingRef.current && consentAccepted) void sendOrder({ ...pendingRef.current, privacyConsent: { accepted: true, version: consentVersion } }); }, pending, submitting, orderError, receipt, toast, dismissToast: () => setToast("") };
   return <ShoppingContext.Provider value={value}>{children}</ShoppingContext.Provider>;
 }
 
@@ -452,7 +474,9 @@ export function CartOverlay() {
         <div className="cart-items" id="cart-items">{shop.items.map(item => <article className={`cart-item${item.customRecipe ? " custom" : ""}`} key={item.key}>{item.customRecipe ? <CustomPreview recipe={item.customRecipe} formName={item.formName} silhouette={item.silhouette} shape={item.shape} color={item.color} colorName={item.colorName} twoTone={item.twoTone} accentColor={item.accentColor} /> : <div className="cart-candle-visual"><CandleVisual src={item.image} silhouette={item.silhouette} shape={item.shape} color={item.color} twoTone={item.twoTone} accentColor={item.accentColor} label={item.name} /></div>}<div><h3>{item.name}</h3><p className="cart-recipe">{item.scentName}</p><span className="cart-item-price">{item.price === null ? "Стоимость по запросу" : money(item.price * item.quantity)}</span><div className="quantity-row"><button type="button" aria-label={`Уменьшить количество ${item.name}`} disabled={shop.locked} onClick={() => shop.changeQuantity(item.key, -1)}>−</button><span aria-label="Количество">{item.quantity}</span><button type="button" aria-label={`Увеличить количество ${item.name}`} disabled={shop.locked || item.quantity >= Math.min(99, item.available)} onClick={() => shop.changeQuantity(item.key, 1)}>+</button><button className="remove-item" type="button" aria-label={`Удалить ${item.name}`} disabled={shop.locked} onClick={() => shop.remove(item.key)}>Удалить</button></div>{!shop.loading && !shop.catalogError && !shop.pending && !(item.customRecipe?.formId !== undefined && (shop.formsLoading || shop.formsError)) && item.quantity > item.available && <p className="stock-error">{item.available ? `Доступно ${item.available} шт. Уменьшите количество.` : item.customRecipe ? item.customRecipe.scentId !== undefined ? "Форма, цвет или аромат больше недоступны. Удалите эту свечу и выберите новое сочетание в мастерской." : "Форма больше недоступна. Удалите эту свечу и выберите другую форму в мастерской." : "Вариант больше недоступен. Удалите его из корзины."}</p>}</div></article>)}</div>
         {!!shop.items.length && <><div className="order-total"><span>{shop.hasCustom ? "Предварительно, без доставки" : "Итого без доставки"}</span><strong>{shop.hasCustom ? shop.total ? `${money(shop.total)} + по запросу` : "По запросу" : money(shop.total)}</strong></div>{shop.hasCustom && <p className="checkout-note">Стоимость индивидуальных свечей не включена в сумму. Мастер согласует состав, возможность изготовления и цену до начала работы.</p>}</>}
         <p className="checkout-note">Доставка и способ оплаты согласуются с мастерской после подтверждения заказа.</p>
-        {shop.pending ? <div className="pending-order"><p>Состав и контакты сохранены для этого запроса. Уточним результат отправки, прежде чем менять заказ.</p><button className="button button-dark" type="button" disabled={shop.submitting} onClick={shop.retryOrder}>{shop.submitting ? "Получаем подтверждение…" : "Повторить отправку"}<span aria-hidden="true"><ArrowIcon /></span></button></div> : <form id="checkout-form" className="live-checkout" onSubmit={shop.submitOrder}><h3>Давайте познакомимся</h3><fieldset disabled={shop.submitting}><label>Ваше имя<input name="name" autoComplete="given-name" placeholder="Имя" required maxLength={160} /></label><label>Телефон<input name="phone" type="tel" autoComplete="tel" placeholder="+7" required minLength={7} maxLength={40} /></label><label>Способ доставки<select name="delivery" value={delivery} onChange={event => setDelivery(event.target.value)}><option value="pickup">В пункт выдачи</option><option value="courier">Курьером</option></select></label><label>{delivery === "courier" ? "Город и адрес доставки" : "Город и пункт выдачи"}<input name="address" autoComplete="street-address" placeholder="Город и адрес" required maxLength={1000} /></label><label>Комментарий к заказу<textarea name="comment" rows={3} maxLength={2000} placeholder="Пожелания, упаковка или удобное время для связи" /></label><p className="checkout-note">Отправляя заказ, вы передаёте мастерской указанные контакты для его обработки.</p><button className="button button-dark" type="submit" disabled={shop.loading || !!shop.catalogError || unavailable || !shop.items.length}>Отправить заказ <span aria-hidden="true"><ArrowIcon /></span></button>{unavailable && !shop.loading && !shop.catalogError && <p className="stock-error">Проверьте доступность свечей в корзине.</p>}{hasFormRecipes && shop.formsLoading && <p role="status">Проверяем доступность выбранных форм…</p>}{hasFormRecipes && shop.formsError && <div role="alert" className="stock-error">{shop.formsError}<button type="button" className="text-link" onClick={() => void shop.loadForms()}>Обновить формы <ArrowIcon /></button></div>}{shop.catalogError && <div role="alert" className="stock-error">{shop.catalogError}<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Обновить коллекцию <ArrowIcon /></button></div>}</fieldset></form>}
+        {shop.pending ? <div className="pending-order"><p>Состав и контакты сохранены для этого запроса. Уточним результат отправки, прежде чем менять заказ.</p><OrderConsent version={shop.consentVersion} checked={shop.consentAccepted} onChange={shop.setConsentAccepted} disabled={shop.submitting} /><button className="button button-dark" type="button" disabled={shop.submitting || !shop.consentAccepted} onClick={shop.retryOrder}>{shop.submitting ? "Получаем подтверждение…" : "Повторить отправку"}<span aria-hidden="true"><ArrowIcon /></span></button></div> : <form id="checkout-form" className="live-checkout" onSubmit={shop.submitOrder}><h3>Давайте познакомимся</h3><fieldset disabled={shop.submitting}><label>Ваше имя<input name="name" autoComplete="given-name" placeholder="Имя" required maxLength={160} /></label><label>Телефон<input name="phone" type="tel" autoComplete="tel" placeholder="+7" required minLength={7} maxLength={40} /></label><label>Способ доставки<select name="delivery" value={delivery} onChange={event => setDelivery(event.target.value)}><option value="pickup">В пункт выдачи</option><option value="courier">Курьером</option></select></label><label>{delivery === "courier" ? "Город и адрес доставки" : "Город и пункт выдачи"}<input name="address" autoComplete="street-address" placeholder="Город и адрес" required maxLength={1000} /></label><label>Комментарий к заказу<textarea name="comment" rows={3} maxLength={2000} placeholder="Пожелания, упаковка или удобное время для связи" /></label><OrderConsent version={shop.consentVersion} checked={shop.consentAccepted} onChange={shop.setConsentAccepted} disabled={shop.submitting} /><button className="button button-dark" type="submit" disabled={shop.loading || !!shop.catalogError || unavailable || !shop.items.length || !shop.consentAccepted}>Отправить заказ <span aria-hidden="true"><ArrowIcon /></span></button>{unavailable && !shop.loading && !shop.catalogError && <p className="stock-error">Проверьте доступность свечей в корзине.</p>}{hasFormRecipes && shop.formsLoading && <p role="status">Проверяем доступность выбранных форм…</p>}{hasFormRecipes && shop.formsError && <div role="alert" className="stock-error">{shop.formsError}<button type="button" className="text-link" onClick={() => void shop.loadForms()}>Обновить формы <ArrowIcon /></button></div>}{shop.catalogError && <div role="alert" className="stock-error">{shop.catalogError}<button type="button" className="text-link" onClick={() => void shop.loadCatalog()}>Обновить коллекцию <ArrowIcon /></button></div>}</fieldset></form>}
+        {!shop.consentVersion && !shop.consentError && <p className="checkout-note" role="status">Загружаем условия обработки данных…</p>}
+        {shop.consentError && <div role="alert" className="stock-error">{shop.consentError}<button type="button" className="text-link" onClick={() => void shop.loadConsent()}>Загрузить согласие</button></div>}
         {shop.orderError && <p className="order-error" role="alert">{shop.orderError}</p>}
       </>}
     </div></Modal>}

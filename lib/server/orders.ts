@@ -4,8 +4,9 @@ import { productShape, type CandleShape } from "../catalog";
 import { recipeFormName, atelierColors, atelierColorHex, atelierTopNotes, atelierHeartNotes, atelierBaseNotes } from "../atelier";
 import { ensureSchema, getPool, mapOrder, mapScent } from "./db";
 import { InputError, parseOrder } from "./validation";
+import type { ConsentRecord } from "../legal";
 
-export async function createOrder(body: Record<string, unknown>) {
+export async function createOrder(body: Record<string, unknown>, privacyConsent?: ConsentRecord) {
   const order = parseOrder(body);
   await ensureSchema();
   const db = await getPool().connect();
@@ -67,9 +68,9 @@ export async function createOrder(body: Record<string, unknown>) {
     const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     if (!Number.isSafeInteger(total) || total > 2147483647) throw new InputError("Сумма заказа слишком велика");
     const orderNumber = `T-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
-    const result = await db.query(`INSERT INTO orders(order_number,customer_name,phone,email,address,delivery,comment,items,total,stock_reserved,request_key)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11) RETURNING *`,
-    [orderNumber, order.customerName, order.phone, order.email, order.address, order.delivery, order.comment, JSON.stringify(items), total, ids.length > 0, order.requestKey]);
+    const result = await db.query(`INSERT INTO orders(order_number,customer_name,phone,email,address,delivery,comment,items,total,stock_reserved,request_key,privacy_consent)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12::jsonb) RETURNING *`,
+    [orderNumber, order.customerName, order.phone, order.email, order.address, order.delivery, order.comment, JSON.stringify(items), total, ids.length > 0, order.requestKey, privacyConsent ? JSON.stringify(privacyConsent) : null]);
     await db.query("COMMIT");
     return mapOrder(result.rows[0]);
   } catch (error) { await db.query("ROLLBACK"); throw error; }

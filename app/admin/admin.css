@@ -117,3 +117,17 @@
 .admin-shell .form-card-preview .form-miniature,.form-editor .filter-image-sample .form-miniature{width:100%;height:100%;object-fit:contain;transform:scale(.95)}
 .admin-shell .form-card-preview [data-small=true] .form-miniature,.form-editor .filter-image-sample [data-small=true] .form-miniature{transform:scale(.76)}
 .form-miniature-empty{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;line-height:1.5;text-align:center;color:#747d68;padding:8px}
+.legal-settings { margin:24px 0; }
+.legal-settings>p { max-width:850px; line-height:1.65; font-size:13px; }
+.legal-settings fieldset { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; border:0; padding:0; margin:20px 0; min-width:0; }
+.legal-settings label { display:flex; flex-direction:column; gap:7px; font-size:12px; min-width:0; }
+.legal-settings input,.legal-settings textarea { width:100%; box-sizing:border-box; min-height:42px; border:1px solid #cfc7b9; border-radius:8px; padding:10px 12px; color:inherit; background:#fffdf8; font:inherit; }
+.legal-settings label:last-of-type { grid-column:1 / -1; }
+.legal-settings button { justify-self:start; padding:12px 20px; }
+.legal-settings nav { display:flex; flex-wrap:wrap; gap:14px 24px; font-size:12px; }
+.legal-settings-notice { padding:14px 18px; border-left:3px solid #a78352; background:#f3eadb; }
+.order-consent-record { margin:16px 0; font-size:12px; }
+.order-consent-record summary { cursor:pointer; padding:10px 0; }
+.order-consent-record p,.order-consent-record pre { overflow-wrap:anywhere; white-space:pre-wrap; font:inherit; line-height:1.7; }
+.order-consent-record pre { max-height:360px; overflow:auto; padding:16px; background:#f4efe7; border-radius:8px; }
+@media(max-width:600px) { .legal-settings fieldset { grid-template-columns:1fr; } }

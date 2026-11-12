@@ -11,10 +11,12 @@ import { ExportButton } from "./export-button";
 import { CatalogOrder } from "./catalog-order";
 import { CostingWorkspace } from "./trade-dashboard";
 import { MessengerSettings } from "./messenger-settings";
+import { LegalSettings } from "./legal-settings";
+import type { ConsentRecord } from "../../lib/legal";
 import { orderMessengerNames, type OrderMessenger } from "../../lib/order-messaging";
 import "./admin.css";
 
-type Order = { messengerChannels?: OrderMessenger[]; id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
+type Order = { privacyConsent?: ConsentRecord | null; messengerChannels?: OrderMessenger[]; id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string; delivery:string; comment:string; items:OrderItem[]; total:number; status:"new"|"in_progress"|"completed"; createdAt:string; stockReserved:boolean };
 type Field = { key:string; label:string; kind:"text"|"image"; fallback:string };
 type Tab = "products" | "forms" | "colors" | "scents" | "aroma" | "orders" | "content" | "costing";
 const empty: Product = { id:0, name:"", category:"", categoryId:null, categorySlug:null, notes:"", price:0, stock:0, published:false, image:null, hasVariants:false, variants:[] };
@@ -168,6 +170,7 @@ export default function Admin() {
         <div className="orders-list">{orders.length === 0 ? <div className="empty-admin">Заказов пока нет</div> : orders.map(order => <article className="order-card" key={order.id}>
           <header><div><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleString("ru-RU")}</span></div><strong>{orderAmount(order)}</strong></header>
           <div className="order-channels"><span className="admin-kicker">Связь по заказу</span><div>{order.messengerChannels?.length ? order.messengerChannels.map(channel => <span className="order-channel" key={channel}>Переход в {orderMessengerNames[channel]}</span>) : <span className="order-channel">Только сайт</span>}</div><small>{order.messengerChannels?.length ? "Покупатель открыл ссылку на чат. Отправку сообщения нужно проверить в мессенджере." : "Переходы в мессенджеры не зафиксированы."}</small></div>
+          {order.privacyConsent && <details className="order-consent-record"><summary>Согласие на обработку данных · {new Date(order.privacyConsent.acceptedAt).toLocaleString("ru-RU")}</summary><p>Версия: {order.privacyConsent.version}</p><pre>{order.privacyConsent.document}</pre></details>}
           {needsQuote(order) && <p className="order-quote-note">{order.total > 0 ? "В сумме учтены свечи из каталога. Стоимость индивидуальных свечей нужно согласовать с покупателем." : "Индивидуальные свечи: стоимость нужно согласовать с покупателем."}</p>}
           <div className="order-grid">
             <div><b>{order.customerName}</b><a href={`tel:${order.phone}`}>{order.phone}</a>{order.email && <a href={`mailto:${order.email}`}>{order.email}</a>}<p>{order.address}</p><small>{order.delivery}{order.comment ? ` · ${order.comment}` : ""}</small></div>
@@ -187,7 +190,7 @@ export default function Admin() {
           <footer><select aria-label={`Статус заказа ${order.orderNumber}`} disabled={busy} value={order.status} onChange={event => updateStatus(order.id, event.target.value as Order["status"])}><option value="new">Новый</option><option value="in_progress">В процессе</option><option value="completed">Выполнен</option></select><button className="delete-order" disabled={busy} onClick={() => removeOrder(order)}>Удалить</button></footer>
         </article>)}</div>
       </>}
-      {tab === "content" && <><MessengerSettings content={content} onSaved={load} /><p className="admin-intro">Тексты и фотографии новой витрины. Анимация пламени доступна на исходном фото первого экрана; загруженное фото будет показано без искажения.</p><div className="content-grid">{fields.map(field => <Content key={`${field.key}-${content[field.key]?.value ?? ""}`} field={field} value={content[field.key]?.value || field.fallback} save={saveContent} />)}</div></>}
+      {tab === "content" && <><MessengerSettings content={content} onSaved={load} /><LegalSettings content={content} onSaved={load} /><p className="admin-intro">Тексты и фотографии новой витрины. Анимация пламени доступна на исходном фото первого экрана; загруженное фото будет показано без искажения.</p><div className="content-grid">{fields.map(field => <Content key={`${field.key}-${content[field.key]?.value ?? ""}`} field={field} value={content[field.key]?.value || field.fallback} save={saveContent} />)}</div></>}
     </section>
     {ordering && <CatalogOrder products={products} onClose={() => setOrdering(false)} onReload={async () => { const fresh = await request<Product[]>("/api/products?admin=1"); setProducts(fresh); return fresh; }} onSave={async (ids, expectedIds) => { const fresh = await request<Product[]>("/api/products/order", { method: "PATCH", ...json({ ids, expectedIds }) }); setProducts(fresh); setOrdering(false); setSaved(true); }} />}
     {editing && <ProductEditor product={editing} forms={forms} scents={scents} colors={colors} onSave={saveProduct} onClose={() => setEditing(null)} />}
