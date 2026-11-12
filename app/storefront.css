@@ -41,3 +41,7 @@
  .tiho-site .hero-image img,.tiho-site .hero-image canvas{object-position:75% center}
  .tiho-site .hero-content>.eyebrow{font-size:10px;line-height:1.6;letter-spacing:.08em}
 }
+.footer-legal { display:flex; flex-wrap:wrap; gap:12px 32px; margin:24px 0; padding:22px 0; border-top:1px solid rgba(255,255,255,.16); border-bottom:1px solid rgba(255,255,255,.16); }
+.footer-legal a { font-size:11px; line-height:1.6; text-decoration:underline; text-underline-offset:4px; opacity:.8; }
+.footer-legal a:hover,.footer-legal a:focus-visible { opacity:1; }
+@media(max-width:560px) { .footer-legal { flex-direction:column; gap:14px; }.footer-legal a { font-size:11px; } }

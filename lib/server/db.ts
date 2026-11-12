@@ -3,6 +3,7 @@ import { aromaPortraits } from "../aroma-portraits";
 import type { Product, OrderItem, Scent, Variant, CandleColor, CandleForm } from "../catalog";
 import { candleShapes, emptyAromaProfile, productShape, MAX_PRODUCT_VOLUME_ML, MAX_PRODUCT_DIMENSION_CM, type CandleShape } from "../catalog";
 import { orderMessengerNames, type OrderMessenger } from "../order-messaging";
+import type { ConsentRecord } from "../legal";
 
 declare global { var tihoPool: Pool | undefined; var tihoSchemaReady: Promise<void> | undefined; }
 
@@ -10,6 +11,7 @@ export type StoredProduct = Product;
 export type StoredCategory={id:number;name:string;slug:string;mood:string;description:string;notes:string[];paper:string;ink:string;accent:string;soft:string};
 
 export type StoredOrder = {
+  privacyConsent?: ConsentRecord | null;
   id:number; orderNumber:string; customerName:string; phone:string; email:string; address:string;
   delivery:string; comment:string; items:OrderItem[]; stockReserved:boolean;
   messengerChannels: OrderMessenger[];
@@ -52,6 +54,8 @@ export async function ensureSchema() {
     await db.query(`CREATE TABLE IF NOT EXISTS site_content (
       key TEXT PRIMARY KEY, value TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'text', updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    // Existing orders keep NULL: never manufacture a historical consent.
+    await db.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS privacy_consent JSONB");
     const categoryCount=await db.query<{count:string}>("SELECT COUNT(*)::text AS count FROM categories");
     if(categoryCount.rows[0].count==="0"){
       const seedCategories=[
@@ -212,7 +216,7 @@ export function mapProduct(row: Record<string, unknown>): StoredProduct {
 export function mapCategory(row:Record<string,unknown>):StoredCategory{return{id:Number(row.id),name:String(row.name),slug:String(row.slug),mood:String(row.mood),description:String(row.description),notes:Array.isArray(row.notes)?row.notes.map(String):[],paper:String(row.paper),ink:String(row.ink),accent:String(row.accent),soft:String(row.soft)}}
 
 export function mapOrder(row: Record<string, unknown>): StoredOrder {
-  return { messengerChannels: Array.isArray(row.messenger_channels) ? row.messenger_channels.filter((value): value is OrderMessenger => typeof value === "string" && Object.hasOwn(orderMessengerNames, value)) : [], id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
+  return { privacyConsent: (row.privacy_consent as ConsentRecord | null) ?? null, messengerChannels: Array.isArray(row.messenger_channels) ? row.messenger_channels.filter((value): value is OrderMessenger => typeof value === "string" && Object.hasOwn(orderMessengerNames, value)) : [], id:Number(row.id), orderNumber:String(row.order_number), customerName:String(row.customer_name), phone:String(row.phone), email:String(row.email), address:String(row.address), delivery:String(row.delivery), comment:String(row.comment || ""), items:Array.isArray(row.items) ? row.items as StoredOrder["items"] : [], total:Number(row.total), status:String(row.status) as StoredOrder["status"], stockReserved:Boolean(row.stock_reserved), createdAt:new Date(String(row.created_at)).toISOString() };
 }
 
 export function mapScent(row: Record<string, unknown>): Scent {

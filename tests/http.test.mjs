@@ -41,6 +41,7 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await call('/api/scents/1/profile',{method:'PATCH',...json({})})).status,401);
   assert.equal((await call('/api/orders')).status,401);
   assert.equal((await call('/api/order-contacts',{method:'PATCH',...json({})})).status,401);
+  assert.equal((await call('/api/legal',{method:'PATCH',...json({})})).status,401);
   assert.equal((await call('/api/admin/costing')).status,401);
   assert.equal((await call('/api/admin/costing',{method:'POST',...json({action:'material',name:'Гипс',unit:'г',price:1})})).status,401);
   assert.equal((await call('/api/admin/login',{method:'POST',...json({password:'wrong'})})).status,401);
@@ -117,8 +118,20 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal(saved.status,201);
   const product=await saved.json();
   assert.equal(product.form.silhouette,shape.silhouette);assert.equal(product.form.shape,null); assert.equal(product.name,'Ракушка HTTP');assert.equal(product.colorId,colors[0].id);assert.equal(product.scentId,scents[0].id);assert.equal(product.stock,3);
-  const customer={customerName:'Проверка',phone:'+79990000000',address:'Тестовый адрес',delivery:'Самовывоз'};
+  const legal=await (await call('/api/legal')).json();
+  assert.match(legal.version,/^[a-f0-9]{64}$/);
+  for(const page of ['/privacy','/consent']) { const response=await call(page);assert.equal(response.status,200);const html=await response.text();assert.match(html,/ТИХО/);assert.doesNotMatch(html,/Индивидуальный предприниматель/); }
+  const privacyConsent={accepted:true,version:legal.version};
+  const customer={privacyConsent,customerName:'Проверка',phone:'+79990000000',address:'Тестовый адрес',delivery:'Самовывоз'};
   const line={productId:product.id,scentId:scents[0].id,colorId:colors[0].id,quantity:1};
+  const countBefore=(await pool.query('SELECT COUNT(*)::int AS n FROM orders')).rows[0].n;
+  for(const privacyConsent of [undefined,{accepted:false,version:legal.version},{accepted:'true',version:legal.version},{accepted:true,version:'invalid'}]) {
+    assert.equal((await call('/api/orders',{method:'POST',...json({...customer,privacyConsent,requestKey:randomUUID(),items:[line]})})).status,400);
+  }
+  const stale=await call('/api/orders',{method:'POST',...json({...customer,privacyConsent:{accepted:true,version:'0'.repeat(64)},requestKey:randomUUID(),items:[line]})});
+  assert.equal(stale.status,409);assert.equal((await stale.json()).code,'CONSENT_UPDATED');
+  assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM orders')).rows[0].n,countBefore);
+  assert.equal((await pool.query('SELECT stock FROM products WHERE id=$1',[product.id])).rows[0].stock,3);
   const wrong=await call('/api/orders',{method:'POST',...json({...customer,requestKey:randomUUID(),items:[{...line,colorId:colors[1].id}]})});
   assert.equal(wrong.status,409);
   const placedRequest={...customer,requestKey:randomUUID(),items:[line]};
@@ -132,6 +145,8 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   const orders=await (await admin('/api/orders')).json();
   const order=orders.find(item=>item.items.some(line=>line.productId===product.id));
   assert.deepEqual(order.messengerChannels,[]);
+  assert.equal(order.privacyConsent.version,legal.version);assert.match(order.privacyConsent.document,/Согласие на обработку/);assert.match(order.privacyConsent.acceptedAt,/^\d{4}-/);
+  assert.equal((await pool.query('SELECT privacy_consent FROM orders WHERE id=$1',[order.id])).rows[0].privacy_consent.acceptedAt,order.privacyConsent.acceptedAt);
   const handoff=body=>call('/api/orders/messenger',{method:'POST',...json(body)});
   assert.equal((await handoff({orderNumber:order.orderNumber,channel:'telegram'})).status,400);
   assert.equal((await handoff({requestKey:placedRequest.requestKey,channel:'__proto__'})).status,400);
@@ -215,4 +230,12 @@ test('production HTTP: admin authentication, candle references, aroma chapters, 
   assert.equal((await admin('/api/content',{method:'PATCH',body:content})).status,200);
   assert.equal((await (await admin('/api/content')).json())['hero.title'].value,'Работает сохранение');
   assert.equal((await admin('/api/admin/logout',{method:'POST'})).status,200);
+  const savedEvidence=await pool.query('SELECT id,privacy_consent FROM orders ORDER BY id');
+  const updatedSettings={...legal.settings,ownerName:'Тестовый владелец',ownerAddress:'Тестовый адрес для обращений',contactEmail:'privacy@example.test'};
+  const legalUpdate=await admin('/api/legal',{method:'PATCH',...json(updatedSettings)});
+  assert.equal(legalUpdate.status,200);const nextLegal=await legalUpdate.json();assert.notEqual(nextLegal.version,legal.version);
+  assert.match(await (await call('/privacy')).text(),/Тестовый владелец/);
+  assert.equal((await admin('/api/legal',{method:'PATCH',...json({...updatedSettings,contactEmail:'bad'})})).status,400);
+  assert.deepEqual((await pool.query('SELECT id,privacy_consent FROM orders ORDER BY id')).rows,savedEvidence.rows,'Changing public details never rewrites existing consent evidence');
+
 });

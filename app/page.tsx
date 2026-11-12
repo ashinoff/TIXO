@@ -64,6 +64,7 @@ export default function Home() {
 <footer className="footer footer-ritual pad">
   <div className="footer-top"><span>Аромат / Свет / Тишина</span><a href="#home">Вернуться к началу <span aria-hidden="true"><ArrowIcon direction="up" /></span></a></div>
   <div className="footer-signature"><a className="footer-wordmark" href="#home" aria-label="ТИХО — наверх">тихо</a><div><p>Для вечеров,<br />которые хочется повторить</p><nav aria-label="Навигация в конце страницы"><a href="#collection">Коллекция <ArrowIcon /></a><a href="#care">Простой ритуал <ArrowIcon /></a></nav></div></div>
+  <nav className="footer-legal" aria-label="Правовая информация"><a href="/privacy">Политика обработки персональных данных</a><a href="/consent">Согласие на обработку персональных данных</a></nav>
   <div className="footer-bottom"><span>© ТИХО / TIXO, {new Date().getFullYear()}</span><a href="#workshop">Мастерская свечей ручной работы</a><span>Создано для ваших вечеров</span></div>
 </footer>
 <CartOverlay />

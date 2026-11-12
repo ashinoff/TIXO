@@ -18,12 +18,15 @@ window.matchMedia=query=>({matches:query.includes("prefers-reduced-motion: reduc
 window.Image=class { set src(value){this.url=value;queueMicrotask(()=>this.onload?.());} decode(){return Promise.resolve();} };
 window.HTMLCanvasElement.prototype.getContext=()=>null;
 window.scrollTo=()=>{};
+window.requestAnimationFrame=callback=>setTimeout(()=>callback(performance.now()),1);
+window.cancelAnimationFrame=handle=>clearTimeout(handle);
+globalThis.requestAnimationFrame=window.requestAnimationFrame;globalThis.cancelAnimationFrame=window.cancelAnimationFrame;
 const {createRoot}=await import('react-dom/client');
 const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/legal.ts','app/admin/legal-settings.tsx','app/components/order-consent.tsx','app/components/legal-document.tsx','lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -37,7 +40,14 @@ const {ShoppingProvider,Catalog,ScentDiscovery,CartOverlay,CartTrigger}=require(
 const {Atelier}=require('./app/components/atelier.js');
 const WorkshopHome=()=>React.createElement(ShoppingProvider,null,React.createElement('div',{className:'tiho-site'},React.createElement(CartTrigger),React.createElement(Catalog),React.createElement(ScentDiscovery),React.createElement(Atelier),React.createElement(CartOverlay)));
 
-beforeEach(()=>window.sessionStorage.clear());
+const legalVersion = 'a'.repeat(64);
+let legalResponse;
+let fetchImplementation;
+Object.defineProperty(globalThis, 'fetch', { configurable: true,
+  get: () => (url, init = {}) => url === '/api/legal' && !init.method ? legalResponse() : fetchImplementation(url, init),
+  set: implementation => { fetchImplementation = implementation; },
+});
+beforeEach(()=>{window.sessionStorage.clear();window.matchMedia=query=>({matches:query.includes("prefers-reduced-motion: reduce"),addEventListener(){},removeEventListener(){}});legalResponse=()=>response({version:legalVersion,settings:{}});});
 after(()=>{dom.window.close();rmSync(temp,{recursive:true,force:true});});
 const scents=[['Вишня и миндаль','#b82035','Красный'],['Сандал и дым','#222225','Чёрный'],['Белая ваниль','#f7f5ef','Белый'],['Роза и пион','#e7a0b5','Розовый']].map(([name,color,colorName],i)=>({id:i+1,name,color,colorName,notes:['нота'],description:'Описание',active:true}));
 const colors=scents.map(s=>({id:s.id,name:s.colorName,hex:s.color,active:true}));
@@ -45,6 +55,7 @@ const forms=[{id:1,name:'Спираль',shape:'twist',active:true},{id:2,name:'
 const products=['Спираль','Ракушка'].map((name,i)=>({id:i+1,name,shape:i?'shell':'twist',notes:'Форма',price:1500,stock:3,published:true,image:null,hasVariants:false,variants:[]}));
 const response=(data,status=200)=>Promise.resolve(new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}}));
 const button=(name)=>[...document.querySelectorAll('.catalog-filter-panel button'),...document.querySelectorAll('button')].find(node=>node.textContent.includes(name));
+const confirmConsent=async()=>{const checkbox=document.querySelector('input[name="privacyConsent"]');if(checkbox&&!checkbox.checked)await click(checkbox);};
 const editCard=name=>[...document.querySelectorAll('.scent-admin-card')].find(card=>card.querySelector('h2')?.textContent===name)?.querySelector('footer button');
 const click=async node=>{assert.ok(node);await act(async()=>node.click());};
 const setValue=async(node,value)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});};
@@ -78,7 +89,7 @@ test('color and aroma filters intersect independently and checkout keeps every c
     assert.match(document.querySelector('.cart-items').textContent,/Чёрный/);
     const form=document.querySelector('#checkout-form');
     for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Адрес'}))form.elements.namedItem(name).value=value;
-    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    await confirmConsent(); await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.deepEqual(sent.items.map(i=>i.colorId),[1,2,2]);
     assert.deepEqual(sent.items.map(i=>i.scentId),[2,2,3]);
     assert.match(document.querySelector('.order-success').textContent,/T-COLORS/);
@@ -131,7 +142,7 @@ test('custom recipe snapshots survive edits and checkout retries reuse the same 
     assert.equal(document.querySelectorAll('.cart-item').length,2);
     const form=document.querySelector('#checkout-form');
     for(const [name,value] of Object.entries({name:'Тест',phone:'+79990000000',address:'Тестовый адрес'}))form.elements.namedItem(name).value=value;
-    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    await confirmConsent(); await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.equal(sent.length,1);
     assert.match(document.querySelector('.pending-order').textContent,/Повторить отправку/);
     await click(button('Повторить отправку'));
@@ -186,7 +197,7 @@ test('admin stays authenticated if orders fail; scents still load, edit and save
 });
 
 const selectValue=async(node,value)=>{assert.ok(node);await act(async()=>{node.value=String(value);node.dispatchEvent(new Event('change',{bubbles:true}));});};
-const submit=async form=>{assert.ok(form);await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));};
+const submit=async form=>{assert.ok(form);await confirmConsent(); await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));};
 
 test('inventory uses separate dropdowns for create/edit, quick stock updates and independent form catalog',async()=>{
   let saved;let stockBody;let addedForm;
@@ -1188,7 +1199,7 @@ test('checkout offers merchant messengers only after confirmation; copying and r
     assert.equal(document.querySelector('.order-messengers'),null);
     assert.equal(document.querySelector('#checkout-form input[name="email"]'),null);
     const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Анна',phone:'+79990000000',address:'Сочи'}))form.elements.namedItem(name).value=value;
-    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    await confirmConsent(); await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
     assert.equal(posts,1);assert.equal(Object.hasOwn(submitted,'email'),false);assert.equal(document.querySelectorAll('.messenger-link').length,2);
     assert.doesNotMatch(document.querySelector('.order-messengers').textContent,/Instagram/);
     assert.ok([...document.querySelectorAll('.messenger-link')].every(a=>a.target==='_blank'&&a.rel.includes('noreferrer')));
@@ -1484,4 +1495,78 @@ test('trade dashboard distinguishes unknown costs, filters the register and save
     assert.equal(source.expenses.length,1);assert.match(document.querySelector('tbody').textContent,/Закупка воска/);assert.match(document.querySelector('.trade-notice').textContent,/сохранён/);
     assert.equal(writes.every(w=>w.action==='expense'),true);assert.equal(source.products[0].stock,2);
   }finally{await act(async()=>root.unmount());}
+});
+
+test('checkout requires a separate unchecked consent and sends its exact version',async()=>{
+  window.localStorage.clear();let sent;
+  globalThis.fetch=async(url,init={})=>url==='/api/products'?response(products.map(product=>({...product,scentId:1,colorId:1,scent:scents[0],color:colors[0]}))):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/orders'?(sent=JSON.parse(init.body),response({orderNumber:'T-PRIVACY',total:1500},201)):response({});
+  const root=createRoot(document.getElementById('root'));
+  try {
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.ok(document.querySelector('.footer-legal a[href="/privacy"]'));
+    assert.ok(document.querySelector('.footer-legal a[href="/consent"]'));
+    await click(document.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));
+    const form=document.querySelector('#checkout-form');
+    for(const [name,value] of Object.entries({name:'Проверка',phone:'+79990000000',address:'Сочи'}))form.elements.namedItem(name).value=value;
+    const checkbox=form.elements.namedItem('privacyConsent');assert.equal(checkbox.checked,false);assert.equal(checkbox.required,true);
+    assert.equal(form.querySelector('button[type=submit]').disabled,true);
+    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(sent,undefined);assert.equal(window.localStorage.getItem('tixo.atelier.request.v1'),null);
+    await click(checkbox);assert.equal(form.querySelector('button[type=submit]').disabled,false);
+    await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.deepEqual(sent.privacyConsent,{accepted:true,version:legalVersion});
+    assert.match(document.querySelector('.order-success').textContent,/T-PRIVACY/);
+  } finally {await act(async()=>root.unmount());}
+});
+
+test('updated consent is confirmed explicitly and retries keep the original request key',async()=>{
+  window.localStorage.clear();const sent=[];const nextVersion='b'.repeat(64);
+  globalThis.fetch=async(url,init={})=>{
+    if(url==='/api/products')return response(products.map(product=>({...product,scentId:1,colorId:1,scent:scents[0],color:colors[0]})));if(url==='/api/scents')return response(scents);if(url==='/api/colors')return response(colors);
+    if(url==='/api/orders'){
+      sent.push(JSON.parse(init.body));
+      if(sent.length===1){legalResponse=()=>response({version:nextVersion});return response({code:'CONSENT_UPDATED',error:'Текст обновился',version:nextVersion},409);}
+      return response({orderNumber:'T-RECONFIRMED',total:1500},201);
+    }
+    return response({});
+  };
+  const root=createRoot(document.getElementById('root'));
+  try {
+    await act(async()=>root.render(React.createElement(Home)));
+    await click(document.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));
+    const form=document.querySelector('#checkout-form');for(const [name,value] of Object.entries({name:'Проверка',phone:'+79990000000',address:'Сочи'}))form.elements.namedItem(name).value=value;
+    await confirmConsent();await act(async()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(sent.length,1);assert.equal(document.querySelector('.pending-order input[type=checkbox]').checked,false);
+    assert.equal(button('Повторить отправку').disabled,true);
+    assert.equal(JSON.parse(window.localStorage.getItem('tixo.atelier.request.v1')).requestKey,sent[0].requestKey);
+    await confirmConsent();await click(button('Повторить отправку'));
+    assert.equal(sent.length,2);assert.equal(sent[1].requestKey,sent[0].requestKey);assert.equal(sent[1].privacyConsent.version,nextVersion);
+    assert.deepEqual(sent[1].items,sent[0].items);assert.match(document.querySelector('.order-success').textContent,/T-RECONFIRMED/);
+  } finally {await act(async()=>root.unmount());}
+});
+
+test('an old pending order has no invented consent and cannot retry before confirmation',async()=>{
+  window.localStorage.clear();const old={requestKey:crypto.randomUUID(),customerName:'Проверка',phone:'+79990000000',address:'Сочи',delivery:'pickup',comment:'',items:[{productId:1,variantId:null,scentId:1,colorId:1,quantity:1}]};
+  window.localStorage.setItem('tixo.atelier.request.v1',JSON.stringify(old));let sent;
+  globalThis.fetch=async(url,init={})=>url==='/api/products'?response(products.map(product=>({...product,scentId:1,colorId:1,scent:scents[0],color:colors[0]}))):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/orders'?(sent=JSON.parse(init.body),response({orderNumber:'T-OLD-PENDING',total:1500},201)):response({});
+  const root=createRoot(document.getElementById('root'));
+  try {
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(document.querySelector('.pending-order input[type=checkbox]').checked,false);
+    assert.equal(button('Повторить отправку').disabled,true);assert.equal(sent,undefined);
+    await confirmConsent();await click(button('Повторить отправку'));
+    assert.equal(sent.requestKey,old.requestKey);assert.deepEqual(sent.privacyConsent,{accepted:true,version:legalVersion});
+  } finally {await act(async()=>root.unmount());}
+});
+
+test('unavailable consent keeps checkout closed to submission and can be reloaded',async()=>{
+  window.localStorage.clear();legalResponse=()=>response({error:'unavailable'},503);
+  globalThis.fetch=async url=>url==='/api/products'?response(products.map(product=>({...product,scentId:1,colorId:1,scent:scents[0],color:colors[0]}))):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):response({});
+  const root=createRoot(document.getElementById('root'));
+  try {
+    await act(async()=>root.render(React.createElement(Home)));await click(document.querySelector('.quick-add'));await click(document.querySelector('.cart-trigger'));
+    assert.equal(document.querySelector('input[name=privacyConsent]').disabled,true);assert.match(document.querySelector('.cart-dialog').textContent,/Не удалось загрузить согласие/);
+    legalResponse=()=>response({version:legalVersion});await click(button('Загрузить согласие'));
+    assert.equal(document.querySelector('input[name=privacyConsent]').disabled,false);assert.equal(document.querySelector('input[name=privacyConsent]').checked,false);
+  } finally {await act(async()=>root.unmount());}
 });
