@@ -8,6 +8,7 @@ import { WorkshopStory } from "./components/workshop-story";
 import { SectionNavigation } from "./components/section-navigation";
 import { ArrowIcon } from "./components/ui-icon";
 import { SectionStack, SectionAnchor } from "./components/section-stack";
+import { PageViewCounter } from "./components/page-view-counter";
 import "./components/evening-ritual.css";
 import "./components/section-navigation.css";
 import "./storefront.css";
@@ -38,6 +39,7 @@ export default function Home() {
     return ()=>{observer.disconnect();elements.forEach(el=>el.classList.remove("pending"));motion.removeEventListener("change",stop);};
   },[]);
   return <ShoppingProvider><div className="tiho-site">
+  <PageViewCounter path="/" />
   <a className="skip" href="#collection">Перейти к коллекции</a>
   <main className="motion-ready">
 <SectionStack />

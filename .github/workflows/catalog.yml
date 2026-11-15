@@ -38,6 +38,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:ui
       - run: node --test tests/costing-ui.test.mjs
+      - run: node --test tests/site-stats-ui.test.mjs
       - run: node --test tests/trade-report.test.mjs
       - run: npm run build:amvera
         env:
@@ -51,6 +52,10 @@ jobs:
           NODE_ENV: production
           TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
       - run: node --test tests/costing-http.test.mjs
+        env:
+          NODE_ENV: production
+          TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
+      - run: node --test tests/site-stats-http.test.mjs
         env:
           NODE_ENV: production
           TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
