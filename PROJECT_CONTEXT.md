@@ -14,7 +14,7 @@
 ## Рабочее окружение
 
 - Публичный домен владельца: https://www.tixocandle.ru/; админка `/admin`.
-- Адрес приложения Amvera: https://tixo-mia-ashinoff.mia0.amvera.tech/; админка `/admin`.
+- Сайт: https://www.tixocandle.ru/ (Amvera, регион msk1, проект `tixo`, база `tixo-db`; резервный адрес https://tixo-ashinoff.msk1.amvera.tech/); админка `/admin`.
 - Репозиторий: `ashinoff/TIXO`, публикационная ветка `main`.
 - Next.js / React / TypeScript, Node.js 22, PostgreSQL через `pg`; версии в package.json.
 - Docker, standalone, порт 3000; данные из DATABASE_URL, загруженные изображения на постоянном диске `/data/uploads`.

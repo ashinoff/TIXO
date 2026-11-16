@@ -26,7 +26,7 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/site-stats.ts','app/components/page-view-counter.tsx','app/admin/site-statistics.tsx','lib/legal.ts','app/admin/legal-settings.tsx','app/components/order-consent.tsx','app/components/legal-document.tsx','lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['lib/site-stats.ts','app/components/page-view-counter.tsx','app/admin/site-statistics.tsx','lib/legal.ts','app/admin/legal-settings.tsx','app/components/order-consent.tsx','app/components/legal-document.tsx','lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','lib/photo-url.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
@@ -319,7 +319,7 @@ test('uploaded form is the colored fallback in gallery, detail and cart; a candl
     assert.equal(cards[0].querySelector('img'),null);
     assert.match(cards[0].querySelector('.wax-uploaded').getAttribute('style'),/shell\.png/);
     assert.equal(cards[0].querySelector('.wax-uploaded').style.getPropertyValue('--wax'),'#b82035');
-    assert.equal(cards[1].querySelector('img').getAttribute('src'),'/api/uploads/candle.webp');assert.equal(cards[1].querySelector('.wax-stage'),null);
+    assert.equal(cards[1].querySelector('img').getAttribute('src'),'/api/uploads/candle.webp?w=960');assert.equal(cards[1].querySelector('.wax-stage'),null);
     await click(cards[0].querySelector('.product-image'));
     assert.ok(document.querySelector('.detail-photo .wax-uploaded'));assert.equal(document.querySelector('.detail-photo img'),null);
     await click(button('Добавить в корзину'));await click(document.querySelector('.cart-trigger'));
@@ -1117,7 +1117,7 @@ test('photo halves navigate only the photo and a swipe suppresses its synthetic 
     await act(async()=>root.render(React.createElement(Home)));await click(document.querySelector('.product-image'));
     const src=()=>document.querySelector('.photo-current').getAttribute('src');
     const left=document.querySelectorAll('.photo-tap-target')[0],right=document.querySelectorAll('.photo-tap-target')[1];
-    await click(right);assert.equal(src(),'/tap-b.png');await click(left);assert.equal(src(),'/tap-a.png');await click(left);assert.equal(src(),'/tap-c.png');
+    const upcoming=document.querySelector('.photo-next');await click(right);assert.equal(src(),'/tap-b.png');assert.equal(document.querySelector('.photo-current'),upcoming,'The neighbouring photo is moved into place, not recreated, so it does not flash');await click(left);assert.equal(src(),'/tap-a.png');await click(left);assert.equal(src(),'/tap-c.png');
     for(const [type,x] of [['touchstart',200],['touchmove',100],['touchend',100]]){
       const event=new Event(type,{bubbles:true,cancelable:true}),point={identifier:1,clientX:x,clientY:200};
       Object.defineProperties(event,{touches:{value:type==='touchend'?[]:[point]},changedTouches:{value:[point]}});
@@ -1423,7 +1423,7 @@ test('catalog photos swipe without opening the product, keep vertical scrolling 
   try{
     await act(async()=>root.render(React.createElement(ShoppingProvider,null,React.createElement('div',{className:'tiho-site'},React.createElement(Catalog),React.createElement(CartOverlay),React.createElement(CartTrigger)))));
     const card=document.querySelector('.product-card'),photo=card.querySelector('.product-image'),src=()=>card.querySelector('.catalog-photo-current').getAttribute('src');
-    assert.equal(src(),'/cover.png');await swipe(photo,-100);assert.equal(src(),'/side.png');
+    const upcoming=card.querySelector('.catalog-photo-next img');assert.equal(src(),'/cover.png');await swipe(photo,-100);assert.equal(src(),'/side.png');assert.equal(card.querySelector('.catalog-photo-current'),upcoming,'The catalog photo is moved into place, not recreated');
     await act(async()=>photo.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:1})));
     assert.equal(document.querySelector('.product-dialog'),null,'The synthesized tap must not open a modal');
     assert.equal((await swipe(photo,4,130)).defaultPrevented,false,'Vertical scrolling remains native');assert.equal(src(),'/side.png');

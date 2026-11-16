@@ -9,6 +9,7 @@ import { SectionNavigation } from "./components/section-navigation";
 import { ArrowIcon } from "./components/ui-icon";
 import { SectionStack, SectionAnchor } from "./components/section-stack";
 import { PageViewCounter } from "./components/page-view-counter";
+import { photoUrl } from "../lib/photo-url";
 import "./components/evening-ritual.css";
 import "./components/section-navigation.css";
 import "./storefront.css";
@@ -46,7 +47,7 @@ export default function Home() {
 <SectionAnchor section="home" />
 <section className="hero" id="home" aria-labelledby="hero-title">
 <header className="header" id="header"><a className="wordmark" href="#home" aria-label="ТИХО — на главную">тихо</a><nav aria-label="Основная навигация"><a href="#collection">Коллекция</a><a href="#workshop">Мастерская</a><a href="#aromas">Ароматы</a></nav><CartTrigger /></header>
-<div className="hero-image" id="hero-image"><img src={heroImage} alt="Горящая чёрная ребристая свеча на тёмном камне" width="1536" height="1024" fetchPriority="high" /></div><div className="hero-shade" aria-hidden="true"></div>
+<div className="hero-image" id="hero-image"><img src={photoUrl(heroImage, 1600)} alt="Горящая чёрная ребристая свеча на тёмном камне" width="1536" height="1024" fetchPriority="high" /></div><div className="hero-shade" aria-hidden="true"></div>
 <div className="hero-content"><p className="eyebrow intro-enter"><span className="tiny-line"></span> АРОМАТИЧЕСКИЕ СВЕЧИ РУЧНОЙ РАБОТЫ</p><h1 id="hero-title" className="intro-enter">{c("hero.title", "Пусть мир").replace(/\./g, "")}<br /><span>{c("hero.emphasis", "подождёт").replace(/\./g, "")}</span></h1><p className="hero-description intro-enter">{c("hero.description", "Один огонь. Шлейфовый аромат.\nИ вечер, который снова принадлежит вам.").replace(/Любимый аромат/gi, "Шлейфовый аромат")}</p><a className="button button-glass intro-enter" href="#collection">Найти свою свечу <span aria-hidden="true"><ArrowIcon /></span></a></div>
 <a className="hero-caption" href="#aromas"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ / ТИХО</span><span>Время для себя</span><span className="caption-notes">Живой свет · шлейфовый аромат</span></a>
 {heroImage === "/assets/hero-real-candle.webp" && <LivingFlame nextSection="collection" />}

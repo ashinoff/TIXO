@@ -1,5 +1,5 @@
 // Read-only verification: no admin login, order creation, catalogue edits or database writes.
-const origin = new URL(process.env.PUBLICATION_ORIGIN || 'https://tixo-mia-ashinoff.mia0.amvera.tech/');
+const origin = new URL(process.env.PUBLICATION_ORIGIN || 'https://www.tixocandle.ru/');
 const attempts = Number(process.env.PUBLICATION_ATTEMPTS || 12);
 const delay = Number(process.env.PUBLICATION_DELAY_MS || 10000);
 const stamp = process.env.GITHUB_SHA || 'anonymous-counter-v1';

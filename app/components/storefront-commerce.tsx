@@ -15,6 +15,7 @@ import { isLegacyFormPlaceholder } from "@/lib/form-portraits";
 import { ScentPortrait } from "./scent-portrait";
 import { ArrowIcon, CheckIcon } from "./ui-icon";
 import { PhotoCarousel, type PhotoCarouselHandle } from "./photo-carousel";
+import { photoUrl } from "../../lib/photo-url";
 import { useProductSwipe } from "../../lib/use-product-swipe";
 import { OrderMessengers } from "./order-messengers";
 import { flushMessengerHandoffs } from "../../lib/messenger-handoff";
@@ -97,7 +98,7 @@ function visualData(product: Product, color?: CandleColor): CandleVisualData {
   return { twoTone: product.form?.twoTone, accentColor: product.accentColor?.hex, accentColorName: product.accentColor?.name, silhouette: product.form?.silhouette, shape: product.form ? product.form.shape : productShape(product), color: color?.hex ?? product.color?.hex };
 }
 function CandleVisual({ src, label, silhouette, shape, color, twoTone, accentColor }: CandleVisualData & { src?: string | null; label: string }) {
-  return src ? <img src={src} alt={label} width="1254" height="1254" loading="lazy" /> : <div className="candle-silhouette-visual"><CandlePreview silhouette={silhouette} shape={shape} color={color} twoTone={twoTone} accentColor={accentColor} label={`${label} · силуэт формы`} /></div>;
+  return src ? <img src={photoUrl(src, 320)} alt={label} width="1254" height="1254" loading="lazy" /> : <div className="candle-silhouette-visual"><CandlePreview silhouette={silhouette} shape={shape} color={color} twoTone={twoTone} accentColor={accentColor} label={`${label} · силуэт формы`} /></div>;
 }
 function reducedMotion() { return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; }
 const inspection = {

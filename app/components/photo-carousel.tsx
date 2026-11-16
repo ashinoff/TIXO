@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- photographs preserve uploaded URLs and proportions */
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
+import { photoUrl } from "../../lib/photo-url";
 import { ArrowIcon } from "./ui-icon";
 
 export type PhotoCarouselHandle = { move: (offset: number) => void; drag: (distance: number) => void; cancel: () => void };
@@ -104,18 +105,27 @@ export function usePhotoCarousel<T extends HTMLElement = HTMLDivElement>(count: 
   return { index, motion, track, previous, next, move, navigate, drag, cancel };
 }
 
+/** Keys follow the photograph, so the decoded image moves between slots instead of being recreated. */
+export function slotKeys(photos: string[], index: number, previous: number, next: number) {
+  const current = photos[index], before = photos[previous], after = photos[next];
+  return { current, previous: before === current ? `${before}#previous` : before, next: after === current || after === before ? `${after}#next` : after };
+}
+
 /** One moving strip: the current photo and its neighbours follow the same finger. */
-export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]; label: string; controlsRef: Ref<PhotoCarouselHandle> }) {
+export function PhotoCarousel({ photos: originals, label, controlsRef }: { photos: string[]; label: string; controlsRef: Ref<PhotoCarouselHandle> }) {
+  const photos = useMemo(() => originals.map(src => photoUrl(src, 1600)), [originals]);
   const count = photos.length;
   const { index, motion, track, previous, next, move, navigate, drag, cancel } = usePhotoCarousel(count, photos);
   useImperativeHandle(controlsRef, () => ({ move, drag, cancel }));
+  const keys = slotKeys(photos, index, previous, next);
   return <div className="detail-gallery" role="region" aria-label="Фотографии свечи" onKeyDown={event => {
     if (count > 1 && (event.key === "ArrowLeft" || event.key === "ArrowRight")) { event.preventDefault(); move(event.key === "ArrowLeft" ? -1 : 1); }
   }}>
     <div className="detail-photo">
       <div className="detail-photo-track" ref={track}>
-        <img key={`current:${photos[index]}`} className="photo-current" src={photos[index]} alt={`${label}${count > 1 ? ` · фото ${index + 1}` : ""}`} decoding="async" draggable={false} />
-        {count > 1 && <><img key={`previous:${photos[previous]}`} className="photo-adjacent photo-previous" src={photos[previous]} alt="" aria-hidden="true" decoding="async" draggable={false} /><img key={`next:${photos[next]}`} className="photo-adjacent photo-next" src={photos[next]} alt="" aria-hidden="true" decoding="async" draggable={false} /></>}
+        <img key={keys.current} className="photo-current" src={photos[index]} alt={`${label}${count > 1 ? ` · фото ${index + 1}` : ""}`} decoding="async" draggable={false} />
+        {count > 1 && <img key={keys.previous} className="photo-adjacent photo-previous" src={photos[previous]} alt="" aria-hidden="true" decoding="async" draggable={false} />}
+        {count > 1 && <img key={keys.next} className="photo-adjacent photo-next" src={photos[next]} alt="" aria-hidden="true" decoding="async" draggable={false} />}
       </div>
       {count > 1 && <div className="photo-tap-zones">
         <button type="button" className="photo-tap-target" aria-label="Предыдущее фото — левая половина" disabled={motion !== null} onClick={() => move(-1)} />
@@ -123,6 +133,6 @@ export function PhotoCarousel({ photos, label, controlsRef }: { photos: string[]
       </div>}
       {count > 1 && <div className="photo-navigation"><button type="button" aria-label="Предыдущее фото" disabled={motion !== null} onClick={() => move(-1)}><ArrowIcon direction="left" /></button><span role="status" aria-live="polite">{index + 1} / {count}</span><button type="button" aria-label="Следующее фото" disabled={motion !== null} onClick={() => move(1)}><ArrowIcon direction="right" /></button></div>}
     </div>
-    {count > 1 && <div className="photo-thumbnails">{photos.map((src, target) => <button key={src} type="button" aria-label={`Фото ${target + 1}`} aria-pressed={target === index} disabled={motion !== null} onClick={() => navigate(target, target < index ? -1 : 1)}><img src={src} alt="" width="70" height="82" loading="lazy" /></button>)}</div>}
+    {count > 1 && <div className="photo-thumbnails">{originals.map((src, target) => <button key={src} type="button" aria-label={`Фото ${target + 1}`} aria-pressed={target === index} disabled={motion !== null} onClick={() => navigate(target, target < index ? -1 : 1)}><img src={photoUrl(src, 320)} alt="" width="70" height="82" loading="lazy" /></button>)}</div>}
   </div>;
 }
