@@ -327,6 +327,21 @@ test('uploaded form is the colored fallback in gallery, detail and cart; a candl
   }finally{await act(async()=>root.unmount());}
 });
 
+test('a phone downloads lighter copies of uploaded photos in the catalog and the product card',async()=>{
+  window.localStorage.clear();
+  window.matchMedia=query=>({matches:query.includes('max-width: 760px')||query.includes('prefers-reduced-motion: reduce'),addEventListener(){},removeEventListener(){}});
+  const candle={...products[0],formId:1,form:forms[0],colorId:1,color:colors[0],scentId:1,scent:scents[0],image:'/api/uploads/candle.webp',images:['/api/uploads/candle.webp','/api/uploads/side.webp']};
+  globalThis.fetch=async url=>url==='/api/products'?response([candle]):url==='/api/scents'?response(scents):url==='/api/colors'?response(colors):url==='/api/forms'?response(forms):response({});
+  const root=createRoot(document.getElementById('root'));
+  try{
+    await act(async()=>root.render(React.createElement(Home)));
+    assert.equal(document.querySelector('.catalog-photo-current').getAttribute('src'),'/api/uploads/candle.webp?w=640');
+    await click(document.querySelector('.product-image'));
+    assert.equal(document.querySelector('.photo-current').getAttribute('src'),'/api/uploads/candle.webp?w=960');
+    assert.equal(document.querySelector('.photo-thumbnails img').getAttribute('src'),'/api/uploads/candle.webp?w=320');
+  }finally{await act(async()=>root.unmount());}
+});
+
 test('form editor uploads filter artwork without rewriting old masks; existing product photo removal stays compatible',async()=>{
   let sent;let edited;
   const form={id:1,name:'Моя форма',shape:null,silhouette:'/api/uploads/my-form.png',active:true};

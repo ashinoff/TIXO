@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- preserve the original uploaded photographs */
 import { useMemo, type HTMLAttributes, type ReactNode } from "react";
 import { photoUrl } from "../../lib/photo-url";
+import { useMobileLayout } from "../../lib/use-mobile-layout";
 import { useCatalogPhotoSwipe } from "../../lib/use-catalog-photo-swipe";
 import { slotKeys, usePhotoCarousel } from "./photo-carousel";
 import { ArrowIcon } from "./ui-icon";
@@ -9,7 +10,8 @@ import { ArrowIcon } from "./ui-icon";
 export function CatalogPhotoGallery({ photos, label, onOpen, inspection, children }: {
   photos: string[]; label: string; onOpen: () => void; inspection: HTMLAttributes<HTMLButtonElement>; children: ReactNode;
 }) {
-  const sized = useMemo(() => photos.map(src => photoUrl(src, 960)), [photos]);
+  const width = useMobileLayout() ? 640 : 960;
+  const sized = useMemo(() => photos.map(src => photoUrl(src, width)), [photos, width]);
   const { index, motion, track, previous, next, move, drag, cancel } = usePhotoCarousel<HTMLSpanElement>(photos.length, sized);
   const swipe = useCatalogPhotoSwipe({ move, drag, cancel });
   const multiple = photos.length > 1;

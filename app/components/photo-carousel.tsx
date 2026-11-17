@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- photographs preserve uploaded URLs and proportions */
 import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from "react";
 import { photoUrl } from "../../lib/photo-url";
+import { useMobileLayout } from "../../lib/use-mobile-layout";
 import { ArrowIcon } from "./ui-icon";
 
 export type PhotoCarouselHandle = { move: (offset: number) => void; drag: (distance: number) => void; cancel: () => void };
@@ -113,7 +114,9 @@ export function slotKeys(photos: string[], index: number, previous: number, next
 
 /** One moving strip: the current photo and its neighbours follow the same finger. */
 export function PhotoCarousel({ photos: originals, label, controlsRef }: { photos: string[]; label: string; controlsRef: Ref<PhotoCarouselHandle> }) {
-  const photos = useMemo(() => originals.map(src => photoUrl(src, 1600)), [originals]);
+  // A phone screen shows no difference above 960 px, so it downloads the lighter copy.
+  const width = useMobileLayout() ? 960 : 1600;
+  const photos = useMemo(() => originals.map(src => photoUrl(src, width)), [originals, width]);
   const count = photos.length;
   const { index, motion, track, previous, next, move, navigate, drag, cancel } = usePhotoCarousel(count, photos);
   useImperativeHandle(controlsRef, () => ({ move, drag, cancel }));
