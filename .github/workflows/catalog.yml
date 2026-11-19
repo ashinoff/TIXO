@@ -69,10 +69,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: catalog
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: node scripts/check-costing-publication.mjs
+        env:
+          PUBLICATION_ATTEMPTS: 36
+          PUBLICATION_DELAY_MS: 15000
