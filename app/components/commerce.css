@@ -20,12 +20,12 @@
 .tiho-site .product-image{aspect-ratio:4/5;width:100%}
 .tiho-site .product-image>img{width:100%;height:100%;object-fit:contain;object-position:center}
 .tiho-site .product-title{align-items:baseline;gap:10px}
-.tiho-site .product-title button{min-width:0;text-align:left;overflow-wrap:anywhere}
+.tiho-site .product-title a{min-width:0;text-align:left;overflow-wrap:anywhere}
 .tiho-site .product-title>span{white-space:nowrap}
 .tiho-site .detail-colors{border:0;margin:25px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
 .tiho-site .detail-colors legend{font-size:14px;margin-bottom:8px}
 @media(max-width:1100px){.tiho-site .product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tiho-site .aroma-filters{gap:23px}.tiho-site .color-filter{gap:13px}}
-@media(max-width:600px){.tiho-site .color-filter{gap:10px;padding:15px 0 24px}.tiho-site .filter-label{width:100%}.tiho-site .color-filter-option{font-size:12px}.tiho-site .aroma-filters{gap:8px 20px}.tiho-site .aroma-filters button{font-size:14px;padding-bottom:12px}.tiho-site .collection-toolbar{margin-bottom:26px}.tiho-site .product-grid{gap:32px 14px}.tiho-site .product-title{flex-wrap:wrap}.tiho-site .product-title button{font-size:20px}.tiho-site .product-category{font-size:11px}}
+@media(max-width:600px){.tiho-site .color-filter{gap:10px;padding:15px 0 24px}.tiho-site .filter-label{width:100%}.tiho-site .color-filter-option{font-size:12px}.tiho-site .aroma-filters{gap:8px 20px}.tiho-site .aroma-filters button{font-size:14px;padding-bottom:12px}.tiho-site .collection-toolbar{margin-bottom:26px}.tiho-site .product-grid{gap:32px 14px}.tiho-site .product-title{flex-wrap:wrap}.tiho-site .product-title a{font-size:20px}.tiho-site .product-category{font-size:11px}}
 
 /* A candle photograph has priority; otherwise its own form supplies the silhouette. */
 .tiho-site .candle-silhouette-visual{width:100%;height:100%;min-height:80px;background:radial-gradient(ellipse at 40% 30%,#f7f4eb,#dadccf);--preview-surface:#e5e5d9;position:relative}.tiho-site .product-image>.candle-silhouette-visual{position:absolute;inset:0;transform:scale(var(--zoom-scale,1));transform-origin:var(--zoom-x,50%) var(--zoom-y,50%);transition:transform 1.5s cubic-bezier(.2,.7,.2,1)}.tiho-site .product-image:has(.candle-silhouette-visual) .image-no{color:#4b503f}.tiho-site .detail-photo>.candle-silhouette-visual{min-height:inherit}.tiho-site .cart-candle-visual{width:100%;height:127px;overflow:hidden}.tiho-site .cart-candle-visual>img{width:100%;height:100%;object-fit:cover}.tiho-site .cart-candle-visual .wax-missing{font-size:9px}.tiho-site .product-image>.candle-silhouette-visual .wax-missing{font-size:14px}.tiho-site .detail-photo:has(.candle-silhouette-visual){background:#e5e5d9}
@@ -186,7 +186,7 @@
  .tiho-site .photo-navigation{left:8px;right:8px;bottom:8px}
  .tiho-site .detail-content{grid-area:3/2;min-width:0;min-height:0;display:flex;flex-direction:column;padding:18px 22px}
  .tiho-site .detail-information{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable;padding-right:6px}
- .tiho-site .detail-information h2{font-size:clamp(28px,3vw,38px);margin-top:10px;overflow-wrap:anywhere}
+ .tiho-site .detail-information :is(h1,h2){font-size:clamp(28px,3vw,38px);margin-top:10px;overflow-wrap:anywhere}
  .tiho-site .detail-information>p{font-size:14px;line-height:1.55;margin-top:12px}
  .tiho-site .detail-specs{margin:16px 0 0}
  .tiho-site .detail-specs>div{padding:8px 0;font-size:13px;gap:18px;line-height:1.45}

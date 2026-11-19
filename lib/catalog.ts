@@ -122,3 +122,6 @@ export function selectVariant(product: Product, scentId?: number | null, colorId
   return variants.find(variant => variant.stock > 0)
     ?? variants[0];
 }
+
+/** Public server snapshot, shared with the existing interactive storefront. */
+export type StorefrontData = { products: Product[]; scents: Scent[]; colors: CandleColor[]; forms: CandleForm[]; content: Record<string, { value: string; kind: string }> };

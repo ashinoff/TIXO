@@ -43,6 +43,10 @@ jobs:
       - run: npm run build:amvera
         env:
           NEXT_TELEMETRY_DISABLED: 1
+      - run: node --test tests/seo-http.test.mjs
+        env:
+          NODE_ENV: production
+          TEST_DATABASE_URL: postgresql://tixo_test:tixo_test_ci@localhost:5432/tixo_test
       - run: npm run test:http
         env:
           NODE_ENV: production

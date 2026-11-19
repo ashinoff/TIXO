@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  /* config options here */
+  // Resolve product metadata before streaming, including true 404 responses and social previews.
+  htmlLimitedBots: /.*/,
 };
 
 export default nextConfig;

@@ -1,76 +1,10 @@
-"use client";
-/* eslint-disable @next/next/no-img-element -- preserve the composition of candle photographs */
-import { Fragment, useEffect, useState } from "react";
-import { ShoppingProvider, Catalog, ScentDiscovery, CartOverlay, CartTrigger } from "./components/storefront-commerce";
-import { LivingFlame } from "./components/living-flame";
-import { EveningRitual } from "./components/evening-ritual";
-import { WorkshopStory } from "./components/workshop-story";
-import { SectionNavigation } from "./components/section-navigation";
-import { ArrowIcon } from "./components/ui-icon";
-import { SectionStack, SectionAnchor } from "./components/section-stack";
-import { PageViewCounter } from "./components/page-view-counter";
-import { photoUrl } from "../lib/photo-url";
-import "./components/evening-ritual.css";
-import "./components/section-navigation.css";
-import "./storefront.css";
-import "./components/commerce.css";
-import "./components/section-stack.css";
-import "./components/workshop-story.css";
+import Storefront from "./storefront";
+import { getStorefrontData } from "../lib/server/storefront";
+import { organizationSchema, pageMetadata, serializeSchema, SITE_TITLE, SITE_DESCRIPTION } from "../lib/seo";
 
-type Content = Record<string, {value:string;kind:string}>;
-export default function Home() {
-  const [content,setContent]=useState<Content>({});
-  const c=(key:string,fallback:string)=>content[`atelier.${key}`]?.value || fallback;
-  const heroImage=c("image.hero","/assets/hero-real-candle.webp");
-  useEffect(()=>{
-    const controller=new AbortController();
-    fetch("/api/content",{signal:controller.signal}).then(r=>r.ok?r.json():{}).then(setContent).catch(()=>{});
-    return ()=>controller.abort();
-  },[]);
-  useEffect(()=>{
-    const motion=window.matchMedia("(prefers-reduced-motion: reduce)");
-    if(motion.matches || !("IntersectionObserver" in window))return;
-    const elements=[...document.querySelectorAll<HTMLElement>(".tiho-site .reveal")];
-    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
-      if(entry.isIntersecting){entry.target.classList.remove("pending");observer.unobserve(entry.target);}
-    }),{threshold:.08});
-    elements.forEach(el=>{if(el.getBoundingClientRect().top>window.innerHeight){el.classList.add("pending");observer.observe(el);}});
-    const stop=()=>{if(motion.matches){elements.forEach(el=>el.classList.remove("pending"));observer.disconnect();}};
-    motion.addEventListener("change",stop);
-    return ()=>{observer.disconnect();elements.forEach(el=>el.classList.remove("pending"));motion.removeEventListener("change",stop);};
-  },[]);
-  return <ShoppingProvider><div className="tiho-site">
-  <PageViewCounter path="/" />
-  <a className="skip" href="#collection">Перейти к коллекции</a>
-  <main className="motion-ready">
-<SectionStack />
-<SectionAnchor section="home" />
-<section className="hero" id="home" aria-labelledby="hero-title">
-<header className="header" id="header"><a className="wordmark" href="#home" aria-label="ТИХО — на главную">тихо</a><nav aria-label="Основная навигация"><a href="#collection">Коллекция</a><a href="#workshop">Мастерская</a><a href="#aromas">Ароматы</a></nav><CartTrigger /></header>
-<div className="hero-image" id="hero-image"><img src={photoUrl(heroImage, 1600)} alt="Горящая чёрная ребристая свеча на тёмном камне" width="1536" height="1024" fetchPriority="high" /></div><div className="hero-shade" aria-hidden="true"></div>
-<div className="hero-content"><p className="eyebrow intro-enter"><span className="tiny-line"></span> АРОМАТИЧЕСКИЕ СВЕЧИ РУЧНОЙ РАБОТЫ</p><h1 id="hero-title" className="intro-enter">{c("hero.title", "Пусть мир").replace(/\./g, "")}<br /><span>{c("hero.emphasis", "подождёт").replace(/\./g, "")}</span></h1><p className="hero-description intro-enter">{c("hero.description", "Один огонь. Шлейфовый аромат.\nИ вечер, который снова принадлежит вам.").replace(/Любимый аромат/gi, "Шлейфовый аромат")}</p><a className="button button-glass intro-enter" href="#collection">Найти свою свечу <span aria-hidden="true"><ArrowIcon /></span></a></div>
-<a className="hero-caption" href="#aromas"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ / ТИХО</span><span>Время для себя</span><span className="caption-notes">Живой свет · шлейфовый аромат</span></a>
-{heroImage === "/assets/hero-real-candle.webp" && <LivingFlame nextSection="collection" />}
-<div className="hero-bottom"><a className="scroll-cue" href="#collection">Почувствовать тишину <span aria-hidden="true"><ArrowIcon direction="down" /></span></a></div>
-</section>
-{["collection", "aromas"].map((section, index) => <Fragment key={section}>
-  <SectionAnchor section={section} />
-  {section === "collection" ? <Catalog number={`0${index + 1}`} /> : <ScentDiscovery number={`0${index + 1}`} />}
-</Fragment>)}
-<SectionAnchor section="intro" />
-<section className="introduction pad" id="intro" aria-labelledby="intro-quote"><div className="intro-meta reveal"><span className="eyebrow">МАЛЕНЬКИЙ РИТУАЛ</span><span className="eyebrow">БОЛЬШЕ, ЧЕМ СВЕТ</span></div><h2 className="reveal" id="intro-title">Есть вещи, которые<br />возвращают <span>к себе</span></h2><div className="intro-bottom reveal"><p><span className="intro-sensations">Тёплый свет на стене. Знакомый аромат.<br /></span><span id="intro-quote">Свеча, которую выбирают не по случаю —<br />а по ощущению</span></p><a className="text-link" href="#collection">С этого начинается ТИХО <span aria-hidden="true"><ArrowIcon direction="down-right" /></span></a></div></section>
-<SectionAnchor section="workshop" />
-<section className="workshop pad" id="workshop" aria-labelledby="workshop-title"><div className="section-heading reveal"><p className="eyebrow">03 / МАСТЕРСКАЯ ТИХО</p><span className="eyebrow">СДЕЛАНО РУКАМИ / ВЫБРАНО СЕРДЦЕМ</span></div><div className="workshop-grid"><WorkshopStory pouringImage={c("image.about", "/assets/workshop-real-candle.webp")} /><div className="workshop-copy"><h2 className="reveal" id="workshop-title">У тепла<br />есть <span>автор</span></h2><p className="reveal">{c("about.lead", "ТИХО — мастерская свечей ручной работы. Нам близки простые формы, выразительные ароматы и вещи, рядом с которыми хочется задержаться.")}</p><p className="reveal">{c("about.text", "Мы создаём свечи для обычных вечеров, которые однажды становятся любимыми воспоминаниями.")}</p><div className="craft-list"><div className="reveal"><span>01</span><h3>Форма</h3><p>Создаётся из специального гипса вручную. Используется натуральный соевый воск, который не выделяет вредных веществ при горении.</p></div><div className="reveal"><span>02</span><h3>Аромат</h3><p>В составе парфюма для свечи — натуральные эфирные масла. В составе отдушек отсутствуют канцерогены, мутагены, токсины, фталаты. Все ароматы соответствуют стандартам безопасности и чистоты RIFM и IFRA.</p></div><div className="reveal"><span>03</span><h3>Прикосновение</h3><p>Ручная работа, которая оставляет каждой свече её индивидуальность.</p></div></div></div></div></section>
-<SectionAnchor section="care" />
-<EveningRitual />
-</main>
-<footer className="footer footer-ritual pad">
-  <div className="footer-top"><span>Аромат / Свет / Тишина</span><a href="#home">Вернуться к началу <span aria-hidden="true"><ArrowIcon direction="up" /></span></a></div>
-  <div className="footer-signature"><a className="footer-wordmark" href="#home" aria-label="ТИХО — наверх">тихо</a><div><p>Для вечеров,<br />которые хочется повторить</p><nav aria-label="Навигация в конце страницы"><a href="#collection">Коллекция <ArrowIcon /></a><a href="#care">Простой ритуал <ArrowIcon /></a></nav></div></div>
-  <nav className="footer-legal" aria-label="Правовая информация"><a href="/privacy">Политика обработки персональных данных</a><a href="/consent">Согласие на обработку персональных данных</a></nav>
-  <div className="footer-bottom"><span>© ТИХО / TIXO, {new Date().getFullYear()}</span><a href="#workshop">Мастерская свечей ручной работы</a><span>Создано для ваших вечеров</span></div>
-</footer>
-<CartOverlay />
-<SectionNavigation />
-</div></ShoppingProvider>;
+export const dynamic = "force-dynamic";
+export const metadata = pageMetadata("/", SITE_TITLE, SITE_DESCRIPTION);
+export default async function Home() {
+  const data = await getStorefrontData();
+  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeSchema(organizationSchema) }} /><Storefront initialData={data} /></>;
 }

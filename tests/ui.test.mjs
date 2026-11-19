@@ -26,14 +26,14 @@ const rootDir=path.resolve(import.meta.dirname,'..');
 const temp=mkdtempSync(path.join(tmpdir(),'tixo-ui-'));
 writeFileSync(path.join(temp,'package.json'),'{"type":"commonjs"}');
 symlinkSync(path.join(rootDir,'node_modules'),path.join(temp,'node_modules'),'dir');
-for(const file of ['lib/site-stats.ts','app/components/page-view-counter.tsx','app/admin/site-statistics.tsx','lib/legal.ts','app/admin/legal-settings.tsx','app/components/order-consent.tsx','app/components/legal-document.tsx','lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','lib/photo-url.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/page.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
+for(const file of ['app/components/product-page.tsx','lib/seo.ts','lib/use-product-navigation.ts','lib/site-stats.ts','app/components/page-view-counter.tsx','app/admin/site-statistics.tsx','lib/legal.ts','app/admin/legal-settings.tsx','app/components/order-consent.tsx','app/components/legal-document.tsx','lib/trade-report.ts','app/admin/trade-dashboard.tsx','app/admin/export-button.tsx','lib/use-photo-story.ts','app/components/workshop-story.tsx','app/components/catalog-filter-dock.tsx','app/components/catalog-photo-gallery.tsx','lib/use-catalog-photo-swipe.ts','lib/photo-url.ts','app/components/catalog-filter.tsx','lib/form-portraits.ts','app/components/form-miniature.tsx','lib/messenger-handoff.ts','lib/order-messaging.ts','app/components/order-messengers.tsx','app/admin/messenger-settings.tsx','lib/use-product-swipe.ts','lib/use-mobile-layout.ts','lib/section-scroll.ts','app/components/section-stack.tsx','lib/aroma-portraits.ts','lib/atelier.ts','lib/catalog.ts','app/storefront.tsx','app/admin/page.tsx','app/admin/cost-calculator.tsx','app/admin/catalog-order.tsx','app/admin/editors.tsx','app/components/ui-icon.tsx','app/components/modal.tsx','app/components/candle-preview.tsx','app/components/product-card.tsx','app/components/atelier.tsx','app/components/workshop-scene.tsx','app/components/living-flame.tsx','app/components/evening-ritual.tsx','app/components/section-navigation.tsx','app/components/scent-portrait.tsx','app/components/storefront-commerce.tsx','app/components/photo-carousel.tsx']) {
   const target=path.join(temp,file.replace(/\.tsx?$/,'.js'));
   mkdirSync(path.dirname(target),{recursive:true});
   const source=readFileSync(path.join(rootDir,file),'utf8').replace(/^import ".*\.css";$/gm,'').replace(/"@\/lib\/([\w-]+)"/g,(_,name)=>JSON.stringify(path.join(temp,`lib/${name}.js`)));
   writeFileSync(target,ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText);
 }
 const require=createRequire(path.join(temp,'test.cjs'));
-const Home=require('./app/page.js').default;
+const Home=require('./app/storefront.js').default;
 const Admin=require('./app/admin/page.js').default;
 // The retired builder is tested in isolation for compatibility with saved recipes.
 const {ShoppingProvider,Catalog,ScentDiscovery,CartOverlay,CartTrigger}=require('./app/components/storefront-commerce.js');
@@ -1583,5 +1583,55 @@ test('unavailable consent keeps checkout closed to submission and can be reloade
     assert.equal(document.querySelector('input[name=privacyConsent]').disabled,true);assert.match(document.querySelector('.cart-dialog').textContent,/Не удалось загрузить согласие/);
     legalResponse=()=>response({version:legalVersion});await click(button('Загрузить согласие'));
     assert.equal(document.querySelector('input[name=privacyConsent]').disabled,false);assert.equal(document.querySelector('input[name=privacyConsent]').checked,false);
+  } finally {await act(async()=>root.unmount());}
+});
+
+test('server snapshot renders searchable candles and native links before JavaScript', async () => {
+  const {renderToStaticMarkup}=await import('react-dom/server');
+  const {ProductPage}=require('./app/components/product-page.js');
+  const {productPath,productSchema,serializeSchema,productIdFromSlug}=require('./lib/seo.js');
+  const candle={...products[0],name:'ЗМЕЯ',colorId:1,scentId:1,color:colors[0],scent:scents[0],volumeMl:110,images:['/fixture.webp']};
+  const data={products:[candle],colors,scents,forms,content:{'atelier.hero.title':{value:'Авторский заголовок',kind:'text'}}};
+  const home=renderToStaticMarkup(React.createElement(Home,{initialData:data}));
+  assert.match(home,/Авторский заголовок/);assert.match(home,/ЗМЕЯ/);assert.ok(home.includes(`href="${productPath(candle)}"`));assert.doesNotMatch(home,/Готовим вашу коллекцию/);
+  const page=new JSDOM(renderToStaticMarkup(React.createElement(ProductPage,{product:candle,data}))).window.document;
+  assert.equal(page.querySelectorAll('h1').length,1);assert.equal(page.querySelector('h1').textContent,'ЗМЕЯ');assert.match(page.querySelector('.detail-specs').textContent,/110 мл/);assert.match(page.querySelector('.detail-footer').textContent,/1.?500/);
+  assert.equal(productIdFromSlug(productPath(candle).split('/').at(-1)),candle.id);assert.equal(productIdFromSlug('bad-99999999999999999999999999'),null);
+  const malicious={...candle,notes:'</script><script id="injected">bad</script>'};
+  const json=serializeSchema(productSchema(malicious));assert.ok(!json.includes('</script>'));assert.equal(JSON.parse(json).description.includes(malicious.notes),true);
+  assert.equal(productSchema({...candle,stock:0}).offers.availability,'https://schema.org/OutOfStock');
+});
+
+test('product URL, filtered next, Back and Forward preserve the catalogue and restore metadata', async () => {
+  window.localStorage.clear();window.history.replaceState({},'', '/#collection');document.title='ТИХО — витрина';
+  const canonical=document.createElement('link');canonical.rel='canonical';canonical.href='https://www.tixocandle.ru/';document.head.append(canonical);
+  const candles=products.map((p,i)=>({...p,colorId:1,scentId:1,color:colors[0],scent:scents[0],images:[`/fixture-${i}.webp`]}));
+  const data={products:candles,colors,scents,forms,content:{}};
+  globalThis.fetch=async url=>response(url==='/api/products'?candles:url==='/api/scents'?scents:url==='/api/colors'?colors:url==='/api/forms'?forms:{});
+  const {productPath}=require('./lib/seo.js');const root=createRoot(document.getElementById('root'));
+  const settle=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,30));});
+  try {
+    await act(async()=>root.render(React.createElement(Home,{initialData:data})));
+    const initialGrid=document.querySelector('#product-grid');
+    await click(document.querySelector('.product-title a'));assert.equal(window.location.pathname,productPath(candles[0]));assert.ok(document.querySelector('.product-dialog'));assert.match(document.title,/Спираль/);
+    const entries=window.history.length;
+    await click(document.querySelector('.outside-product-navigation .product-next'));assert.equal(window.history.length,entries);assert.equal(window.location.pathname,productPath(candles[1]));assert.equal(document.querySelector('#product-grid'),initialGrid);
+    window.history.back();await settle();assert.equal(document.querySelector('.product-dialog'),null);assert.equal(window.location.hash,'#collection');assert.equal(document.title,'ТИХО — витрина');assert.equal(canonical.href,'https://www.tixocandle.ru/');
+    window.history.forward();await settle();assert.equal(document.querySelector('.product-detail-body').dataset.productId,String(candles[1].id));assert.equal(window.location.pathname,productPath(candles[1]));
+    await click(document.querySelector('.detail-close'));await settle();assert.equal(window.location.hash,'#collection');assert.equal(document.querySelector('#product-grid'),initialGrid);
+  } finally {await act(async()=>root.unmount());canonical.remove();window.history.replaceState({},'', '/');}
+});
+
+test('direct candle page uses refreshed stock and the existing cart without an order request', async () => {
+  window.localStorage.clear();const {ProductPage}=require('./app/components/product-page.js');
+  const candle={...products[0],colorId:1,scentId:1,color:colors[0],scent:scents[0],stock:2};
+  const data={products:[candle],colors,scents,forms,content:{}};let orders=0;
+  globalThis.fetch=async (url,init={})=>{if(url==='/api/orders'&&init.method==='POST')orders++;return response(url==='/api/products'?[{...candle,price:1700}]:url==='/api/scents'?scents:url==='/api/colors'?colors:url==='/api/forms'?forms:{});};
+  const root=createRoot(document.getElementById('root'));
+  try {
+    await act(async()=>root.render(React.createElement(ProductPage,{product:candle,data})));
+    assert.match(document.querySelector('.detail-footer').textContent,/1.?700/);
+    await click(document.querySelector('.detail-content>.button'));
+    assert.ok(document.querySelector('.cart-dialog'));assert.equal(document.querySelector('.cart-item .quantity-row span').textContent,'1');assert.match(document.querySelector('.order-total').textContent,/1.?700/);assert.equal(orders,0);
   } finally {await act(async()=>root.unmount());}
 });
