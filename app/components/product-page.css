@@ -1,0 +1,9 @@
+.tiho-site.product-page{min-height:100dvh;background:#e7e3d9;color:#25291f}
+.tiho-site .product-page-header{max-width:1180px;margin:auto;padding:24px 32px;display:flex;align-items:center;gap:32px}
+.tiho-site .product-page-header .wordmark{margin-right:auto;color:inherit}
+.tiho-site .product-page-header .cart-trigger{color:inherit;border-color:#969e89}
+.tiho-site .product-page-main{padding:8px 32px 32px;max-width:1104px;margin:auto}
+.tiho-site .product-page-card{position:relative;width:100%;max-width:1040px;margin:auto;box-shadow:0 14px 50px #25291f12}
+.tiho-site .product-page-navigation{display:flex;justify-content:space-between;gap:24px;margin-top:24px;font-size:14px}
+.tiho-site .product-page-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;padding:24px;font-size:13px}
+@media(max-width:760px){.tiho-site .product-page-header{padding:20px;gap:18px;font-size:13px}.tiho-site .product-page-header .wordmark{font-size:32px}.tiho-site .product-page-main{padding:0 0 24px}.tiho-site .product-page-card{height:auto;max-height:none;min-height:0}.tiho-site .product-page-card .product-detail-body{height:auto;max-height:none;overflow:visible}.tiho-site .product-page-card .detail-content{height:auto;overflow:visible}.tiho-site .product-page-card .detail-information{max-height:none;overflow:visible}.tiho-site .product-page-navigation{padding:0 20px}.tiho-site .product-page-footer{font-size:12px;gap:16px}}

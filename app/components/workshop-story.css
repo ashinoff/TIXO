@@ -9,8 +9,8 @@
 .tiho-site .workshop-story-frame.is-leaving img,.tiho-site .workshop-story.is-held .workshop-story-frame,.tiho-site .workshop-story.is-held .workshop-story-frame img{animation-play-state:paused}
 .tiho-site .workshop-story-kicker{position:absolute;inset:0 0 auto;padding:23px 24px 47px;background:linear-gradient(#17130d66,transparent);color:#f5ede1;font-size:10px;line-height:1.5;letter-spacing:.14em;pointer-events:none}
 .tiho-site .workshop-story-caption{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;min-height:97px;padding-top:21px;user-select:text;cursor:text}
-.tiho-site .workshop-story-caption h3{font-size:clamp(19px,1.65vw,25px);font-weight:400;line-height:1.25;letter-spacing:-.03em;color:#343c2d}
-.tiho-site .workshop-story-caption p{font-size:12px;line-height:1.65;color:#626b56;margin-top:7px;max-width:34ch}
+.tiho-site .workshop-story-caption .workshop-scene-title{font-size:clamp(19px,1.65vw,25px);font-weight:400;line-height:1.25;letter-spacing:-.03em;color:#343c2d;margin:0}
+.tiho-site .workshop-story-caption p:not(.workshop-scene-title){font-size:12px;line-height:1.65;color:#626b56;margin-top:7px;max-width:34ch}
 .tiho-site .workshop-story-count{font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap;color:#414c35}
 .tiho-site .workshop-story-count i{font-size:11px;font-style:normal;color:#71795f}
 .tiho-site .workshop-story-hint{padding-top:16px;border-top:1px solid #bbbfb1;font-size:10px;line-height:1.8;color:#68725a}
@@ -24,8 +24,8 @@
  .tiho-site .workshop-story,.tiho-site .workshop-story-caption{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
  .tiho-site .workshop-story-kicker{padding:19px 19px 40px;font-size:9px}
  .tiho-site .workshop-story-caption{padding-top:17px;min-height:96px;gap:12px}
- .tiho-site .workshop-story-caption h3{font-size:21px}
- .tiho-site .workshop-story-caption p{font-size:11px}
+ .tiho-site .workshop-story-caption .workshop-scene-title{font-size:21px}
+ .tiho-site .workshop-story-caption p:not(.workshop-scene-title){font-size:11px}
  .tiho-site .workshop-story-count{font-size:14px}
  .tiho-site .workshop-story-hint{padding-top:13px;font-size:9px}
  .tiho-site .workshop-story-hint span{display:none}

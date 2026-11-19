@@ -27,6 +27,16 @@ for (let attempt = 1; attempt <= attempts; attempt++) {
     }
     if (!verified) throw new Error('The domain still serves the previous admin bundle');
     const storefront = await read(new URL(`/?verify=${stamp}-${attempt}`, origin));
+    if (!/<link\b[^>]*rel="canonical"[^>]*href="https:\/\/www\.tixocandle\.ru\/?"/.test(storefront)) throw new Error('The storefront canonical has not been published');
+    const productPath = storefront.match(/href="(\/candles\/[a-z0-9-]+)"/)?.[1];
+    if (!productPath) throw new Error('Server-rendered catalogue links have not been published');
+    const [robots, sitemap, productHtml] = await Promise.all([
+      read(new URL('/robots.txt', origin)), read(new URL('/sitemap.xml', origin)), read(new URL(productPath, origin)),
+    ]);
+    if (!robots.includes('Sitemap: https://www.tixocandle.ru/sitemap.xml')) throw new Error('robots.txt is missing the sitemap');
+    if (!sitemap.includes(`https://www.tixocandle.ru${productPath}`)) throw new Error('The sitemap is missing the public candle');
+    if (!productHtml.includes('application/ld+json') || !productHtml.includes('"@type":"Product"') || !productHtml.includes('property="og:image"')) throw new Error('Product metadata has not been published');
+    if (!html.includes('content="noindex, nofollow"')) throw new Error('Admin noindex has not been published');
     const counterScripts = [...new Set([...storefront.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)].map(match => match[1].replaceAll('&amp;', '&')))];
     let counterFound = false;
     for (const src of counterScripts) {
@@ -39,7 +49,7 @@ for (let attempt = 1; attempt <= attempts; attempt++) {
       const response = await fetch(new URL(path, origin), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
       if (response.status !== 401) throw new Error(`Expected protected report endpoint ${path}, got HTTP ${response.status}`);
     }
-    console.log(`Confirmed anonymous counter, admin statistics, material editor, trade reports and protected APIs on ${origin.host}. Read-only verification: no pageview submitted.`);
+    console.log(`Confirmed server-rendered catalogue, candle URLs/schema, sitemap, robots, canonical, admin noindex, anonymous counter, trade reports and protected APIs on ${origin.host}. Read-only verification: no pageview submitted.`);
     process.exit(0);
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);

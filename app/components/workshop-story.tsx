@@ -35,7 +35,7 @@ export function WorkshopStory({ pouringImage = workshopScenes[4].image }: { pour
       <div className="workshop-story-kicker" aria-hidden="true">ТИХО / ОТ ФОРМЫ ДО СВЕТА</div>
     </div>
     <div className="workshop-story-caption photo-story-copy" aria-live={paused ? "polite" : "off"} aria-atomic="true">
-      <div><h3>{scene.label}</h3><p>{scene.detail}</p></div>
+      <div><p className="workshop-scene-title">{scene.label}</p><p>{scene.detail}</p></div>
       <span className="workshop-story-count" aria-label={`${currentIndex + 1} из ${scenes.length}`}>{String(currentIndex + 1).padStart(2, "0")} <i>/ 06</i></span>
     </div>
     <p className="workshop-story-hint" aria-hidden="true">Листайте влево или вправо · удерживайте для паузы<span>мышью · свайпом · Shift + колесо</span></p>
